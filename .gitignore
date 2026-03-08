@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+dist/
+
+# Foundry
+packages/contracts/cache/
+packages/contracts/out/
+packages/contracts/broadcast/
+
+# Env
+.env
+.env.local
+.env*.local
+.env.testnet
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Test
+test-results/
