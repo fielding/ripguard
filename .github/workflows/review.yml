@@ -1,0 +1,51 @@
+name: Review Crew
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install agent harnesses
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          npm install -g @openai/codex
+
+      - name: Install review-crew
+        run: pip install git+https://${{ secrets.REVIEW_CREW_PAT }}@github.com/fielding/review-crew.git
+
+      - name: Run review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          review \
+            ${{ github.repository }} \
+            ${{ github.event.issue.number }} \
+            --ci \
+            --reviewers 2
