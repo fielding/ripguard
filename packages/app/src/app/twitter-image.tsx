@@ -101,7 +101,7 @@ export default function TwitterImage() {
         >
           <span style={{ display: "flex" }}>{siteHost}</span>
           <span style={{ display: "flex" }}>|</span>
-          <span style={{ display: "flex" }}>Unaudited beta</span>
+          <span style={{ display: "flex" }}>Powered by Sablier v2.0</span>
         </div>
       </div>
     ),

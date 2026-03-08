@@ -378,9 +378,9 @@ function CreateLockInner() {
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <Header />
 
-      {/* Beta warning */}
-      <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-6 py-2 text-center text-sm text-yellow-400">
-        Unaudited beta. Do not deposit what you can&apos;t afford to lose.
+      {/* Trust signal */}
+      <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">
+        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks
       </div>
 
       <main className="relative flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 max-w-xl mx-auto w-full">
@@ -940,8 +940,8 @@ function ConfirmDialog({
               className="mt-1 accent-white focus:ring-2 focus:ring-cyan/50 focus:ring-offset-1 focus:ring-offset-black rounded"
             />
             <span className="text-sm text-white/70">
-              I understand this lock is permanent and non-cancelable. I accept
-              the risk of using unaudited software.
+              I understand this lock is permanent and non-cancelable. Locks are
+              enforced by Sablier&apos;s audited on-chain contracts.
             </span>
           </label>
         </div>

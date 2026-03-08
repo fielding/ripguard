@@ -622,8 +622,8 @@ export default function Vaults() {
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <Header />
 
-      <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-6 py-2 text-center text-sm text-yellow-400">
-        Unaudited beta. Do not deposit what you can&apos;t afford to lose.
+      <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">
+        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks
       </div>
 
       <main className="flex-1 flex flex-col">

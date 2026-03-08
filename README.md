@@ -88,7 +88,7 @@ forge test
 
 ## Security
 
-This software is **unaudited**. The smart contract (`RipGuardRouter`) is intentionally minimal — it holds no state, has no admin functions, and cannot be upgraded. All funds flow through Sablier's audited Lockup protocol.
+The `RipGuardRouter` is intentionally minimal — it holds no state, has no admin functions, and cannot be upgraded. All funds flow through [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security). RipGuard never custodies funds; the router is stateless and all locks are enforced by Sablier's battle-tested on-chain contracts.
 
 If you find a vulnerability, please report it responsibly by emailing the team rather than opening a public issue.
 

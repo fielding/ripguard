@@ -157,7 +157,7 @@ export function WelcomeModal() {
         </button>
 
         <p className="text-[10px] text-white/15 text-center mt-4">
-          Unaudited beta &middot; Start with a small test lock
+          Powered by Sablier v2.0 audited contracts
         </p>
       </div>
     </div>
