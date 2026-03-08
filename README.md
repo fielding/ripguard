@@ -30,21 +30,14 @@ Or set a custom schedule.
 
 ## Fees
 
-0.5% broker fee on each lock, routed to the RipGuard Audit Fund. The fee is passed through Sablier's native broker mechanism — no separate contract.
+0.5% broker fee on each lock, passed through Sablier's native broker mechanism — no separate contract involved. Fees are routed to the RipGuard Audit Fund.
 
 ## Architecture
 
-The `RipGuardRouter` is a stateless, non-upgradeable wrapper around Sablier Lockup. It:
-
-- Pulls USDC from the user
-- Creates a non-cancelable Sablier Lockup Linear stream
-- Routes a 0.5% broker fee to the treasury via Sablier's native mechanism
-- Never holds funds beyond a single transaction
-- Has no admin functions, no owner, no pause
+RipGuard calls Sablier Lockup v2.0 directly — there is no custom router or wrapper contract. The frontend constructs the Sablier `createWithTimestamps` call with the user's parameters and the broker fee, then submits it on-chain.
 
 **On-chain contracts (Base Mainnet):**
 
-- **RipGuardRouter**: [`packages/contracts/src/RipGuardRouter.sol`](packages/contracts/src/RipGuardRouter.sol)
 - **Sablier Lockup**: [`0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B`](https://basescan.org/address/0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B) (Sablier Lockup v2.0)
 - **USDC**: [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
 
@@ -54,10 +47,8 @@ All streams are created as **non-cancelable, non-transferable** Lockup Linear st
 
 - **Frontend**: Next.js 15, React 19, TailwindCSS 4
 - **Web3**: wagmi, viem, RainbowKit
-- **Contracts**: Solidity 0.8.22, Foundry, OpenZeppelin
 - **Protocol**: Sablier Lockup v2.0 on Base
 - **Token**: USDC on Base
-- **Monorepo**: pnpm workspaces (`packages/app`, `packages/contracts`)
 
 ## Development
 
@@ -74,21 +65,9 @@ pnpm --filter app dev
 
 See [`packages/app/.env.example`](packages/app/.env.example) for required environment variables.
 
-### Contracts
-
-```bash
-cd packages/contracts
-
-# Build
-forge build
-
-# Test
-forge test
-```
-
 ## Security
 
-The `RipGuardRouter` is intentionally minimal — it holds no state, has no admin functions, and cannot be upgraded. All funds flow through [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security). RipGuard never custodies funds; the router is stateless and all locks are enforced by Sablier's battle-tested on-chain contracts.
+RipGuard never custodies funds. All locks are created and enforced entirely by [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security) — there are no custom smart contracts in the system. The frontend is a thin client that constructs Sablier calls.
 
 If you find a vulnerability, please report it responsibly by emailing the team rather than opening a public issue.
 
