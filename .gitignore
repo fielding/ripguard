@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+dist/
+
+# Foundry
+packages/contracts/cache/
+packages/contracts/out/
+
+# Env
+.env
+.env.local
+.env.production.local
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
