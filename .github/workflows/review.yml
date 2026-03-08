@@ -33,7 +33,7 @@ jobs:
       - name: Install agent harnesses
         run: |
           npm install -g @anthropic-ai/claude-code
-          npm install -g @openai/codex
+          npm install -g @mariozechner/pi-coding-agent
 
       - name: Install review-crew
         run: pip install git+https://${{ secrets.REVIEW_CREW_PAT }}@github.com/fielding/review-crew.git
