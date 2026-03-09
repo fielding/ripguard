@@ -743,7 +743,7 @@ export default function Home() {
           <p className="text-xs text-white/15 max-w-md mx-auto leading-relaxed">
             RipGuard does not custody funds — all locks are created directly in
             Sablier&apos;s audited protocol on Base. Non-custodial. Immutable.
-            This is not financial advice. 0.5% broker fee collected
+            This is not financial advice. DYOR. 0.5% broker fee collected
             via Sablier&apos;s native mechanism.
           </p>
         </footer>
