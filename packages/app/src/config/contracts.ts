@@ -60,7 +60,7 @@ export const PRESETS = {
     label: "Cliff 7D + Vest 90D",
     description: "7-day cliff, then linear vest over 90 days",
     cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 90 * 24 * 60 * 60,
+    totalSeconds: 97 * 24 * 60 * 60, // 7d cliff + 90d vest
     isLumpSum: false,
   },
 } as const;
