@@ -1,5 +1,7 @@
 "use client";
 
+// Global error boundary renders outside the root layout, so use inline styles
+// instead of Tailwind classes (which aren't available here).
 export default function GlobalError({
   reset,
 }: {
@@ -8,15 +10,43 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body className="bg-black text-white flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4 px-6">
-          <h2 className="text-xl font-semibold">Something went wrong</h2>
-          <p className="text-white/50 text-sm max-w-sm">
+      <body
+        style={{
+          backgroundColor: "#000",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          margin: 0,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <div style={{ textAlign: "center", padding: "0 1.5rem" }}>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem" }}>
+            Something went wrong
+          </h2>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: "0.875rem",
+              maxWidth: "24rem",
+              margin: "0 auto 1rem",
+            }}
+          >
             An unexpected error occurred. Please try again.
           </p>
           <button
             onClick={reset}
-            className="border border-white/20 rounded-lg px-5 py-2 text-sm hover:bg-white/10 transition-colors"
+            style={{
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "0.5rem",
+              padding: "0.5rem 1.25rem",
+              fontSize: "0.875rem",
+              background: "transparent",
+              color: "#fff",
+              cursor: "pointer",
+            }}
           >
             Try again
           </button>
