@@ -853,7 +853,7 @@ function TimelinePreview({
           <>
             Nothing unlocks for {formatDuration(cliffSeconds)}, then{" "}
             {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly
-            over {formatDuration(totalSeconds)}
+            over {formatDuration(totalSeconds - cliffSeconds)}
           </>
         ) : (
           <>
