@@ -701,8 +701,8 @@ export default function Home() {
           <p className="text-xs text-white/15 max-w-md mx-auto leading-relaxed">
             Unaudited beta. Do not deposit what you can&apos;t afford to lose.
             RipGuard does not custody funds — all locks are created directly in
-            the Sablier protocol on Base. Smart contracts can fail. Use at your
-            own risk. This is not financial advice. 0.5% broker fee collected
+            Sablier&apos;s audited protocol on Base. Non-custodial. Immutable.
+            This is not financial advice. DYOR. 0.5% broker fee collected
             via Sablier&apos;s native mechanism.
           </p>
         </footer>
