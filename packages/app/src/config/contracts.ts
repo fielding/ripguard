@@ -36,8 +36,9 @@ export const EXPLORER_URL = IS_TESTNET
   : "https://basescan.org";
 
 // Safe starting block for event queries (Sablier v2.0 deployment)
+// Testnet: TestUSDC deployed at block 38,905,638 — start just before that
 export const STREAM_START_BLOCK = IS_TESTNET
-  ? BigInt(0) // Base Sepolia — scan from genesis (low volume)
+  ? BigInt(38000000)
   : BigInt(22000000); // Base mainnet
 
 // Schedule presets
@@ -46,7 +47,7 @@ export const PRESETS = {
     label: "Panic Lock 7D",
     description: "Lock everything for 7 days",
     cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 7 * 24 * 60 * 60,
+    totalSeconds: 7 * 24 * 60 * 60 + 1, // cliff must be < total in Sablier; +1s creates effective lump sum
     isLumpSum: true,
   },
   lock30d: {
