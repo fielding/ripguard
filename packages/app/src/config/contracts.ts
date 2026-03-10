@@ -35,10 +35,17 @@ export const EXPLORER_URL = IS_TESTNET
   ? "https://sepolia.basescan.org"
   : "https://basescan.org";
 
-// Safe starting block for event queries (Sablier v2.0 deployment)
+// Safe starting block for event queries
+// Testnet: TestUSDC (0x54C0f145D70ca4792e695697B6498552F1EC0009) deployed between blocks 38,540,000–38,550,000
+// Mainnet: safe baseline before RipGuard launch
 export const STREAM_START_BLOCK = IS_TESTNET
-  ? BigInt(0) // Base Sepolia — scan from genesis (low volume)
-  : BigInt(22000000); // Base mainnet
+  ? BigInt(38_540_000) // Just before TestUSDC deployment on Base Sepolia
+  : BigInt(22_000_000); // Base mainnet
+
+// Max block range per getLogs call.
+// Public Base Sepolia RPCs (RainbowKit defaults) reject ranges > ~2k blocks.
+// Mainnet paid RPCs (Alchemy etc.) support up to 50k.
+export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(2_000) : BigInt(50_000);
 
 // Schedule presets
 export const PRESETS = {
