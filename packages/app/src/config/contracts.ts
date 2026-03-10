@@ -38,8 +38,13 @@ export const EXPLORER_URL = IS_TESTNET
 // Safe starting block for event queries (Sablier v2.0 deployment)
 // Testnet: TestUSDC deployed at block 38,905,638 — start just before that
 export const STREAM_START_BLOCK = IS_TESTNET
-  ? BigInt(38000000)
-  : BigInt(22000000); // Base mainnet
+  ? BigInt(38_900_000) // Just before TestUSDC deployment (38,905,638)
+  : BigInt(22_000_000); // Base mainnet
+
+// Max block range per getLogs call.
+// Public Base Sepolia RPCs (RainbowKit defaults) reject ranges > ~2k blocks.
+// Mainnet paid RPCs (Alchemy etc.) support up to 50k.
+export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(2_000) : BigInt(50_000);
 
 // Schedule presets
 export const PRESETS = {

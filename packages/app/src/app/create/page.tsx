@@ -324,9 +324,15 @@ function CreateLockInner() {
       // Auto-advance directly to lock — avoids going back to confirm with stale
       // allowance cache which causes a second "Approve USDC" popup
       refetchAllowance().then(() => {
-        toast("USDC approved.", "success");
-        trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
-        handleLock();
+        // Guard: step may have changed while awaiting refetch (e.g. wallet rejection race)
+        setStep((currentStep) => {
+          if (currentStep === "approve") {
+            toast("USDC approved.", "success");
+            trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
+            handleLock();
+          }
+          return currentStep;
+        });
       });
     }
   }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount, handleLock]);
@@ -526,6 +532,11 @@ function CreateLockInner() {
                   {customCliff > customTotal && (
                     <p className="text-xs text-red-400">
                       Cliff can&apos;t be longer than total duration
+                    </p>
+                  )}
+                  {customCliff > 0 && customCliff === customTotal && (
+                    <p className="text-xs text-amber-400/80">
+                      Cliff equals total — this creates a lump sum lock that unlocks all at once after {Math.floor(customCliff / 86400)}d.
                     </p>
                   )}
                 </div>
@@ -744,6 +755,8 @@ function CreateLockInner() {
                 fee={fee}
                 totalAmount={totalAmount}
                 hasEnoughAllowance={hasEnoughAllowance}
+                isApproveInFlight={isApproving || isApproveConfirming}
+                isLockInFlight={isLocking || isLockConfirming}
                 confirmed={confirmed}
                 onConfirmedChange={setConfirmed}
                 onApprove={handleApprove}
@@ -834,6 +847,8 @@ function ConfirmDialog({
   fee,
   totalAmount,
   hasEnoughAllowance,
+  isApproveInFlight,
+  isLockInFlight,
   confirmed,
   onConfirmedChange,
   onApprove,
@@ -845,6 +860,8 @@ function ConfirmDialog({
   fee: bigint;
   totalAmount: bigint;
   hasEnoughAllowance: boolean;
+  isApproveInFlight: boolean;
+  isLockInFlight: boolean;
   confirmed: boolean;
   onConfirmedChange: (v: boolean) => void;
   onApprove: () => void;
@@ -977,18 +994,18 @@ function ConfirmDialog({
           {!hasEnoughAllowance ? (
             <button
               onClick={onApprove}
-              disabled={!confirmed}
+              disabled={!confirmed || isApproveInFlight}
               className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
-              Approve USDC
+              {isApproveInFlight ? "Approving..." : "Approve USDC"}
             </button>
           ) : (
             <button
               onClick={onLock}
-              disabled={!confirmed}
+              disabled={!confirmed || isLockInFlight}
               className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
-              Create Lock
+              {isLockInFlight ? "Creating..." : "Create Lock"}
             </button>
           )}
         </div>

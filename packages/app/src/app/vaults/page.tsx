@@ -15,6 +15,7 @@ import {
 import {
   SABLIER_LOCKUP,
   STREAM_START_BLOCK,
+  LOG_CHUNK_SIZE,
   EXPLORER_URL,
 } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
@@ -280,7 +281,7 @@ function VaultDashboard() {
 
     (async () => {
       try {
-        const CHUNK_SIZE = BigInt(50_000);
+        const CHUNK_SIZE = LOG_CHUNK_SIZE;
         const toBlock = await publicClient.getBlockNumber();
         let from = STREAM_START_BLOCK > toBlock ? toBlock : STREAM_START_BLOCK;
         const allLogs: { args: { tokenId?: bigint } }[] = [];
@@ -330,10 +331,14 @@ function VaultDashboard() {
           setStreamIds(ids);
         }
       } catch (err) {
-        trackContractError({ action: "fetchVaults", error: String(err), contract: "SablierLockup" });
+        const errStr = String(err);
+        trackContractError({ action: "fetchVaults", error: errStr, contract: "SablierLockup" });
         if (!cancelled) {
+          const isRangeError = errStr.toLowerCase().includes("block range") || errStr.toLowerCase().includes("too large") || errStr.toLowerCase().includes("limit exceeded");
           setFetchError(
-            "Failed to load vaults. The RPC may be down — try again in a moment."
+            isRangeError
+              ? "Failed to load vaults — RPC rejected the block range query. Try switching to a different wallet RPC."
+              : "Failed to load vaults. The RPC may be down — try again in a moment."
           );
         }
       } finally {
