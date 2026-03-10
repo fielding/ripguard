@@ -269,7 +269,8 @@ function VaultDashboard() {
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams
+  // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams.
+  // Chunks getLogs into 50k-block ranges to work within public RPC limits.
   useEffect(() => {
     if (!isConnected || !address || !publicClient) return;
 
@@ -279,24 +280,40 @@ function VaultDashboard() {
 
     (async () => {
       try {
-        const logs = await publicClient.getLogs({
-          address: SABLIER_LOCKUP,
-          event: {
-            type: "event",
-            name: "Transfer",
-            inputs: [
-              { name: "from", type: "address", indexed: true },
-              { name: "to", type: "address", indexed: true },
-              { name: "tokenId", type: "uint256", indexed: true },
-            ],
-          },
-          args: {
-            from: "0x0000000000000000000000000000000000000000",
-            to: address,
-          },
-          fromBlock: STREAM_START_BLOCK,
-          toBlock: "latest",
-        });
+        const CHUNK_SIZE = BigInt(50_000);
+        const toBlock = await publicClient.getBlockNumber();
+        let from = STREAM_START_BLOCK > toBlock ? toBlock : STREAM_START_BLOCK;
+        const allLogs: { args: { tokenId?: bigint } }[] = [];
+        const eventDef = {
+          type: "event" as const,
+          name: "Transfer",
+          inputs: [
+            { name: "from", type: "address" as const, indexed: true },
+            { name: "to", type: "address" as const, indexed: true },
+            { name: "tokenId", type: "uint256" as const, indexed: true },
+          ],
+        };
+
+        while (from <= toBlock) {
+          if (cancelled) return;
+          const to = from + CHUNK_SIZE - BigInt(1) < toBlock
+            ? from + CHUNK_SIZE - BigInt(1)
+            : toBlock;
+          const chunk = await publicClient.getLogs({
+            address: SABLIER_LOCKUP,
+            event: eventDef,
+            args: {
+              from: "0x0000000000000000000000000000000000000000",
+              to: address,
+            },
+            fromBlock: from,
+            toBlock: to,
+          });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          allLogs.push(...(chunk as any[]));
+          from = to + BigInt(1);
+        }
+        const logs = allLogs;
 
         if (!cancelled) {
           const seen = new Set<string>();

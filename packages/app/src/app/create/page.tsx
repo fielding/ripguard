@@ -158,10 +158,12 @@ function CreateLockInner() {
         label: p.label,
       };
     }
+    const isLumpSum = customCliff === customTotal && customCliff > 0;
     return {
       cliffSeconds: customCliff,
-      totalSeconds: customTotal,
-      isLumpSum: customCliff === customTotal && customCliff > 0,
+      // Sablier requires cliff < total strictly; for lump sum (cliff=total) add 1s
+      totalSeconds: isLumpSum ? customTotal + 1 : customTotal,
+      isLumpSum,
       label: "Custom Schedule",
     };
   }, [selectedPreset, customCliff, customTotal]);
@@ -302,13 +304,15 @@ function CreateLockInner() {
   // Auto-advance steps after tx confirmations
   useEffect(() => {
     if (isApproveConfirmed && step === "approve") {
+      // Auto-advance directly to lock — avoids going back to confirm with stale
+      // allowance cache which causes a second "Approve USDC" popup
       refetchAllowance().then(() => {
-        setStep("confirm");
-        toast("USDC approved. Ready to lock.", "success");
+        toast("USDC approved.", "success");
         trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
+        handleLock();
       });
     }
-  }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount]);
+  }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount, handleLock]);
 
   useEffect(() => {
     if (isLockConfirmed && step === "lock" && lockTxHash) {
