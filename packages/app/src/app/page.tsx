@@ -659,7 +659,7 @@ export default function Home() {
                 <li>Proof-of-lock receipts</li>
                 <li>Dashboard to track all your vaults</li>
               </ul>
-              <p>The 0.5% keeps the lights on and funds a formal audit.</p>
+              <p>The 0.5% keeps the lights on. There are no custom contracts to audit — Sablier is already battle-tested and audited.</p>
             </FAQItem>
 
             <FAQItem question={`"Can I unlock early if I really need it?"`}>
