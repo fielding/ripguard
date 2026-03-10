@@ -14,6 +14,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Force dynamic rendering — web3 app needs client-side wallet state
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "RipGuard — Lock your winnings before you give them back",
   description:
