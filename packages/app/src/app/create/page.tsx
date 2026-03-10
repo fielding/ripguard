@@ -138,7 +138,7 @@ function CreateLockInner() {
 
   // Schedule state
   const [selectedPreset, setSelectedPreset] = useState<PresetKey | "custom">(
-    isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "custom"
+    isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "panicLock7d"
   );
   const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
   const [customTotal, setCustomTotal] = useState(customTotalParam ?? 604800); // 7 days default
@@ -156,7 +156,7 @@ function CreateLockInner() {
   const [confirmed, setConfirmed] = useState(false);
 
   const resetForm = useCallback(() => {
-    setSelectedPreset("custom");
+    setSelectedPreset("panicLock7d");
     setCustomCliff(0);
     setCustomTotal(604800);
     setAmountInput("");
@@ -175,12 +175,12 @@ function CreateLockInner() {
         label: p.label,
       };
     }
-    const isLumpSum = customCliff === customTotal && customCliff > 0;
+    const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
     return {
       cliffSeconds: customCliff,
-      // Sablier requires cliff < total strictly; for lump sum (cliff=total) add 1s
-      totalSeconds: isLumpSum ? customTotal + 1 : customTotal,
-      isLumpSum,
+      // Sablier requires cliff < total strictly; add 1s so linear stream amount is non-zero
+      totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
+      isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
       label: "Custom Schedule",
     };
   }, [selectedPreset, customCliff, customTotal]);
