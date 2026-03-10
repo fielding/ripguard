@@ -35,10 +35,11 @@ export const EXPLORER_URL = IS_TESTNET
   ? "https://sepolia.basescan.org"
   : "https://basescan.org";
 
-// Safe starting block for event queries (Sablier v2.0 deployment)
-// Testnet: TestUSDC deployed at block 38,905,638 — start just before that
+// Safe starting block for event queries
+// Testnet: TestUSDC (0x54C0f145D70ca4792e695697B6498552F1EC0009) deployed between blocks 38,540,000–38,550,000
+// Mainnet: safe baseline before RipGuard launch
 export const STREAM_START_BLOCK = IS_TESTNET
-  ? BigInt(38_900_000) // Just before TestUSDC deployment (38,905,638)
+  ? BigInt(38_540_000) // Just before TestUSDC deployment on Base Sepolia
   : BigInt(22_000_000); // Base mainnet
 
 // Max block range per getLogs call.
