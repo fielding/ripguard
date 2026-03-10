@@ -340,12 +340,37 @@ function VaultDashboard() {
     }
   }, [isConnected]);
 
-  // Batch read stream data + withdrawable amounts
+  // Batch read stream data using individual getters (Sablier v2.0 has no getStream())
+  // 6 calls per stream: startTime, endTime, cliffTime, deposited, withdrawn, claimable
   const streamContracts = streamIds.flatMap((id) => [
     {
       address: SABLIER_LOCKUP,
       abi: sablierLockupAbi,
-      functionName: "getStream" as const,
+      functionName: "getStartTime" as const,
+      args: [id] as const,
+    },
+    {
+      address: SABLIER_LOCKUP,
+      abi: sablierLockupAbi,
+      functionName: "getEndTime" as const,
+      args: [id] as const,
+    },
+    {
+      address: SABLIER_LOCKUP,
+      abi: sablierLockupAbi,
+      functionName: "getCliffTime" as const,
+      args: [id] as const,
+    },
+    {
+      address: SABLIER_LOCKUP,
+      abi: sablierLockupAbi,
+      functionName: "getDepositedAmount" as const,
+      args: [id] as const,
+    },
+    {
+      address: SABLIER_LOCKUP,
+      abi: sablierLockupAbi,
+      functionName: "getWithdrawnAmount" as const,
       args: [id] as const,
     },
     {
@@ -364,44 +389,50 @@ function VaultDashboard() {
     },
   });
 
-  // Parse vault data
+  // Parse vault data — 6 results per stream: startTime, endTime, cliffTime, deposited, withdrawn, claimable
   let failedStreamCount = 0;
   const vaults: VaultData[] = streamIds
     .map((streamId, i) => {
-      const streamResult = streamResults?.[i * 2];
-      const claimableResult = streamResults?.[i * 2 + 1];
+      const base = i * 6;
+      const startTimeResult  = streamResults?.[base];
+      const endTimeResult    = streamResults?.[base + 1];
+      const cliffTimeResult  = streamResults?.[base + 2];
+      const depositedResult  = streamResults?.[base + 3];
+      const withdrawnResult  = streamResults?.[base + 4];
+      const claimableResult  = streamResults?.[base + 5];
 
       if (
-        streamResult?.status !== "success" ||
+        startTimeResult?.status !== "success" ||
+        endTimeResult?.status !== "success" ||
+        cliffTimeResult?.status !== "success" ||
+        depositedResult?.status !== "success" ||
+        withdrawnResult?.status !== "success" ||
         claimableResult?.status !== "success"
       ) {
         if (streamResults) failedStreamCount++;
         return null;
       }
 
-      const stream = streamResult.result as {
-        amounts: { deposited: bigint; withdrawn: bigint; refunded: bigint };
-        startTime: number;
-        endTime: number;
-        cliffTime: number;
-      };
+      const startTime  = startTimeResult.result as number;
+      const endTime    = endTimeResult.result as number;
+      const cliffTime  = cliffTimeResult.result as number;
+      const deposited  = depositedResult.result as bigint;
+      const withdrawn  = withdrawnResult.result as bigint;
+      const claimable  = claimableResult.result as bigint;
 
-      const claimable = claimableResult.result as bigint;
-
-      const totalSeconds = stream.endTime - stream.startTime;
-      const cliffSeconds =
-        stream.cliffTime > 0 ? stream.cliffTime - stream.startTime : 0;
+      const totalSeconds = endTime - startTime;
+      const cliffSeconds = cliffTime > 0 ? cliffTime - startTime : 0;
 
       return {
         streamId,
-        totalAmount: stream.amounts.deposited,
+        totalAmount: deposited,
         cliffSeconds,
         totalSeconds,
-        deposited: stream.amounts.deposited,
-        withdrawn: stream.amounts.withdrawn,
-        startTime: stream.startTime,
-        endTime: stream.endTime,
-        cliffTime: stream.cliffTime,
+        deposited,
+        withdrawn,
+        startTime,
+        endTime,
+        cliffTime,
         claimable,
       };
     })
