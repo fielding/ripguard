@@ -15,6 +15,9 @@ packages/contracts/out/
 .env.local
 .env.production.local
 
+# Vercel
+.vercel/
+
 # OS
 .DS_Store
 
