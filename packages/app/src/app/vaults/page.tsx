@@ -15,6 +15,7 @@ import {
 import {
   SABLIER_LOCKUP,
   STREAM_START_BLOCK,
+  LOG_CHUNK_SIZE,
   EXPLORER_URL,
 } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
@@ -279,24 +280,40 @@ function VaultDashboard() {
 
     (async () => {
       try {
-        const logs = await publicClient.getLogs({
-          address: SABLIER_LOCKUP,
-          event: {
-            type: "event",
-            name: "Transfer",
-            inputs: [
-              { name: "from", type: "address", indexed: true },
-              { name: "to", type: "address", indexed: true },
-              { name: "tokenId", type: "uint256", indexed: true },
-            ],
-          },
-          args: {
-            from: "0x0000000000000000000000000000000000000000",
-            to: address,
-          },
-          fromBlock: STREAM_START_BLOCK,
-          toBlock: "latest",
-        });
+        const CHUNK_SIZE = LOG_CHUNK_SIZE;
+        const toBlock = await publicClient.getBlockNumber();
+        let from = STREAM_START_BLOCK > toBlock ? toBlock : STREAM_START_BLOCK;
+        const allLogs: { args: { tokenId?: bigint } }[] = [];
+        const eventDef = {
+          type: "event" as const,
+          name: "Transfer",
+          inputs: [
+            { name: "from", type: "address" as const, indexed: true },
+            { name: "to", type: "address" as const, indexed: true },
+            { name: "tokenId", type: "uint256" as const, indexed: true },
+          ],
+        };
+
+        while (from <= toBlock) {
+          if (cancelled) return;
+          const to = from + CHUNK_SIZE - BigInt(1) < toBlock
+            ? from + CHUNK_SIZE - BigInt(1)
+            : toBlock;
+          const chunk = await publicClient.getLogs({
+            address: SABLIER_LOCKUP,
+            event: eventDef,
+            args: {
+              from: "0x0000000000000000000000000000000000000000",
+              to: address,
+            },
+            fromBlock: from,
+            toBlock: to,
+          });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          allLogs.push(...(chunk as any[]));
+          from = to + BigInt(1);
+        }
+        const logs = allLogs;
 
         if (!cancelled) {
           const seen = new Set<string>();
@@ -313,10 +330,14 @@ function VaultDashboard() {
           setStreamIds(ids);
         }
       } catch (err) {
-        trackContractError({ action: "fetchVaults", error: String(err), contract: "SablierLockup" });
+        const errStr = String(err);
+        trackContractError({ action: "fetchVaults", error: errStr, contract: "SablierLockup" });
         if (!cancelled) {
+          const isRangeError = errStr.toLowerCase().includes("block range") || errStr.toLowerCase().includes("too large") || errStr.toLowerCase().includes("limit exceeded");
           setFetchError(
-            "Failed to load vaults. The RPC may be down — try again in a moment."
+            isRangeError
+              ? "Failed to load vaults — RPC rejected the block range query. Try switching to a different wallet RPC."
+              : "Failed to load vaults. The RPC may be down — try again in a moment."
           );
         }
       } finally {
