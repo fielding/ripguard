@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/providers";
 import { TestnetBanner } from "@/components/TestnetBanner";
-import { WelcomeModal } from "@/components/WelcomeModal";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +13,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
-// Web3 apps with browser-only APIs (WalletConnect/IndexedDB) cannot be statically prerendered
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "RipGuard — Lock your winnings before you give them back",
