@@ -34,7 +34,7 @@ jobs:
       - name: Initialize review directories
         run: |
           {
-            echo "REVIEW_CREW_ROOT=$RUNNER_TEMP/review-crew"
+            echo "REVIEW_CREW=$RUNNER_TEMP/review-crew"
             echo "HISTORY_DIR=$RUNNER_TEMP/review-crew/history"
             echo "REPOS_DIR=$RUNNER_TEMP/review-crew/repos"
             echo "WORKTREES_DIR=$RUNNER_TEMP/review-crew/worktrees"
