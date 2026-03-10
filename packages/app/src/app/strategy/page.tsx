@@ -181,6 +181,9 @@ export default function StrategyPage() {
                     onChange={(event) => setTargetProfitUsd(Number(event.target.value) || 0)}
                     className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-4 py-3 text-base outline-none focus:border-cyan/40"
                   />
+                  <div className="text-xs text-white/35">
+                    The planner protects at least this amount, even if your percent slider is lower.
+                  </div>
                 </div>
 
                 <div className="space-y-3">

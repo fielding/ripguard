@@ -48,9 +48,18 @@ export function formatUsd(value: number): string {
 export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
   const bankrollUsd = clamp(inputs.bankrollUsd, 100, 5_000_000);
   const targetProfitUsd = clamp(inputs.targetProfitUsd, 50, bankrollUsd);
-  const protectPct = clamp(inputs.protectPct, 5, 95);
+  const requestedProtectPct = clamp(inputs.protectPct, 5, 95);
   const cooldownDays = clamp(inputs.cooldownDays, 1, 180);
   const relapsesPerMonth = clamp(inputs.relapsesPerMonth, 0, 30);
+  const minimumProtectedUsd = roundMoney(targetProfitUsd);
+  const protectedUsd = roundMoney(
+    clamp(
+      Math.max(bankrollUsd * (requestedProtectPct / 100), minimumProtectedUsd),
+      0,
+      bankrollUsd,
+    ),
+  );
+  const effectiveProtectPct = (protectedUsd / bankrollUsd) * 100;
 
   const convictionModifier =
     inputs.conviction === "fragile" ? -14 : inputs.conviction === "steady" ? 0 : 12;
@@ -58,7 +67,7 @@ export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
   const disciplineScore = clamp(
     Math.round(
       48 +
-        protectPct * 0.35 +
+        effectiveProtectPct * 0.35 +
         cooldownDays * 0.55 -
         relapsesPerMonth * 3.8 +
         convictionModifier
@@ -67,23 +76,22 @@ export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
     100,
   );
 
-  const protectedUsd = roundMoney(bankrollUsd * (protectPct / 100));
   const tradingBufferUsd = roundMoney(bankrollUsd - protectedUsd);
   const relapseTaxUsd = roundMoney(
-    Math.min(tradingBufferUsd, targetProfitUsd * (relapsesPerMonth / 6)),
+    Math.min(tradingBufferUsd, tradingBufferUsd * (relapsesPerMonth / 6)),
   );
 
   let recommendedPreset: StrategyPresetKey = "panicLock7d";
   let presetReason = "Short, hard timeout to stop immediate revenge trading.";
 
-  if (cooldownDays >= 30 && protectPct >= 55) {
+  if (cooldownDays >= 30 && effectiveProtectPct >= 55) {
     recommendedPreset = "lock30d";
-    presetReason = "You want a full reset window with steady liquidity returning over time.";
+    presetReason = "You are protecting a meaningful chunk of the stack and want a full reset window.";
   }
 
-  if (cooldownDays >= 60 && protectPct >= 70) {
+  if (cooldownDays >= 60 && effectiveProtectPct >= 70) {
     recommendedPreset = "cliff7dVest90d";
-    presetReason = "You want a real cooling-off cliff plus a long glide path back into liquidity.";
+    presetReason = "Your secured profit target needs a real cooling-off cliff plus a long glide path back into liquidity.";
   }
 
   const narrative =
@@ -110,7 +118,7 @@ export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
       description: "You ape back in within the same hour because the chart still looks hot.",
       unlockedUsd: earlyRelapseUnlocked,
       protectedUsd: earlyRelapseProtected,
-      posture: protectPct >= 70 ? "watch" : "danger",
+      posture: effectiveProtectPct >= 70 ? "watch" : "danger",
     },
     {
       title: "48-hour tilt loop",
