@@ -52,16 +52,6 @@ function formatDuration(seconds: number): string {
   return `${days}d`;
 }
 
-function formatAbsoluteDate(timestampMs: number): string {
-  return new Date(timestampMs).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 const SCALE = BigInt("1000000000000000000"); // 1e18
 
 function computeFee(amount: bigint): bigint {
@@ -379,9 +369,6 @@ function CreateLockInner() {
     depositAmount > 0 && meetsMinimum && schedule.totalSeconds > 0 && isConnected;
 
   const isValidForm = canProceed && hasEnoughBalance;
-  const planStartMs = Date.now();
-  const cliffAtMs = planStartMs + schedule.cliffSeconds * 1000;
-  const fullyUnlockedAtMs = planStartMs + schedule.totalSeconds * 1000;
 
   // Freeze form inputs once past the schedule step to prevent amount
   // changes during confirm/approve/lock (race condition with tx values)
@@ -630,52 +617,6 @@ function CreateLockInner() {
                   isLumpSum={schedule.isLumpSum}
                   depositAmount={depositAmount}
                 />
-              </section>
-            )}
-
-            {/* Plan Snapshot */}
-            {depositAmount > 0 && (
-              <section className="w-full space-y-3">
-                <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                  Lock Plan Snapshot
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="border border-white/10 rounded-lg p-4 bg-white/[0.02]">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
-                      You sign
-                    </div>
-                    <div className="text-sm font-medium mt-2">Funds leave wallet</div>
-                    <div className="text-xs text-white/45 mt-1">
-                      {formatUnits(totalAmount, USDC_DECIMALS)} USDC total, including fee.
-                    </div>
-                  </div>
-                  <div className="border border-white/10 rounded-lg p-4 bg-white/[0.02]">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
-                      First unlock
-                    </div>
-                    <div className="text-sm font-medium mt-2">
-                      {schedule.cliffSeconds > 0 ? formatAbsoluteDate(cliffAtMs) : "Immediate vesting"}
-                    </div>
-                    <div className="text-xs text-white/45 mt-1">
-                      {schedule.isLumpSum
-                        ? "Everything unlocks at once."
-                        : schedule.cliffSeconds > 0
-                          ? `Nothing unlocks for ${formatDuration(schedule.cliffSeconds)}.`
-                          : "Vesting starts immediately."}
-                    </div>
-                  </div>
-                  <div className="border border-white/10 rounded-lg p-4 bg-white/[0.02]">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
-                      Fully liquid
-                    </div>
-                    <div className="text-sm font-medium mt-2">
-                      {formatAbsoluteDate(fullyUnlockedAtMs)}
-                    </div>
-                    <div className="text-xs text-white/45 mt-1">
-                      Full schedule length: {formatDuration(schedule.totalSeconds)}.
-                    </div>
-                  </div>
-                </div>
               </section>
             )}
 
@@ -991,15 +932,6 @@ function ConfirmDialog({
             the vesting schedule.
           </div>
 
-          <div className="border border-white/10 rounded-lg p-3 space-y-2 text-sm bg-white/[0.02]">
-            <div className="text-white/70 font-medium">What happens next</div>
-            <ul className="space-y-1.5 text-white/45">
-              <li>1. Approve USDC spending for the exact total.</li>
-              <li>2. Create a non-cancelable Sablier lock in your wallet.</li>
-              <li>3. Track vesting progress from the Vaults dashboard.</li>
-            </ul>
-          </div>
-
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -1057,8 +989,8 @@ function SuccessView({
   schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
   onCreateAnother: () => void;
 }) {
-  const [createdAtMs] = useState(() => Date.now());
-  const endDate = new Date(createdAtMs + schedule.totalSeconds * 1000);
+  const now = Math.floor(Date.now() / 1000);
+  const endDate = new Date((now + schedule.totalSeconds) * 1000);
 
   const nextUnlock = (() => {
     if (schedule.isLumpSum) {
