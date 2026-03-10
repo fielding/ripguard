@@ -39,12 +39,25 @@ const DURATION_OPTIONS = [
   { label: "3 days", seconds: 259200 },
   { label: "7 days", seconds: 604800 },
   { label: "14 days", seconds: 1209600 },
+  { label: "21 days", seconds: 1814400 },
   { label: "30 days", seconds: 2592000 },
   { label: "60 days", seconds: 5184000 },
   { label: "90 days", seconds: 7776000 },
   { label: "180 days", seconds: 15552000 },
   { label: "365 days", seconds: 31536000 },
 ];
+
+function parsePositiveDurationParam(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 86400) return null;
+  return parsed;
+}
+
+function parseAmountParam(value: string | null): string {
+  if (!value) return "";
+  return /^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(value) ? value : "";
+}
 
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
@@ -115,16 +128,20 @@ function Spinner() {
 function CreateLockInner() {
   const searchParams = useSearchParams();
   const presetParam = searchParams.get("preset") as PresetKey | null;
+  const customCliffParam = parsePositiveDurationParam(searchParams.get("cliff"));
+  const customTotalParam = parsePositiveDurationParam(searchParams.get("total"));
+  const isCustomFromQuery = searchParams.get("mode") === "custom" && customTotalParam !== null;
+  const amountParam = parseAmountParam(searchParams.get("amount"));
 
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
 
   // Schedule state
   const [selectedPreset, setSelectedPreset] = useState<PresetKey | "custom">(
-    presetParam && presetParam in PRESETS ? presetParam : "custom"
+    isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "custom"
   );
-  const [customCliff, setCustomCliff] = useState(0);
-  const [customTotal, setCustomTotal] = useState(604800); // 7 days default
+  const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
+  const [customTotal, setCustomTotal] = useState(customTotalParam ?? 604800); // 7 days default
 
   // Auto-clamp total to be >= cliff, and enforce minimum 1 day
   useEffect(() => {
@@ -134,7 +151,7 @@ function CreateLockInner() {
       setCustomTotal(customCliff);
     }
   }, [customCliff, customTotal]);
-  const [amountInput, setAmountInput] = useState("");
+  const [amountInput, setAmountInput] = useState(amountParam);
   const [step, setStep] = useState<Step>("schedule");
   const [confirmed, setConfirmed] = useState(false);
 

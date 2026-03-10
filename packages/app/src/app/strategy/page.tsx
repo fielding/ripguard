@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { buildStrategyPlan, formatUsd, type StrategyInputs } from "@/lib/strategy";
-import { PRESETS } from "@/config/contracts";
 
 type Conviction = StrategyInputs["conviction"];
 
@@ -67,8 +66,6 @@ export default function StrategyPage() {
     [bankrollUsd, targetProfitUsd, protectPct, cooldownDays, relapsesPerMonth, conviction],
   );
 
-  const recommendedPreset = PRESETS[plan.recommendedPreset];
-
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <Header />
@@ -113,9 +110,10 @@ export default function StrategyPage() {
 
             <div className="rounded-[28px] border border-cyan/15 bg-gradient-to-b from-cyan/[0.08] to-transparent p-7 sm:p-8 space-y-6">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-cyan/70">Recommended preset</div>
-                <h2 className="mt-3 text-2xl font-semibold">{recommendedPreset.label}</h2>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-cyan/70">Recommended lock setup</div>
+                <h2 className="mt-3 text-2xl font-semibold">{plan.recommendedSetupLabel}</h2>
                 <p className="mt-2 text-white/55 leading-relaxed">{plan.presetReason}</p>
+                <p className="mt-2 text-sm text-white/40">{plan.recommendedSetupDescription}</p>
               </div>
 
               <div className="rounded-2xl border border-white/[0.08] bg-black/20 p-5 space-y-3">
@@ -136,10 +134,10 @@ export default function StrategyPage() {
 
               <div className="flex flex-col gap-3">
                 <Link
-                  href={`/create?preset=${plan.recommendedPreset}`}
+                  href={plan.recommendedSetupHref}
                   className="bg-cyan text-black font-bold rounded-xl px-5 py-4 text-center hover:bg-cyan/90 transition-all hover:shadow-[0_0_40px_rgba(0,229,255,0.25)]"
                 >
-                  Use {recommendedPreset.label}
+                  Build This Lock Plan
                 </Link>
                 <Link
                   href="/create"

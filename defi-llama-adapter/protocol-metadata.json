@@ -5,7 +5,7 @@
   "description": "Self-custodial profit locker for crypto traders. Lock USDC gains on-chain via Sablier time-locks. Non-custodial, immutable.",
   "chain": "Base",
   "logo": "https://ripguard.xyz/icon-192.png",
-  "audits": "2",
+  "audits": "0",
   "audit_note": "Uses Sablier Lockup v2.0 (audited). No custom RipGuard contract.",
   "gecko_id": null,
   "cmcId": null,

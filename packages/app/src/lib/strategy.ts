@@ -1,4 +1,6 @@
-export type StrategyPresetKey = "panicLock7d" | "lock30d" | "cliff7dVest90d";
+import { PRESETS } from "@/config/contracts";
+
+export type StrategyPresetKey = keyof typeof PRESETS;
 
 export type StrategyInputs = {
   bankrollUsd: number;
@@ -23,7 +25,10 @@ export type StrategyPlan = {
   disciplineScore: number;
   cooldownHours: number;
   relapseTaxUsd: number;
-  recommendedPreset: StrategyPresetKey;
+  recommendedPreset: StrategyPresetKey | null;
+  recommendedSetupLabel: string;
+  recommendedSetupHref: string;
+  recommendedSetupDescription: string;
   presetReason: string;
   narrative: string;
   scenarios: StrategyScenario[];
@@ -81,18 +86,30 @@ export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
     Math.min(tradingBufferUsd, tradingBufferUsd * (relapsesPerMonth / 6)),
   );
 
-  let recommendedPreset: StrategyPresetKey = "panicLock7d";
-  let presetReason = "Short, hard timeout to stop immediate revenge trading.";
+  let recommendedPreset: StrategyPresetKey | null = null;
+  let recommendedSetupLabel = `Exact ${cooldownDays}D Lock`;
+  let recommendedSetupDescription =
+    "Match the modeled cooldown exactly so the create flow reflects the plan shown on this page.";
+  let presetReason = "This plan needs an exact cooling-off window instead of falling back to a shorter preset.";
 
   if (cooldownDays >= 30 && effectiveProtectPct >= 55) {
     recommendedPreset = "lock30d";
+    recommendedSetupLabel = PRESETS.lock30d.label;
+    recommendedSetupDescription = PRESETS.lock30d.description;
     presetReason = "You are protecting a meaningful chunk of the stack and want a full reset window.";
   }
 
   if (cooldownDays >= 60 && effectiveProtectPct >= 70) {
     recommendedPreset = "cliff7dVest90d";
+    recommendedSetupLabel = PRESETS.cliff7dVest90d.label;
+    recommendedSetupDescription = PRESETS.cliff7dVest90d.description;
     presetReason = "Your secured profit target needs a real cooling-off cliff plus a long glide path back into liquidity.";
   }
+
+  const cooldownSeconds = cooldownDays * 24 * 60 * 60;
+  const recommendedSetupHref = recommendedPreset
+    ? `/create?preset=${recommendedPreset}&amount=${protectedUsd}`
+    : `/create?mode=custom&cliff=${cooldownSeconds}&total=${cooldownSeconds}&amount=${protectedUsd}`;
 
   const narrative =
     disciplineScore >= 80
@@ -143,6 +160,9 @@ export function buildStrategyPlan(inputs: StrategyInputs): StrategyPlan {
     cooldownHours: cooldownDays * 24,
     relapseTaxUsd,
     recommendedPreset,
+    recommendedSetupLabel,
+    recommendedSetupHref,
+    recommendedSetupDescription,
     presetReason,
     narrative,
     scenarios,
