@@ -1,9 +1,32 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 const STORAGE_KEY = "ripguard-onboarding-seen";
+
+function subscribeToWelcomeState(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+  return () => window.removeEventListener("storage", handleStorage);
+}
+
+function getWelcomeSnapshot() {
+  try {
+    return typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return false;
+  }
+}
 
 const STEPS = [
   {
@@ -24,17 +47,12 @@ const STEPS = [
 ];
 
 export function WelcomeModal() {
-  const [show, setShow] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return !localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return false;
-    }
-  });
+  const [dismissed, setDismissed] = useState(false);
+  const shouldShow = useSyncExternalStore(subscribeToWelcomeState, getWelcomeSnapshot, () => false);
+  const show = shouldShow && !dismissed;
 
   const dismiss = useCallback(() => {
-    setShow(false);
+    setDismissed(true);
     try {
       localStorage.setItem(STORAGE_KEY, "1");
     } catch {
