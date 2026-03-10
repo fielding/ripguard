@@ -39,32 +39,40 @@ export const testUsdcAbi = [
 ] as const;
 
 export const sablierLockupAbi = [
+  // Sablier v2.0 uses individual getters instead of getStream()
   {
     type: "function",
-    name: "getStream",
+    name: "getStartTime",
     inputs: [{ name: "streamId", type: "uint256" }],
-    outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "sender", type: "address" },
-          { name: "recipient", type: "address" },
-          { name: "amounts", type: "tuple", components: [
-            { name: "deposited", type: "uint128" },
-            { name: "withdrawn", type: "uint128" },
-            { name: "refunded", type: "uint128" },
-          ]},
-          { name: "token", type: "address" },
-          { name: "startTime", type: "uint40" },
-          { name: "endTime", type: "uint40" },
-          { name: "cliffTime", type: "uint40" },
-          { name: "cancelable", type: "bool" },
-          { name: "wasCanceled", type: "bool" },
-          { name: "transferable", type: "bool" },
-        ],
-      },
-    ],
+    outputs: [{ name: "", type: "uint40" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getEndTime",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint40" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getCliffTime",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint40" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getDepositedAmount",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint128" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getWithdrawnAmount",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint128" }],
     stateMutability: "view",
   },
   {
