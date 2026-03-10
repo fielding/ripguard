@@ -21,6 +21,12 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const BROKER_FEE =
   TREASURY === ZERO_ADDRESS ? BigInt(0) : BigInt("5000000000000000"); // 5e15
 
+// Human-readable fee percentage derived from BROKER_FEE (e.g. "0.5%")
+export const BROKER_FEE_PCT =
+  BROKER_FEE > BigInt(0)
+    ? `${Number((BROKER_FEE * BigInt(10000)) / BigInt("10000000000000000")) / 100}%`
+    : "0%";
+
 // Whether we're running on a testnet
 export const IS_TESTNET = process.env.NEXT_PUBLIC_CHAIN === "base-sepolia";
 
@@ -30,9 +36,15 @@ export const EXPLORER_URL = IS_TESTNET
   : "https://basescan.org";
 
 // Safe starting block for event queries (Sablier v2.0 deployment)
+// Testnet: TestUSDC deployed at block 38,905,638 — start just before that
 export const STREAM_START_BLOCK = IS_TESTNET
-  ? BigInt(0) // Base Sepolia — scan from genesis (low volume)
-  : BigInt(22000000); // Base mainnet
+  ? BigInt(38_900_000) // Just before TestUSDC deployment (38,905,638)
+  : BigInt(22_000_000); // Base mainnet
+
+// Max block range per getLogs call.
+// Public Base Sepolia RPCs (RainbowKit defaults) reject ranges > ~2k blocks.
+// Mainnet paid RPCs (Alchemy etc.) support up to 50k.
+export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(2_000) : BigInt(50_000);
 
 // Schedule presets
 export const PRESETS = {
@@ -40,7 +52,7 @@ export const PRESETS = {
     label: "Panic Lock 7D",
     description: "Lock everything for 7 days",
     cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 7 * 24 * 60 * 60,
+    totalSeconds: 7 * 24 * 60 * 60 + 1, // cliff must be < total in Sablier; +1s creates effective lump sum
     isLumpSum: true,
   },
   lock30d: {
@@ -54,7 +66,7 @@ export const PRESETS = {
     label: "Cliff 7D + Vest 90D",
     description: "7-day cliff, then linear vest over 90 days",
     cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 90 * 24 * 60 * 60,
+    totalSeconds: 97 * 24 * 60 * 60, // 7d cliff + 90d vest
     isLumpSum: false,
   },
 } as const;
