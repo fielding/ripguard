@@ -3,7 +3,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { Header } from "@/components/Header";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { formatUnits } from "viem";
 import {
   useAccount,
@@ -23,17 +23,21 @@ import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { trackClaim, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
-import {
-  filterVaults,
-  getVaultStatus,
-  sortVaults,
-  summarizeVaults,
-  type VaultData,
-  type VaultFilter,
-  type VaultSort,
-} from "@/lib/vaults";
 
 const USDC_DECIMALS = 6;
+
+type VaultData = {
+  streamId: bigint;
+  totalAmount: bigint;
+  cliffSeconds: number;
+  totalSeconds: number;
+  deposited: bigint;
+  withdrawn: bigint;
+  startTime: number;
+  endTime: number;
+  cliffTime: number;
+  claimable: bigint;
+};
 
 function formatCountdown(seconds: number): string {
   if (seconds <= 0) return "Now";
@@ -88,7 +92,6 @@ function VaultCard({
     vault.deposited > BigInt(0)
       ? Number((vault.withdrawn * BigInt(10000)) / vault.deposited) / 100
       : 0;
-  const status = getVaultStatus(vault, now);
 
   const nextUnlock = (() => {
     if (vault.cliffTime > 0 && now < vault.cliffTime) {
@@ -104,18 +107,6 @@ function VaultCard({
 
   const nextUnlockLabel =
     nextUnlock.time > 0 ? formatCountdown(nextUnlock.time) : "Now";
-  const statusLabel = {
-    ready: "Claim ready",
-    cliff: "In cliff",
-    vesting: "Vesting",
-    matured: "Fully unlocked",
-  }[status];
-  const statusClassName = {
-    ready: "bg-green-500/12 text-green-300 border-green-500/20",
-    cliff: "bg-amber-500/12 text-amber-300 border-amber-500/20",
-    vesting: "bg-cyan/12 text-cyan border-cyan/20",
-    matured: "bg-white/8 text-white/70 border-white/10",
-  }[status];
 
   return (
     <div className="card-gradient rounded-xl p-5 space-y-4">
@@ -124,15 +115,8 @@ function VaultCard({
           <div className="text-xs text-white/40 font-mono">
             Stream #{vault.streamId.toString()}
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="text-sm text-white/60">
-              {getScheduleType(vault.cliffSeconds, vault.totalSeconds)}
-            </div>
-            <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClassName}`}
-            >
-              {statusLabel}
-            </span>
+          <div className="text-sm text-white/60 mt-0.5">
+            {getScheduleType(vault.cliffSeconds, vault.totalSeconds)}
           </div>
         </div>
         <div className="sm:text-right">
@@ -278,20 +262,12 @@ function VaultDashboard() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { toast } = useToast();
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   const [streamIds, setStreamIds] = useState<bigint[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
-  const [filter, setFilter] = useState<VaultFilter>("all");
-  const [sort, setSort] = useState<VaultSort>("newest");
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
-    return () => clearInterval(id);
-  }, []);
 
   // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams
   useEffect(() => {
@@ -484,19 +460,6 @@ function VaultDashboard() {
     }
   }, [isWithdrawError, withdrawError, claimingId, refetchStreams, toast]);
 
-  const totals = useMemo(() => summarizeVaults(vaults, now), [vaults, now]);
-  const visibleVaults = useMemo(
-    () => sortVaults(filterVaults(vaults, filter, now), sort, now),
-    [vaults, filter, sort, now]
-  );
-  const nextUnlockSummary =
-    totals.nextUnlockSeconds === null
-      ? "No future unlocks"
-      : totals.nextUnlockSeconds === 0
-        ? "Ready now"
-        : formatCountdown(totals.nextUnlockSeconds);
-  const activeFilterCount = filter === "all" ? vaults.length : visibleVaults.length;
-
   // Not connected
   if (!isConnected) {
     return (
@@ -582,94 +545,42 @@ function VaultDashboard() {
     );
   }
 
+  // Aggregate stats (only compute when we have multiple vaults)
+  const totals = vaults.length >= 2
+    ? vaults.reduce(
+        (acc, v) => ({
+          locked: acc.locked + v.deposited,
+          claimable: acc.claimable + v.claimable,
+          claimed: acc.claimed + v.withdrawn,
+        }),
+        { locked: BigInt(0), claimable: BigInt(0), claimed: BigInt(0) }
+      )
+    : null;
+
   return (
     <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-8 space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-2">
-        <div className="card-gradient rounded-xl px-4 py-3">
-          <div className="text-xs text-white/40">Total Locked</div>
-          <div className="text-lg font-semibold mt-0.5">
-            {formatUnits(totals.locked, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
+      {totals && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+          <div className="card-gradient rounded-xl px-4 py-3 text-center">
+            <div className="text-xs text-white/40">Total Locked</div>
+            <div className="text-lg font-semibold mt-0.5">
+              {formatUnits(totals.locked, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
+            </div>
           </div>
-          <div className="text-[11px] text-white/30 mt-1">
-            {vaults.length} vault{vaults.length === 1 ? "" : "s"} tracked
+          <div className="card-gradient rounded-xl px-4 py-3 text-center">
+            <div className="text-xs text-white/40">Claimable</div>
+            <div className="text-lg font-semibold text-green-400 mt-0.5">
+              {formatUnits(totals.claimable, USDC_DECIMALS)} <span className="text-sm text-green-400/50">USDC</span>
+            </div>
           </div>
-        </div>
-        <div className="card-gradient rounded-xl px-4 py-3">
-          <div className="text-xs text-white/40">Claimable Now</div>
-          <div className="text-lg font-semibold text-green-400 mt-0.5">
-            {formatUnits(totals.claimable, USDC_DECIMALS)} <span className="text-sm text-green-400/50">USDC</span>
-          </div>
-          <div className="text-[11px] text-white/30 mt-1">
-            {totals.readyCount} ready to claim
-          </div>
-        </div>
-        <div className="card-gradient rounded-xl px-4 py-3">
-          <div className="text-xs text-white/40">In Flight</div>
-          <div className="text-lg font-semibold mt-0.5">
-            {totals.vestingCount} <span className="text-sm text-white/40">active</span>
-          </div>
-          <div className="text-[11px] text-white/30 mt-1">
-            Next unlock {nextUnlockSummary}
+          <div className="card-gradient rounded-xl px-4 py-3 text-center">
+            <div className="text-xs text-white/40">Claimed</div>
+            <div className="text-lg font-semibold mt-0.5">
+              {formatUnits(totals.claimed, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
+            </div>
           </div>
         </div>
-        <div className="card-gradient rounded-xl px-4 py-3">
-          <div className="text-xs text-white/40">Already Claimed</div>
-          <div className="text-lg font-semibold mt-0.5">
-            {formatUnits(totals.claimed, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
-          </div>
-          <div className="text-[11px] text-white/30 mt-1">
-            {totals.maturedCount} fully unlocked
-          </div>
-        </div>
-      </div>
-
-      <div className="card-gradient rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <div className="text-xs uppercase tracking-[0.18em] text-white/35">
-            Command Center
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {([
-              ["all", "All vaults"],
-              ["ready", "Ready now"],
-              ["vesting", "Still vesting"],
-              ["matured", "Fully unlocked"],
-            ] as [VaultFilter, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => setFilter(value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  filter === value
-                    ? "border-cyan/50 bg-cyan/10 text-cyan"
-                    : "border-white/10 text-white/45 hover:border-white/20 hover:text-white/70"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right text-xs text-white/35">
-            Showing {activeFilterCount} of {vaults.length}
-          </div>
-          <label className="flex items-center gap-2 text-xs text-white/45">
-            <span>Sort</span>
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as VaultSort)}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white focus:border-cyan/40 focus:outline-none"
-            >
-              <option value="newest">Newest</option>
-              <option value="largest">Largest amount</option>
-              <option value="claimable">Most claimable</option>
-              <option value="endingSoon">Ending soon</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
+      )}
       {failedStreamCount > 0 && (
         <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-sm text-yellow-400">
           <svg aria-hidden="true" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -685,25 +596,15 @@ function VaultDashboard() {
           </span>
         </div>
       )}
-
-      {visibleVaults.length === 0 ? (
-        <div className="card-gradient rounded-xl px-5 py-8 text-center space-y-2">
-          <div className="text-sm font-medium text-white/75">No vaults match this view</div>
-          <div className="text-sm text-white/40">
-            Try another filter, or create a fresh lock if you want more test data.
-          </div>
-        </div>
-      ) : (
-        visibleVaults.map((vault) => (
-          <CardErrorBoundary key={vault.streamId.toString()} label={`Stream #${vault.streamId.toString()}`}>
-            <VaultCard
-              vault={vault}
-              onClaim={handleClaim}
-              claimingId={claimingId}
-            />
-          </CardErrorBoundary>
-        ))
-      )}
+      {vaults.map((vault) => (
+        <CardErrorBoundary key={vault.streamId.toString()} label={`Stream #${vault.streamId.toString()}`}>
+          <VaultCard
+            vault={vault}
+            onClaim={handleClaim}
+            claimingId={claimingId}
+          />
+        </CardErrorBoundary>
+      ))}
       <div className="text-center pt-4">
         <Link
           href="/create"

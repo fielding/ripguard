@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 const STORAGE_KEY = "ripguard-onboarding-seen";
@@ -24,22 +24,26 @@ const STEPS = [
 ];
 
 export function WelcomeModal() {
-  const [show, setShow] = useState(() => {
-    try {
-      return !localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return false;
-    }
-  });
+  const [show, setShow] = useState(false);
 
-  const dismiss = useCallback(() => {
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setShow(true);
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
+  function dismiss() {
     setShow(false);
     try {
       localStorage.setItem(STORAGE_KEY, "1");
     } catch {
       // localStorage unavailable
     }
-  }, []);
+  }
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +87,7 @@ export function WelcomeModal() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prev;
     };
-  }, [show, dismiss]);
+  }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!show) return null;
 
