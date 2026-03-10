@@ -53,8 +53,8 @@ export const PRESETS = {
     label: "Panic Lock 7D",
     description: "Lock everything for 7 days",
     cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 7 * 24 * 60 * 60,
-    isLumpSum: true,
+    totalSeconds: 7 * 24 * 60 * 60 + 1, // cliff < total required by Sablier; 1s linear window after cliff
+    isLumpSum: false, // Do NOT set unlockCliff=totalAmount — Sablier rejects when linear stream amount is 0
   },
   lock30d: {
     label: "Lock 30D",
