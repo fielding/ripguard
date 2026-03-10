@@ -15,11 +15,6 @@ jobs:
       actions: read
       pull-requests: write
       contents: read
-    env:
-      REVIEW_CREW_ROOT: ${{ runner.temp }}/review-crew
-      HISTORY_DIR: ${{ runner.temp }}/review-crew/history
-      REPOS_DIR: ${{ runner.temp }}/review-crew/repos
-      WORKTREES_DIR: ${{ runner.temp }}/review-crew/worktrees
 
     steps:
       - name: Checkout PR head
@@ -35,6 +30,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Initialize review directories
+        run: |
+          {
+            echo "REVIEW_CREW_ROOT=$RUNNER_TEMP/review-crew"
+            echo "HISTORY_DIR=$RUNNER_TEMP/review-crew/history"
+            echo "REPOS_DIR=$RUNNER_TEMP/review-crew/repos"
+            echo "WORKTREES_DIR=$RUNNER_TEMP/review-crew/worktrees"
+          } >> "$GITHUB_ENV"
 
       - name: Restore previous review session history
         env:
@@ -112,7 +116,8 @@ jobs:
             exit 0
           fi
 
-          relative_session="${session_dir#$HISTORY_DIR/}"
+          history_prefix="${HISTORY_DIR%/}/"
+          relative_session="${session_dir#"$history_prefix"}"
           artifact_path="$RUNNER_TEMP/review-session-pr-${PR_NUMBER}.tar.gz"
           tar -czf "$artifact_path" -C "$HISTORY_DIR" "$relative_session"
 
