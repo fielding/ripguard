@@ -5,6 +5,7 @@ import { WagmiProvider, useAccount } from "wagmi";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { config } from "@/config/wagmi";
 import { ToastProvider } from "@/components/Toast";
+import { TestnetBanner } from "@/components/TestnetBanner";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { trackWalletConnect, trackAppError } from "@/lib/analytics";
 
@@ -65,6 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
         })}>
           <WalletTracker />
           <GlobalErrorHandler />
+          <TestnetBanner />
           <ToastProvider>{children}</ToastProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
