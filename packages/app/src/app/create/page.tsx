@@ -989,7 +989,8 @@ function SuccessView({
   schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
   onCreateAnother: () => void;
 }) {
-  const now = Math.floor(Date.now() / 1000);
+  const [createdAtMs] = useState(() => Date.now());
+  const now = Math.floor(createdAtMs / 1000);
   const endDate = new Date((now + schedule.totalSeconds) * 1000);
 
   const nextUnlock = (() => {

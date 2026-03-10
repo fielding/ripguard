@@ -278,6 +278,59 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Strategy Lab */}
+        <section className="px-5 sm:px-8 py-20 sm:py-24 section-divider">
+          <div className="max-w-5xl mx-auto grid gap-5 lg:grid-cols-[0.9fr_1.1fr] items-stretch">
+            <div className="rounded-3xl border border-cyan/15 bg-gradient-to-b from-cyan/[0.08] to-transparent p-7 sm:p-8">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-cyan/70">
+                New
+              </div>
+              <h2 className="mt-4 text-2xl sm:text-3xl font-bold leading-tight">
+                Not sure how hard to lock it?
+              </h2>
+              <p className="mt-4 text-white/55 leading-relaxed">
+                Use the Strategy Lab to model how much of your bankroll should disappear before your next impulsive trade can touch it.
+              </p>
+              <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                <Link
+                  href="/strategy"
+                  className="bg-cyan text-black font-bold rounded-xl px-6 py-3.5 text-center hover:bg-cyan/90 transition-all hover:shadow-[0_0_40px_rgba(0,229,255,0.25)]"
+                >
+                  Open Strategy Lab
+                </Link>
+                <Link
+                  href="/create"
+                  className="border border-white/10 text-white/65 font-semibold rounded-xl px-6 py-3.5 text-center hover:border-cyan/30 hover:text-cyan transition-colors"
+                >
+                  Skip straight to locking
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                {
+                  title: "Pressure test your plan",
+                  body: "Model what stays liquid if you revenge trade in an hour, two days, or after a clean week.",
+                },
+                {
+                  title: "Get a preset recommendation",
+                  body: "Translate your actual behavior into a Panic Lock, 30D glide path, or a cliff + vesting plan.",
+                },
+                {
+                  title: "Make the future argument shorter",
+                  body: "Decide the rule now so the next high-conviction candle has less room to negotiate with you.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="card-gradient rounded-2xl p-5">
+                  <h3 className="font-semibold text-base">{item.title}</h3>
+                  <p className="mt-3 text-sm text-white/50 leading-relaxed">{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Problem Section */}
         <section className="px-5 sm:px-8 py-24 sm:py-32 section-divider">
           <div className="max-w-3xl mx-auto text-center space-y-8">
