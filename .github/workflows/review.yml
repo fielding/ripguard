@@ -12,8 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
+      actions: read
       pull-requests: write
       contents: read
+    env:
+      REVIEW_CREW_ROOT: ${{ runner.temp }}/review-crew
+      HISTORY_DIR: ${{ runner.temp }}/review-crew/history
+      REPOS_DIR: ${{ runner.temp }}/review-crew/repos
+      WORKTREES_DIR: ${{ runner.temp }}/review-crew/worktrees
 
     steps:
       - name: Checkout PR head
@@ -30,6 +36,42 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Restore previous review session history
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HISTORY_DIR"
+          artifact_name="review-session-pr-${PR_NUMBER}"
+          artifact_json="$(gh api "/repos/${REPO_SLUG}/actions/artifacts?per_page=100&name=${artifact_name}" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0]')"
+
+          if [ -z "$artifact_json" ] || [ "$artifact_json" = "null" ]; then
+            echo "No prior review artifact found for PR #${PR_NUMBER}"
+            exit 0
+          fi
+
+          run_id="$(printf '%s' "$artifact_json" | jq -r '.workflow_run.id // empty')"
+          if [ -z "$run_id" ]; then
+            echo "Artifact found but no workflow run ID was present; skipping restore"
+            exit 0
+          fi
+
+          download_dir="$RUNNER_TEMP/review-history-download"
+          rm -rf "$download_dir"
+          mkdir -p "$download_dir"
+          gh run download "$run_id" --repo "$REPO_SLUG" --name "$artifact_name" --dir "$download_dir"
+
+          tarball="$(find "$download_dir" -type f -name '*.tar.gz' | head -n1 || true)"
+          if [ -z "$tarball" ]; then
+            echo "Downloaded artifact did not contain a tarball; skipping restore"
+            exit 0
+          fi
+
+          tar -xzf "$tarball" -C "$HISTORY_DIR"
+          echo "Restored prior review history from run ${run_id}"
+
       - name: Install agent harnesses
         run: |
           npm install -g @anthropic-ai/claude-code
@@ -39,6 +81,7 @@ jobs:
         run: pip install git+https://${{ secrets.REVIEW_CREW_PAT }}@github.com/fielding/review-crew.git
 
       - name: Run review
+        id: run_review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -49,3 +92,38 @@ jobs:
             ${{ github.event.issue.number }} \
             --ci \
             --reviewers 2
+
+      - name: Package review session artifact
+        id: package_review_session
+        if: ${{ steps.run_review.outcome == 'success' }}
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          owner="${REPO_SLUG%/*}"
+          repo="${REPO_SLUG#*/}"
+          pr_dir="$HISTORY_DIR/$owner/$repo/$PR_NUMBER"
+          session_dir="$(find "$pr_dir" -mindepth 1 -maxdepth 1 -type d | sort | tail -n1 || true)"
+
+          if [ -z "$session_dir" ]; then
+            echo "artifact_ready=false" >> "$GITHUB_OUTPUT"
+            echo "No completed session found to package"
+            exit 0
+          fi
+
+          relative_session="${session_dir#$HISTORY_DIR/}"
+          artifact_path="$RUNNER_TEMP/review-session-pr-${PR_NUMBER}.tar.gz"
+          tar -czf "$artifact_path" -C "$HISTORY_DIR" "$relative_session"
+
+          echo "artifact_ready=true" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=$artifact_path" >> "$GITHUB_OUTPUT"
+          echo "Packaged session artifact from $relative_session"
+
+      - name: Upload review session artifact
+        if: ${{ steps.package_review_session.outputs.artifact_ready == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-session-pr-${{ github.event.issue.number }}
+          path: ${{ steps.package_review_session.outputs.artifact_path }}
+          retention-days: 30
