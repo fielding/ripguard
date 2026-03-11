@@ -46,6 +46,18 @@ const DURATION_OPTIONS = [
   { label: "365 days", seconds: 31536000 },
 ];
 
+function parsePositiveDurationParam(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 86400) return null;
+  return parsed;
+}
+
+function parseAmountParam(value: string | null): string {
+  if (!value) return "";
+  return /^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(value) ? value : "";
+}
+
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   if (days >= 365) return `${Math.floor(days / 365)}y ${days % 365}d`;
@@ -115,20 +127,20 @@ function Spinner() {
 function CreateLockInner() {
   const searchParams = useSearchParams();
   const presetParam = searchParams.get("preset") as PresetKey | null;
+  const customCliffParam = parsePositiveDurationParam(searchParams.get("cliff"));
+  const customTotalParam = parsePositiveDurationParam(searchParams.get("total"));
+  const isCustomFromQuery = searchParams.get("mode") === "custom" && customTotalParam !== null;
+  const amountParam = parseAmountParam(searchParams.get("amount"));
 
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
 
   // Schedule state
   const [selectedPreset, setSelectedPreset] = useState<PresetKey | "custom">(
-<<<<<<< HEAD
-    presetParam && presetParam in PRESETS ? presetParam : "custom"
-=======
     isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "panicLock7d"
->>>>>>> 9da72ab (Fix Panic Lock preset: set isLumpSum=false to avoid Sablier zero-stream rejection)
   );
-  const [customCliff, setCustomCliff] = useState(0);
-  const [customTotal, setCustomTotal] = useState(604800); // 7 days default
+  const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
+  const [customTotal, setCustomTotal] = useState(customTotalParam ?? 604800); // 7 days default
 
   // Auto-clamp total to be >= cliff, and enforce minimum 1 day
   useEffect(() => {
@@ -138,7 +150,7 @@ function CreateLockInner() {
       setCustomTotal(customCliff);
     }
   }, [customCliff, customTotal]);
-  const [amountInput, setAmountInput] = useState("");
+  const [amountInput, setAmountInput] = useState(amountParam);
   const [step, setStep] = useState<Step>("schedule");
   const [confirmed, setConfirmed] = useState(false);
 
