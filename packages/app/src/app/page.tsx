@@ -43,6 +43,30 @@ function ClockIcon({ className }: { className?: string }) {
   );
 }
 
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" />
+    </svg>
+  );
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+    </svg>
+  );
+}
+
+function ArrowDownTrayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+  );
+}
+
 function RipGuardLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -161,6 +185,28 @@ function HeroLogo({ className }: { className?: string }) {
   );
 }
 
+const STATS = [
+  { value: "$3B+", label: "Processed by Sablier" },
+  { value: "4×", label: "Independently audited" },
+  { value: "0", label: "Custom contracts" },
+  { value: "100%", label: "Non-custodial" },
+];
+
+function StatsBar() {
+  return (
+    <div className="border-y border-white/[0.05] bg-white/[0.015] py-8 px-5 sm:px-8">
+      <div className="max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+        {STATS.map((stat) => (
+          <div key={stat.value} className="space-y-1">
+            <div className="text-2xl sm:text-3xl font-bold text-cyan text-glow-cyan">{stat.value}</div>
+            <div className="text-xs text-white/30 uppercase tracking-wider">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const PRESET_ICONS: Record<string, React.ReactNode> = {
   panicLock7d: <ShieldIcon className="w-7 h-7 text-cyan" />,
   lock30d: <ClockIcon className="w-7 h-7 text-cyan" />,
@@ -271,8 +317,7 @@ export default function Home() {
             </div>
 
             <p className="text-[11px] text-white/20 text-center tracking-wider uppercase mt-2">
-              Self-custodial &middot; On-chain enforced &middot; Verified
-              contracts
+              Self-custodial &middot; Powered by Sablier &middot; 4× audited &middot; Base mainnet
             </p>
 
             {!IS_TESTNET && (
@@ -285,6 +330,9 @@ export default function Home() {
             )}
           </div>
         </section>
+
+        {/* Stats Bar */}
+        <StatsBar />
 
         {/* Problem Section */}
         <section className="px-5 sm:px-8 py-24 sm:py-32 section-divider">
@@ -324,7 +372,10 @@ export default function Home() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-8">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="step-circle">1</div>
+                <div className="w-16 h-16 rounded-2xl border border-cyan/20 bg-cyan/[0.06] flex items-center justify-center">
+                  <WalletIcon className="w-8 h-8 text-cyan" />
+                </div>
+                <div className="text-xs text-white/20 font-bold uppercase tracking-widest">Step 1</div>
                 <h3 className="font-semibold text-lg">Deposit your winnings</h3>
                 <p className="text-sm text-white/45 leading-relaxed">
                   Choose how much USDC to protect. You already did the hard
@@ -332,7 +383,10 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="step-circle">2</div>
+                <div className="w-16 h-16 rounded-2xl border border-cyan/20 bg-cyan/[0.06] flex items-center justify-center">
+                  <CalendarIcon className="w-8 h-8 text-cyan" />
+                </div>
+                <div className="text-xs text-white/20 font-bold uppercase tracking-widest">Step 2</div>
                 <h3 className="font-semibold text-lg">Pick a schedule</h3>
                 <p className="text-sm text-white/45 leading-relaxed">
                   Lump sum on a date, cliff + vesting, or drip over time.
@@ -344,7 +398,10 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="step-circle">3</div>
+                <div className="w-16 h-16 rounded-2xl border border-cyan/20 bg-cyan/[0.06] flex items-center justify-center">
+                  <ArrowDownTrayIcon className="w-8 h-8 text-cyan" />
+                </div>
+                <div className="text-xs text-white/20 font-bold uppercase tracking-widest">Step 3</div>
                 <h3 className="font-semibold text-lg">Claim when it unlocks</h3>
                 <p className="text-sm text-white/45 leading-relaxed">
                   Time passes, you claim to your wallet. No one else can touch
