@@ -17,6 +17,7 @@ function RipGuardLogo({ className }: { className?: string }) {
 const NAV_LINKS = [
   { href: "/create", label: "Create Lock" },
   { href: "/vaults", label: "My Vaults" },
+  { href: "/recovery", label: "Recovery Lab" },
 ];
 
 export function Header() {
