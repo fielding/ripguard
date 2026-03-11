@@ -7,9 +7,27 @@ import { usePathname } from "next/navigation";
 function RipGuardLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="#00E5FF" strokeWidth="1.8" fill="rgba(0,229,255,0.08)" />
-      <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="#00E5FF" strokeWidth="1.5" fill="rgba(0,229,255,0.06)" />
-      <path d="M13.5 12V10a2.5 2.5 0 0 1 5 0v2" stroke="#00E5FF" strokeWidth="1.5" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="shield-fill-hdr" x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.04" />
+        </linearGradient>
+      </defs>
+      {/* Shield body */}
+      <path
+        d="M16 2.5L3.5 7.5v8.8c0 7.2 5.2 13.9 12.5 15.7C23.3 30.2 28.5 23.5 28.5 16.3V7.5L16 2.5Z"
+        stroke="#00E5FF"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        fill="url(#shield-fill-hdr)"
+      />
+      {/* Lock body */}
+      <rect x="11.5" y="13" width="9" height="7.5" rx="1.8" stroke="#00E5FF" strokeWidth="1.4" fill="rgba(0,229,255,0.10)" />
+      {/* Lock shackle */}
+      <path d="M13.5 13v-2.2a2.5 2.5 0 0 1 5 0V13" stroke="#00E5FF" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      {/* Keyhole */}
+      <circle cx="16" cy="16.5" r="1.2" fill="#00E5FF" fillOpacity="0.8" />
+      <path d="M16 17.5v1.8" stroke="#00E5FF" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }

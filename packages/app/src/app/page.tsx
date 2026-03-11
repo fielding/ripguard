@@ -48,105 +48,121 @@ function ClockIcon({ className }: { className?: string }) {
 function HeroLogo({ className }: { className?: string }) {
   return (
     <div className={className}>
-      <svg viewBox="0 0 280 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto" aria-hidden="true">
+      <svg viewBox="0 0 280 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto" aria-hidden="true">
         <defs>
-          <filter id="hero-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="8" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          {/* Soft glow for shield outline */}
+          <filter id="hg-glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          <filter id="hero-glow-strong" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="12" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          {/* Strong glow for lock + text */}
+          <filter id="hg-glow-strong" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="9" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          <linearGradient id="shield-gradient" x1="140" y1="20" x2="140" y2="240" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.02" />
+          {/* Ambient bloom beneath shield */}
+          <filter id="hg-bloom" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="22" />
+          </filter>
+          <linearGradient id="hg-shield-fill" x1="140" y1="16" x2="140" y2="230" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.03" />
           </linearGradient>
-          <linearGradient id="lock-gradient" x1="140" y1="100" x2="140" y2="180" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.12" />
+          <linearGradient id="hg-lock-fill" x1="140" y1="108" x2="140" y2="178" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.14" />
             <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.04" />
           </linearGradient>
         </defs>
 
-        {/* Outer shield glow */}
+        {/* Ambient bloom — large diffuse glow behind shield */}
+        <ellipse cx="140" cy="130" rx="110" ry="110" fill="#00E5FF" fillOpacity="0.07" filter="url(#hg-bloom)" />
+
+        {/* Outer shield halo (very faint, spread) */}
         <path
-          d="M140 16L40 56v72c0 64.4 42.7 124.6 100 139.4C197.3 252.6 240 192.4 240 128V56L140 16Z"
-          stroke="#00E5FF"
-          strokeWidth="1"
-          strokeOpacity="0.15"
-          fill="none"
-          filter="url(#hero-glow-strong)"
+          d="M140 18L36 60v70c0 64 43 124 104 139C201 254 244 194 244 130V60L140 18Z"
+          fill="#00E5FF" fillOpacity="0.05"
+          filter="url(#hg-bloom)"
         />
 
-        {/* Shield body */}
+        {/* Shield body fill */}
         <path
-          d="M140 28L50 64v64c0 58.5 38.4 113 90 126.6C191.6 241 230 186.5 230 128V64L140 28Z"
-          stroke="#00E5FF"
-          strokeWidth="2"
-          fill="url(#shield-gradient)"
+          d="M140 26L46 66v64c0 59 39 114 94 128C195 244 234 189 234 130V66L140 26Z"
+          fill="url(#hg-shield-fill)"
         />
 
-        {/* Inner shield line */}
+        {/* Shield outer stroke — glowing */}
         <path
-          d="M140 44L62 76v52c0 52.6 33.3 101.6 78 113.8C184.7 229.6 218 180.6 218 128V76L140 44Z"
-          stroke="#00E5FF"
-          strokeWidth="0.5"
-          strokeOpacity="0.3"
-          fill="none"
+          d="M140 26L46 66v64c0 59 39 114 94 128C195 244 234 189 234 130V66L140 26Z"
+          stroke="#00E5FF" strokeWidth="1.8"
+          filter="url(#hg-glow)"
+        />
+
+        {/* Shield inner bevel line */}
+        <path
+          d="M140 42L62 78v56c0 52 34 101 78 113C184 234 218 186 218 134V78L140 42Z"
+          stroke="#00E5FF" strokeWidth="0.6" strokeOpacity="0.28"
+        />
+
+        {/* Corner accent marks */}
+        <circle cx="140" cy="26" r="2" fill="#00E5FF" fillOpacity="0.6" />
+        <circle cx="46" cy="66" r="1.5" fill="#00E5FF" fillOpacity="0.3" />
+        <circle cx="234" cy="66" r="1.5" fill="#00E5FF" fillOpacity="0.3" />
+
+        {/* Horizontal rule inside shield */}
+        <line x1="80" y1="110" x2="200" y2="110" stroke="#00E5FF" strokeWidth="0.5" strokeOpacity="0.2" />
+
+        {/* Lock shackle */}
+        <path
+          d="M118 118V103a22 22 0 0 1 44 0v15"
+          stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round"
+          filter="url(#hg-glow-strong)"
         />
 
         {/* Lock body */}
         <rect
-          x="104" y="120" width="72" height="56" rx="8"
-          stroke="#00E5FF"
-          strokeWidth="2"
-          fill="url(#lock-gradient)"
-          filter="url(#hero-glow)"
-        />
-
-        {/* Lock shackle */}
-        <path
-          d="M116 120V104a24 24 0 0 1 48 0v16"
-          stroke="#00E5FF"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          fill="none"
-          filter="url(#hero-glow)"
+          x="106" y="118" width="68" height="54" rx="8"
+          fill="url(#hg-lock-fill)"
+          stroke="#00E5FF" strokeWidth="2"
+          filter="url(#hg-glow)"
         />
 
         {/* Keyhole */}
-        <circle cx="140" cy="144" r="6" fill="#00E5FF" fillOpacity="0.6" />
-        <path d="M140 148v10" stroke="#00E5FF" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="140" cy="141" r="6.5" fill="#00E5FF" fillOpacity="0.75" filter="url(#hg-glow-strong)" />
+        <path d="M140 146v9" stroke="#00E5FF" strokeWidth="3" strokeLinecap="round" />
 
-        {/* Small decorative elements */}
-        <circle cx="140" cy="144" r="10" stroke="#00E5FF" strokeWidth="0.5" strokeOpacity="0.3" fill="none" />
+        {/* Subtle tick marks flanking lock */}
+        <line x1="88" y1="145" x2="98" y2="145" stroke="#00E5FF" strokeWidth="1" strokeOpacity="0.25" />
+        <line x1="182" y1="145" x2="192" y2="145" stroke="#00E5FF" strokeWidth="1" strokeOpacity="0.25" />
 
-        {/* RIPGUARD text */}
+        {/* RIPGUARD wordmark */}
         <text
-          x="140" y="272"
+          x="140" y="266"
           textAnchor="middle"
-          fontFamily="system-ui, -apple-system, sans-serif"
-          fontSize="28"
-          fontWeight="800"
-          letterSpacing="6"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Helvetica Neue, sans-serif"
+          fontSize="26"
+          fontWeight="900"
+          letterSpacing="8"
           fill="#00E5FF"
-          filter="url(#hero-glow)"
+          filter="url(#hg-glow-strong)"
         >
           RIPGUARD
         </text>
 
+        {/* Divider line under wordmark */}
+        <line x1="90" y1="274" x2="190" y2="274" stroke="#00E5FF" strokeWidth="0.5" strokeOpacity="0.3" />
+
         {/* Tagline */}
         <text
-          x="140" y="296"
+          x="140" y="290"
           textAnchor="middle"
-          fontFamily="system-ui, -apple-system, sans-serif"
-          fontSize="10"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Helvetica Neue, sans-serif"
+          fontSize="8.5"
           fontWeight="500"
-          letterSpacing="4"
+          letterSpacing="4.5"
           fill="#00E5FF"
-          fillOpacity="0.4"
+          fillOpacity="0.38"
         >
-          THE FINAL FORTRESS
+          NON-CUSTODIAL · ON-CHAIN
         </text>
       </svg>
     </div>
