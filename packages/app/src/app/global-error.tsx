@@ -1,9 +1,8 @@
 "use client";
 
-// Global error boundary — wraps the root layout, so cannot use any providers.
-// Must include <html> and <body> tags.
+// Global error boundary renders outside the root layout, so use inline styles
+// instead of Tailwind classes (which aren't available here).
 export default function GlobalError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -11,15 +10,43 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ background: "#0a0a0a", color: "#fff", fontFamily: "sans-serif", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", margin: 0 }}>
-        <div style={{ textAlign: "center", padding: "2rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.75rem" }}>Something went wrong</h2>
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
-            {error.digest ? `Error ID: ${error.digest}` : "An unexpected error occurred."}
+      <body
+        style={{
+          backgroundColor: "#000",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          margin: 0,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <div style={{ textAlign: "center", padding: "0 1.5rem" }}>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem" }}>
+            Something went wrong
+          </h2>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: "0.875rem",
+              maxWidth: "24rem",
+              margin: "0 auto 1rem",
+            }}
+          >
+            An unexpected error occurred. Please try again.
           </p>
           <button
             onClick={reset}
-            style={{ background: "#00e5ff", color: "#000", fontWeight: 600, border: "none", borderRadius: "0.5rem", padding: "0.625rem 1.5rem", cursor: "pointer", fontSize: "0.875rem" }}
+            style={{
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "0.5rem",
+              padding: "0.5rem 1.25rem",
+              fontSize: "0.875rem",
+              background: "transparent",
+              color: "#fff",
+              cursor: "pointer",
+            }}
           >
             Try again
           </button>

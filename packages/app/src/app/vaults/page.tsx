@@ -270,8 +270,7 @@ function VaultDashboard() {
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams.
-  // Chunks getLogs into 50k-block ranges to work within public RPC limits.
+  // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams
   useEffect(() => {
     if (!isConnected || !address || !publicClient) return;
 

@@ -1,9 +1,12 @@
 import { ImageResponse } from "next/og";
+import { IS_TESTNET } from "@/config/contracts";
 
 export const runtime = "edge";
 export const alt = "RipGuard — Self-custodial profit locker on Base";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+const siteHost = IS_TESTNET ? "testnet.ripguard.xyz" : "ripguard.xyz";
 
 export default function OGImage() {
   return new ImageResponse(
@@ -100,9 +103,9 @@ export default function OGImage() {
             color: "#555555",
           }}
         >
-          <span style={{ display: "flex" }}>ripguard.xyz</span>
+          <span style={{ display: "flex" }}>{siteHost}</span>
           <span style={{ display: "flex" }}>|</span>
-          <span style={{ display: "flex" }}>Unaudited beta</span>
+          <span style={{ display: "flex" }}>Powered by Sablier v2.0</span>
         </div>
       </div>
     ),

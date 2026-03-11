@@ -39,7 +39,6 @@ const DURATION_OPTIONS = [
   { label: "3 days", seconds: 259200 },
   { label: "7 days", seconds: 604800 },
   { label: "14 days", seconds: 1209600 },
-  { label: "21 days", seconds: 1814400 },
   { label: "30 days", seconds: 2592000 },
   { label: "60 days", seconds: 5184000 },
   { label: "90 days", seconds: 7776000 },
@@ -321,21 +320,13 @@ function CreateLockInner() {
   // Auto-advance steps after tx confirmations
   useEffect(() => {
     if (isApproveConfirmed && step === "approve") {
-      // Auto-advance directly to lock — avoids going back to confirm with stale
-      // allowance cache which causes a second "Approve USDC" popup
       refetchAllowance().then(() => {
-        // Guard: step may have changed while awaiting refetch (e.g. wallet rejection race)
-        setStep((currentStep) => {
-          if (currentStep === "approve") {
-            toast("USDC approved.", "success");
-            trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
-            handleLock();
-          }
-          return currentStep;
-        });
+        setStep("confirm");
+        toast("USDC approved. Ready to lock.", "success");
+        trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
       });
     }
-  }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount, handleLock]);
+  }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount]);
 
   useEffect(() => {
     if (isLockConfirmed && step === "lock" && lockTxHash) {
@@ -407,7 +398,7 @@ function CreateLockInner() {
 
       {/* Trust signal */}
       <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">
-        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks &middot; {BROKER_FEE > BigInt(0) ? `${BROKER_FEE_PCT} service fee` : "No fee"}
+        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks
       </div>
 
       <main className="relative flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 max-w-xl mx-auto w-full">
@@ -534,27 +525,15 @@ function CreateLockInner() {
                       Cliff can&apos;t be longer than total duration
                     </p>
                   )}
-                  {customCliff > 0 && customCliff === customTotal && (
-                    <p className="text-xs text-amber-400/80">
-                      Cliff equals total — this creates a lump sum lock that unlocks all at once after {Math.floor(customCliff / 86400)}d.
-                    </p>
-                  )}
                 </div>
               )}
             </section>
 
             {/* Amount Input */}
             <section className="w-full space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                  Amount
-                </h3>
-                {BROKER_FEE > BigInt(0) && (
-                  <span className="text-xs text-white/40 bg-white/[0.04] border border-white/10 rounded px-2 py-0.5">
-                    {BROKER_FEE_PCT} service fee
-                  </span>
-                )}
-              </div>
+              <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
+                Amount
+              </h3>
               <div className="relative">
                 <input
                   type="text"
@@ -668,17 +647,12 @@ function CreateLockInner() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/50">
-                    Service fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
+                    Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
                   </span>
                   <span>{formatUnits(fee, USDC_DECIMALS)} USDC</span>
                 </div>
-                {BROKER_FEE > BigInt(0) && fee > BigInt(0) && (
-                  <p className="text-xs text-white/30">
-                    Your funds go directly into Sablier&apos;s audited contracts — we never hold them. The {BROKER_FEE_PCT} covers infrastructure.
-                  </p>
-                )}
                 <div className="flex justify-between font-medium border-t border-white/10 pt-2">
-                  <span>Total from wallet</span>
+                  <span>Total</span>
                   <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
                 </div>
               </section>
@@ -767,8 +741,6 @@ function CreateLockInner() {
                 fee={fee}
                 totalAmount={totalAmount}
                 hasEnoughAllowance={hasEnoughAllowance}
-                isApproveInFlight={isApproving || isApproveConfirming}
-                isLockInFlight={isLocking || isLockConfirming}
                 confirmed={confirmed}
                 onConfirmedChange={setConfirmed}
                 onApprove={handleApprove}
@@ -859,8 +831,6 @@ function ConfirmDialog({
   fee,
   totalAmount,
   hasEnoughAllowance,
-  isApproveInFlight,
-  isLockInFlight,
   confirmed,
   onConfirmedChange,
   onApprove,
@@ -872,8 +842,6 @@ function ConfirmDialog({
   fee: bigint;
   totalAmount: bigint;
   hasEnoughAllowance: boolean;
-  isApproveInFlight: boolean;
-  isLockInFlight: boolean;
   confirmed: boolean;
   onConfirmedChange: (v: boolean) => void;
   onApprove: () => void;
@@ -953,14 +921,9 @@ function ConfirmDialog({
               <span>{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/50">Service fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
+              <span className="text-white/50">Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
               <span>{formatUnits(fee, USDC_DECIMALS)} USDC</span>
             </div>
-            {BROKER_FEE > BigInt(0) && fee > BigInt(0) && (
-              <p className="text-xs text-white/30 -mt-1">
-                Funds lock directly in Sablier — we never touch them.
-              </p>
-            )}
             <div className="flex justify-between font-medium border-t border-white/10 pt-2">
               <span>Total from wallet</span>
               <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
@@ -1011,18 +974,18 @@ function ConfirmDialog({
           {!hasEnoughAllowance ? (
             <button
               onClick={onApprove}
-              disabled={!confirmed || isApproveInFlight}
+              disabled={!confirmed}
               className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
-              {isApproveInFlight ? "Approving..." : "Approve USDC"}
+              Approve USDC
             </button>
           ) : (
             <button
               onClick={onLock}
-              disabled={!confirmed || isLockInFlight}
+              disabled={!confirmed}
               className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
-              {isLockInFlight ? "Creating..." : "Create Lock"}
+              Create Lock
             </button>
           )}
         </div>
@@ -1044,8 +1007,7 @@ function SuccessView({
   schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
   onCreateAnother: () => void;
 }) {
-  const [createdAtMs] = useState(() => Date.now());
-  const now = Math.floor(createdAtMs / 1000);
+  const now = Math.floor(Date.now() / 1000);
   const endDate = new Date((now + schedule.totalSeconds) * 1000);
 
   const nextUnlock = (() => {
@@ -1097,8 +1059,8 @@ function SuccessView({
         </div>
         <h3 className="text-2xl font-bold">Lock Created!</h3>
         <p className="text-white/50 text-sm max-w-sm mx-auto">
-          {formatUnits(depositAmount, USDC_DECIMALS)} USDC locked via Sablier&apos;s audited contracts.
-          They will vest according to your chosen schedule.
+          Your funds are now locked in a Sablier stream. They will vest according
+          to your chosen schedule.
         </p>
       </div>
 

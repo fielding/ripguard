@@ -32,8 +32,8 @@ function drawCard(
 
   // Accent line at top
   const gradient = ctx.createLinearGradient(0, 0, CARD_W, 0);
-  gradient.addColorStop(0, "#22c55e");
-  gradient.addColorStop(1, "#10b981");
+  gradient.addColorStop(0, "#00E5FF");
+  gradient.addColorStop(1, "#00B8D4");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CARD_W, 3);
 
@@ -82,7 +82,7 @@ function drawCard(
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = "11px system-ui, -apple-system, sans-serif";
   ctx.fillText("NEXT UNLOCK", col1, infoY);
-  ctx.fillStyle = "#22c55e";
+  ctx.fillStyle = "#00E5FF";
   ctx.font = "16px system-ui, -apple-system, sans-serif";
   ctx.fillText(nextUnlock, col1, infoY + 22);
 
@@ -205,6 +205,7 @@ export function ShareCard(props: ShareCardProps) {
         />
         <button
           onClick={() => setMasked(!masked)}
+          aria-label={masked ? "Show locked amount" : "Hide locked amount"}
           className="absolute top-3 right-3 text-xs bg-black/60 border border-white/20 rounded px-2 py-1 text-white/60 hover:text-white transition-colors"
         >
           {masked ? "Show" : "Hide"} amount

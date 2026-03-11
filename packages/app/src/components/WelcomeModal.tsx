@@ -1,32 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 const STORAGE_KEY = "ripguard-onboarding-seen";
-
-function subscribeToWelcomeState(onStoreChange: () => void) {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) {
-      onStoreChange();
-    }
-  };
-
-  window.addEventListener("storage", handleStorage);
-  return () => window.removeEventListener("storage", handleStorage);
-}
-
-function getWelcomeSnapshot() {
-  try {
-    return typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return false;
-  }
-}
 
 const STEPS = [
   {
@@ -47,18 +24,26 @@ const STEPS = [
 ];
 
 export function WelcomeModal() {
-  const [dismissed, setDismissed] = useState(false);
-  const shouldShow = useSyncExternalStore(subscribeToWelcomeState, getWelcomeSnapshot, () => false);
-  const show = shouldShow && !dismissed;
+  const [show, setShow] = useState(false);
 
-  const dismiss = useCallback(() => {
-    setDismissed(true);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setShow(true);
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
+  function dismiss() {
+    setShow(false);
     try {
       localStorage.setItem(STORAGE_KEY, "1");
     } catch {
       // localStorage unavailable
     }
-  }, []);
+  }
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +87,7 @@ export function WelcomeModal() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prev;
     };
-  }, [show, dismiss]);
+  }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!show) return null;
 

@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       setToasts((prev) => [...prev, { id, message, type, link }]);
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 5000);
+      }, type === "error" ? 10000 : 5000);
     },
     []
   );
@@ -61,10 +61,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+        <div
+          className="fixed bottom-4 left-4 right-4 sm:left-auto z-[100] flex flex-col gap-2 max-w-sm pb-safe"
+        >
           {toasts.map((t) => (
             <div
               key={t.id}
+              role="alert"
+              aria-live={t.type === "error" ? "assertive" : "polite"}
               className={`rounded-lg px-4 py-3 text-sm shadow-lg border backdrop-blur-md animate-[slideIn_0.2s_ease-out] ${
                 t.type === "success"
                   ? "bg-green-500/15 border-green-500/30 text-green-300"
@@ -90,6 +94,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => dismiss(t.id)}
                   className="text-white/40 hover:text-white/70 shrink-0"
+                  aria-label="Dismiss notification"
                 >
                   &#x2715;
                 </button>
