@@ -272,7 +272,7 @@ export default function Home() {
 
             <p className="text-[11px] text-white/20 text-center tracking-wider uppercase mt-2">
               Self-custodial &middot; On-chain enforced &middot; Verified
-              contracts &middot; Unaudited beta
+              contracts
             </p>
 
             {!IS_TESTNET && (
@@ -604,8 +604,7 @@ export default function Home() {
               </p>
               <p className="text-white/25">
                 Reality check: all smart contracts carry risk. Start small and
-                verify the Sablier contract yourself on BaseScan. Unaudited
-                beta.
+                verify the Sablier contract yourself on BaseScan.
               </p>
             </FAQItem>
 
@@ -699,7 +698,7 @@ export default function Home() {
             </a>
           </div>
           <p className="text-xs text-white/15 max-w-md mx-auto leading-relaxed">
-            Unaudited beta. Do not deposit what you can&apos;t afford to lose.
+            Do not deposit what you can&apos;t afford to lose.
             RipGuard does not custody funds — all locks are created directly in
             Sablier&apos;s audited protocol on Base. Non-custodial. Immutable.
             This is not financial advice. DYOR. 0.5% broker fee collected
