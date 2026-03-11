@@ -25,5 +25,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.7,
     },
+    {
+      url: `${siteUrl}/rebalance`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.76,
+    },
   ];
 }
