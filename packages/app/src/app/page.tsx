@@ -2,9 +2,9 @@
 
 import { PRESETS, SABLIER_LOCKUP, EXPLORER_URL, IS_TESTNET } from "@/config/contracts";
 import Link from "next/link";
-import Image from "next/image";
 import { Header } from "@/components/Header";
 import { WelcomeModal } from "@/components/WelcomeModal";
+import { RipGuardLockup, RipGuardMark } from "@/components/Brand";
 
 function CheckIcon() {
   return (
@@ -45,135 +45,25 @@ function ClockIcon({ className }: { className?: string }) {
   );
 }
 
-function HeroLogo({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      <svg viewBox="0 0 280 300" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto" aria-hidden="true">
-        <defs>
-          {/* Soft glow for shield outline */}
-          <filter id="hg-glow" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          {/* Strong glow for lock + text */}
-          <filter id="hg-glow-strong" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="9" result="blur" />
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          {/* Ambient bloom beneath shield */}
-          <filter id="hg-bloom" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="22" />
-          </filter>
-          <linearGradient id="hg-shield-fill" x1="140" y1="16" x2="140" y2="230" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.03" />
-          </linearGradient>
-          <linearGradient id="hg-lock-fill" x1="140" y1="108" x2="140" y2="178" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.14" />
-            <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.04" />
-          </linearGradient>
-        </defs>
-
-        {/* Ambient bloom — large diffuse glow behind shield */}
-        <ellipse cx="140" cy="130" rx="110" ry="110" fill="#00E5FF" fillOpacity="0.07" filter="url(#hg-bloom)" />
-
-        {/* Outer shield halo (very faint, spread) */}
-        <path
-          d="M140 18L36 60v70c0 64 43 124 104 139C201 254 244 194 244 130V60L140 18Z"
-          fill="#00E5FF" fillOpacity="0.05"
-          filter="url(#hg-bloom)"
-        />
-
-        {/* Shield body fill */}
-        <path
-          d="M140 26L46 66v64c0 59 39 114 94 128C195 244 234 189 234 130V66L140 26Z"
-          fill="url(#hg-shield-fill)"
-        />
-
-        {/* Shield outer stroke — glowing */}
-        <path
-          d="M140 26L46 66v64c0 59 39 114 94 128C195 244 234 189 234 130V66L140 26Z"
-          stroke="#00E5FF" strokeWidth="1.8"
-          filter="url(#hg-glow)"
-        />
-
-        {/* Shield inner bevel line */}
-        <path
-          d="M140 42L62 78v56c0 52 34 101 78 113C184 234 218 186 218 134V78L140 42Z"
-          stroke="#00E5FF" strokeWidth="0.6" strokeOpacity="0.28"
-        />
-
-        {/* Corner accent marks */}
-        <circle cx="140" cy="26" r="2" fill="#00E5FF" fillOpacity="0.6" />
-        <circle cx="46" cy="66" r="1.5" fill="#00E5FF" fillOpacity="0.3" />
-        <circle cx="234" cy="66" r="1.5" fill="#00E5FF" fillOpacity="0.3" />
-
-        {/* Horizontal rule inside shield */}
-        <line x1="80" y1="110" x2="200" y2="110" stroke="#00E5FF" strokeWidth="0.5" strokeOpacity="0.2" />
-
-        {/* Lock shackle */}
-        <path
-          d="M118 118V103a22 22 0 0 1 44 0v15"
-          stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round"
-          filter="url(#hg-glow-strong)"
-        />
-
-        {/* Lock body */}
-        <rect
-          x="106" y="118" width="68" height="54" rx="8"
-          fill="url(#hg-lock-fill)"
-          stroke="#00E5FF" strokeWidth="2"
-          filter="url(#hg-glow)"
-        />
-
-        {/* Keyhole */}
-        <circle cx="140" cy="141" r="6.5" fill="#00E5FF" fillOpacity="0.75" filter="url(#hg-glow-strong)" />
-        <path d="M140 146v9" stroke="#00E5FF" strokeWidth="3" strokeLinecap="round" />
-
-        {/* Subtle tick marks flanking lock */}
-        <line x1="88" y1="145" x2="98" y2="145" stroke="#00E5FF" strokeWidth="1" strokeOpacity="0.25" />
-        <line x1="182" y1="145" x2="192" y2="145" stroke="#00E5FF" strokeWidth="1" strokeOpacity="0.25" />
-
-        {/* RIPGUARD wordmark */}
-        <text
-          x="140" y="266"
-          textAnchor="middle"
-          fontFamily="ui-sans-serif, system-ui, -apple-system, Helvetica Neue, sans-serif"
-          fontSize="26"
-          fontWeight="900"
-          letterSpacing="8"
-          fill="#00E5FF"
-          filter="url(#hg-glow-strong)"
-        >
-          RIPGUARD
-        </text>
-
-        {/* Divider line under wordmark */}
-        <line x1="90" y1="274" x2="190" y2="274" stroke="#00E5FF" strokeWidth="0.5" strokeOpacity="0.3" />
-
-        {/* Tagline */}
-        <text
-          x="140" y="290"
-          textAnchor="middle"
-          fontFamily="ui-sans-serif, system-ui, -apple-system, Helvetica Neue, sans-serif"
-          fontSize="8.5"
-          fontWeight="500"
-          letterSpacing="4.5"
-          fill="#00E5FF"
-          fillOpacity="0.38"
-        >
-          NON-CUSTODIAL · ON-CHAIN
-        </text>
-      </svg>
-    </div>
-  );
-}
-
 const PRESET_ICONS: Record<string, React.ReactNode> = {
   panicLock7d: <ShieldIcon className="w-7 h-7 text-cyan" />,
   lock30d: <ClockIcon className="w-7 h-7 text-cyan" />,
   cliff7dVest90d: <LockIcon className="w-7 h-7 text-cyan" />,
 };
+
+const HERO_PROOF_POINTS = [
+  "Self-custodial",
+  "Non-cancelable",
+  "Base mainnet",
+  "Powered by Sablier",
+];
+
+const HERO_STATS = [
+  { value: "$3B+", label: "Processed by Sablier" },
+  { value: "4x", label: "Independently audited" },
+  { value: "0", label: "Custom contracts" },
+  { value: "100%", label: "Non-custodial flow" },
+];
 
 function FAQItem({
   question,
@@ -215,82 +105,129 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col">
         {/* Hero Section */}
-        <section className="relative flex flex-col items-center justify-center px-5 sm:px-8 pt-28 sm:pt-40 pb-32 sm:pb-44 overflow-hidden">
-          {/* Hero background image */}
+        <section className="relative overflow-hidden px-5 pt-20 pb-20 sm:px-8 sm:pt-24 sm:pb-24">
           <div className="absolute inset-0 pointer-events-none">
-            <Image
-              src="/hero-bg.png"
-              alt=""
-              fill
-              priority
-              className="object-cover object-center opacity-40 mix-blend-lighten"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/60 to-[#0a0a0a]" />
-          </div>
-          {/* Grid overlay for depth */}
-          <div className="absolute inset-0 grid-overlay pointer-events-none" />
-          {/* Overlay glow — dual layer for richer bloom */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[700px] h-[700px] rounded-full bg-cyan/[0.04] blur-[140px] animate-glow-pulse" />
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[400px] h-[400px] rounded-full bg-cyan/[0.06] blur-[80px] animate-glow-pulse" style={{ animationDelay: "2s" }} />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(10,69,79,0.55),transparent_34%),linear-gradient(180deg,#071015_0%,#06090c_56%,#050608_100%)]" />
+            <div className="absolute inset-0 hero-grid" />
+            <div className="absolute left-1/2 top-[-8%] h-[30rem] w-[30rem] -translate-x-1/2 rounded-full bg-cyan/[0.08] blur-[140px]" />
+            <div className="absolute right-[6%] top-[22%] h-40 w-40 rounded-full bg-cyan/[0.08] blur-[90px]" />
           </div>
 
-          <div className="relative z-10 flex flex-col items-center gap-8 max-w-4xl">
-            <div className="animate-float">
-              <HeroLogo className="w-[220px] sm:w-[280px] glow-cyan" />
+          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
+            <div className="max-w-2xl">
+              <div className="surface-pill mb-6 text-[11px] font-semibold uppercase tracking-[0.28em]">
+                Built on Sablier&apos;s audited contracts
+              </div>
+
+              <RipGuardLockup className="mb-7" />
+
+              <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-white sm:text-[4.35rem] sm:leading-[0.98]">
+                Lock your winnings before you give them back.
+              </h1>
+
+              <p className="mt-6 max-w-xl text-base leading-8 text-white/62 sm:text-lg">
+                The &ldquo;I&apos;m up, get me out&rdquo; button for Base traders. Send USDC
+                straight into the{" "}
+                <a
+                  href="https://sablier.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan underline decoration-cyan/35 hover:decoration-cyan/65 transition-colors"
+                >
+                  Sablier protocol
+                </a>{" "}
+                with a schedule you choose, so future-you can&apos;t instantly ape back in.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link href="/create" className="button-primary px-7 text-base sm:px-8 sm:text-lg">
+                  Create a Lock
+                </Link>
+                <a
+                  href={sablierExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-secondary px-7 text-base sm:px-8 sm:text-lg"
+                >
+                  View Contract
+                </a>
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-2.5">
+                {HERO_PROOF_POINTS.map((point) => (
+                  <span key={point} className="surface-pill text-xs font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan shadow-[0_0_12px_rgba(0,229,255,0.45)]" />
+                    {point}
+                  </span>
+                ))}
+              </div>
+
+              {!IS_TESTNET && (
+                <a
+                  href="https://testnet.ripguard.xyz"
+                  className="mt-5 inline-flex text-sm text-white/34 hover:text-cyan/75 transition-colors"
+                >
+                  Want to test the flow first? Use the testnet version &rarr;
+                </a>
+              )}
             </div>
 
-            <h1 className="text-4xl sm:text-[3.75rem] font-bold text-center leading-[1.08] tracking-tight">
-              Lock your winnings before
-              <br className="hidden sm:block" />
-              {" "}you give them back.
-            </h1>
+            <div className="relative">
+              <div className="hero-stage p-5 sm:p-6">
+                <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-black/20 px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-white/35">
+                  <span>RipGuard Vault Engine</span>
+                  <span>Base Mainnet</span>
+                </div>
 
-            <p className="text-base sm:text-lg text-white/55 text-center max-w-lg leading-relaxed">
-              The &ldquo;I&apos;m up, get me out&rdquo; button. Lock USDC into the{" "}
-              <a
-                href="https://sablier.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cyan underline decoration-cyan/30 hover:decoration-cyan/60 transition-colors"
-              >
-                Sablier protocol
-              </a>{" "}
-              with a schedule you choose. No middleman. No&nbsp;&ldquo;oops&rdquo;&nbsp;button.
-            </p>
+                <div className="relative mt-5 overflow-hidden rounded-[1.6rem] border border-cyan/12 bg-[linear-gradient(180deg,rgba(6,20,25,0.92)_0%,rgba(4,10,13,0.98)_100%)] px-6 py-8 sm:px-8">
+                  <div className="absolute left-1/2 top-4 h-44 w-44 -translate-x-1/2 rounded-full bg-cyan/[0.12] blur-[80px]" />
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="animate-float">
+                      <RipGuardMark className="h-32 w-32 sm:h-36 sm:w-36" />
+                    </div>
+                    <p className="mt-5 text-sm uppercase tracking-[0.3em] text-white/28">
+                      Discipline, enforced on-chain
+                    </p>
+                    <p className="mt-3 max-w-sm text-sm leading-7 text-white/52">
+                      Your USDC routes directly into Sablier Lockup. No RipGuard custody.
+                      No admin override. No cancel path.
+                    </p>
+                  </div>
 
-            <div className="flex flex-col sm:flex-row gap-3.5 mt-4 w-full sm:w-auto">
-              <Link
-                href="/create"
-                className="bg-cyan text-black font-bold rounded-xl px-12 py-4.5 text-base sm:text-lg hover:bg-cyan/90 transition-all hover:shadow-[0_0_50px_rgba(0,229,255,0.3)] active:scale-[0.98] text-center"
-              >
-                Create a Lock
-              </Link>
-              <a
-                href={sablierExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="border border-white/10 text-white/60 font-semibold rounded-xl px-12 py-4.5 text-base sm:text-lg hover:border-cyan/30 hover:text-cyan transition-all text-center backdrop-blur-sm"
-              >
-                View Contract
-              </a>
+                  <div className="relative mt-7 grid gap-3">
+                    {Object.entries(PRESETS).map(([key, preset]) => (
+                      <Link
+                        key={key}
+                        href={`/create?preset=${key}`}
+                        className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3.5 text-left transition-colors hover:border-cyan/24 hover:bg-cyan/[0.05]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan/15 bg-cyan/[0.08]">
+                            {PRESET_ICONS[key]}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white/88">{preset.label}</p>
+                            <p className="text-xs text-white/38">{preset.description}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-cyan/72">
+                          Launch
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <p className="text-[11px] text-white/20 text-center tracking-wider uppercase mt-2">
-              Self-custodial &middot; On-chain enforced &middot; Verified
-              contracts &middot; Powered by Sablier v2.0
-            </p>
-
-            {!IS_TESTNET && (
-              <a
-                href="https://testnet.ripguard.xyz"
-                className="text-xs text-white/25 hover:text-cyan/70 transition-colors mt-1"
-              >
-                Want to try risk-free? Use the testnet version &rarr;
-              </a>
-            )}
+          <div className="relative z-10 mx-auto mt-10 grid max-w-6xl gap-3 sm:mt-12 sm:grid-cols-2 lg:grid-cols-4">
+            {HERO_STATS.map((stat) => (
+              <div key={stat.label} className="hero-stat-card">
+                <div className="text-2xl font-semibold tracking-[-0.05em] text-white">{stat.value}</div>
+                <div className="mt-1 text-sm text-white/42">{stat.label}</div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -321,7 +258,7 @@ export default function Home() {
         </section>
 
         {/* How It Works */}
-        <section className="px-5 sm:px-8 py-24 sm:py-28 section-divider relative overflow-hidden">
+        <section id="how-it-works" className="px-5 sm:px-8 py-24 sm:py-28 section-divider relative overflow-hidden">
           {/* Ambient glow */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-[800px] h-[400px] rounded-full bg-cyan/[0.03] blur-[120px]" />
@@ -414,7 +351,7 @@ export default function Home() {
         </section>
 
         {/* Trust Section */}
-        <section className="px-5 sm:px-8 py-24 sm:py-28 section-divider">
+        <section id="trust" className="px-5 sm:px-8 py-24 sm:py-28 section-divider">
           <div className="max-w-5xl mx-auto space-y-14">
             <div className="text-center space-y-4">
               <h2 className="text-2xl sm:text-3xl font-bold">
@@ -706,7 +643,7 @@ export default function Home() {
             <div>
               <Link
                 href="/create"
-                className="inline-block bg-cyan text-black font-bold rounded-xl px-10 py-4 text-lg hover:bg-cyan/90 transition-all hover:shadow-[0_0_50px_rgba(0,229,255,0.4)] active:scale-[0.98] shadow-[0_0_24px_rgba(0,229,255,0.2)]"
+                className="button-primary px-10 text-lg"
               >
                 Create a Lock
               </Link>
@@ -717,11 +654,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="px-5 sm:px-8 py-12 section-divider text-center space-y-5">
           <div className="flex items-center justify-center gap-2 text-white/20">
-            <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="rgba(0,229,255,0.04)" />
-              <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="rgba(0,229,255,0.03)" />
-              <path d="M13.5 12V10a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
+            <RipGuardMark className="h-5 w-5" />
             <span className="text-xs font-semibold tracking-tight">RipGuard</span>
           </div>
           <div className="flex items-center justify-center gap-6 text-sm text-white/30">
