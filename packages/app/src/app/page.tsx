@@ -46,9 +46,12 @@ function ClockIcon({ className }: { className?: string }) {
 }
 
 const PRESET_ICONS: Record<string, React.ReactNode> = {
-  panicLock7d: <ShieldIcon className="w-7 h-7 text-cyan" />,
-  lock30d: <ClockIcon className="w-7 h-7 text-cyan" />,
-  cliff7dVest90d: <LockIcon className="w-7 h-7 text-cyan" />,
+  hourly1d: <ClockIcon className="w-7 h-7 text-cyan" />,
+  hourly3d: <ClockIcon className="w-7 h-7 text-cyan" />,
+  hourly1w: <ClockIcon className="w-7 h-7 text-cyan" />,
+  daily1w: <ClockIcon className="w-7 h-7 text-cyan" />,
+  panicLock1d: <ShieldIcon className="w-7 h-7 text-cyan" />,
+  panicThenDaily: <LockIcon className="w-7 h-7 text-cyan" />,
 };
 
 const HERO_PROOF_POINTS = [
@@ -316,7 +319,7 @@ export default function Home() {
               Presets built for how degens actually trade.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {Object.entries(PRESETS).map(([key, preset]) => (
                 <Link
                   key={key}

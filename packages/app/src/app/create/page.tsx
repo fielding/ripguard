@@ -27,56 +27,21 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { trackLockCreated, trackLockApproved, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
+import {
+  DURATION_OPTIONS,
+  ALL_INTERVALS,
+  getIntervalOptions,
+  parsePositiveDurationParam,
+  parseAmountParam,
+  formatDuration,
+  computeFee,
+  computeMaxDeposit,
+} from "@/lib/schedule";
 
 type PresetKey = keyof typeof PRESETS;
 
 const USDC_DECIMALS = 6;
 const MIN_DEPOSIT = BigInt(1_000_000); // 1 USDC minimum
-
-// Duration options for custom schedule
-const DURATION_OPTIONS = [
-  { label: "1 day", seconds: 86400 },
-  { label: "3 days", seconds: 259200 },
-  { label: "7 days", seconds: 604800 },
-  { label: "14 days", seconds: 1209600 },
-  { label: "30 days", seconds: 2592000 },
-  { label: "60 days", seconds: 5184000 },
-  { label: "90 days", seconds: 7776000 },
-  { label: "180 days", seconds: 15552000 },
-  { label: "365 days", seconds: 31536000 },
-];
-
-function parsePositiveDurationParam(value: string | null): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 86400) return null;
-  return parsed;
-}
-
-function parseAmountParam(value: string | null): string {
-  if (!value) return "";
-  return /^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(value) ? value : "";
-}
-
-function formatDuration(seconds: number): string {
-  const days = Math.floor(seconds / 86400);
-  if (days >= 365) return `${Math.floor(days / 365)}y ${days % 365}d`;
-  return `${days}d`;
-}
-
-const SCALE = BigInt("1000000000000000000"); // 1e18
-
-function computeFee(amount: bigint): bigint {
-  // totalAmount = amount * 1e18 / (1e18 - BROKER_FEE)
-  // fee = totalAmount - amount
-  return (amount * SCALE) / (SCALE - BROKER_FEE) - amount;
-}
-
-function computeMaxDeposit(walletBalance: bigint): bigint {
-  // Given totalAmount = walletBalance, solve for deposit:
-  // deposit = totalAmount * (1e18 - BROKER_FEE) / 1e18
-  return (walletBalance * (SCALE - BROKER_FEE)) / SCALE;
-}
 
 // ERC-721 Transfer event topic
 const TRANSFER_TOPIC = keccak256(toHex("Transfer(address,address,uint256)"));
@@ -137,15 +102,16 @@ function CreateLockInner() {
 
   // Schedule state
   const [selectedPreset, setSelectedPreset] = useState<PresetKey | "custom">(
-    isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "panicLock7d"
+    isCustomFromQuery ? "custom" : presetParam && presetParam in PRESETS ? presetParam : "hourly1d"
   );
   const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
-  const [customTotal, setCustomTotal] = useState(customTotalParam ?? 604800); // 7 days default
+  const [customTotal, setCustomTotal] = useState(customTotalParam ?? 3600); // 1 hour default
+  const [customInterval, setCustomInterval] = useState(3600); // 1hr default claim interval (display only)
 
-  // Auto-clamp total to be >= cliff, and enforce minimum 1 day
+  // Auto-clamp total to be >= cliff, and enforce minimum 1 hour
   useEffect(() => {
-    if (customTotal < 86400) {
-      setCustomTotal(86400);
+    if (customTotal < 3600) {
+      setCustomTotal(3600);
     } else if (customCliff > customTotal) {
       setCustomTotal(customCliff);
     }
@@ -155,9 +121,9 @@ function CreateLockInner() {
   const [confirmed, setConfirmed] = useState(false);
 
   const resetForm = useCallback(() => {
-    setSelectedPreset("panicLock7d");
+    setSelectedPreset("hourly1d");
     setCustomCliff(0);
-    setCustomTotal(604800);
+    setCustomTotal(3600);
     setAmountInput("");
     setStep("schedule");
     setConfirmed(false);
@@ -195,7 +161,7 @@ function CreateLockInner() {
     }
   }, [amountInput]);
 
-  const fee = useMemo(() => computeFee(depositAmount), [depositAmount]);
+  const fee = useMemo(() => computeFee(depositAmount, BROKER_FEE), [depositAmount]);
   const totalAmount = depositAmount + fee;
 
   // Unlock amounts for Sablier
@@ -420,116 +386,7 @@ function CreateLockInner() {
           />
         ) : (
           <div className="relative w-full card-gradient rounded-2xl p-6 sm:p-8 space-y-8">
-            {/* Schedule Selection */}
-            <section className="w-full space-y-4">
-              <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                Schedule
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {(Object.entries(PRESETS) as [PresetKey, (typeof PRESETS)[PresetKey]][]).map(
-                  ([key, preset]) => (
-                    <button
-                      key={key}
-                      disabled={isFormLocked}
-                      onClick={() => {
-                        setSelectedPreset(key);
-                        setStep("schedule");
-                      }}
-                      className={`card-gradient rounded-lg p-4 text-left transition-all ${
-                        selectedPreset === key
-                          ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
-                          : ""
-                      } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="font-medium text-sm">{preset.label}</div>
-                      <div className="text-xs text-white/40 mt-1">
-                        {preset.description}
-                      </div>
-                    </button>
-                  )
-                )}
-              </div>
-
-              <button
-                disabled={isFormLocked}
-                onClick={() => {
-                  setSelectedPreset("custom");
-                  setStep("schedule");
-                }}
-                className={`w-full card-gradient rounded-lg p-4 text-left transition-all ${
-                  selectedPreset === "custom"
-                    ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
-                    : ""
-                } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <div className="font-medium text-sm">Custom Schedule</div>
-                <div className="text-xs text-white/40 mt-1">
-                  Pick your own cliff + vest duration
-                </div>
-              </button>
-
-              {/* Custom schedule options */}
-              {selectedPreset === "custom" && (
-                <div className="space-y-3 pl-4 border-l border-white/10">
-                  <div>
-                    <label htmlFor="cliff-duration" className="block text-xs text-white/50 mb-1">
-                      Cliff Duration
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="cliff-duration"
-                        value={customCliff}
-                        disabled={isFormLocked}
-                        onChange={(e) =>
-                          setCustomCliff(Number(e.target.value))
-                        }
-                        className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        <option value={0}>No cliff</option>
-                        {DURATION_OPTIONS.map((d) => (
-                          <option key={d.seconds} value={d.seconds}>
-                            {d.label}
-                          </option>
-                        ))}
-                      </select>
-                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="total-duration" className="block text-xs text-white/50 mb-1">
-                      Total Vest Duration
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="total-duration"
-                        value={customTotal}
-                        disabled={isFormLocked}
-                        onChange={(e) =>
-                          setCustomTotal(Number(e.target.value))
-                        }
-                        className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                      {DURATION_OPTIONS.filter(
-                        (d) => d.seconds >= customCliff
-                      ).map((d) => (
-                        <option key={d.seconds} value={d.seconds}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                    </div>
-                  </div>
-                  {customCliff > customTotal && (
-                    <p className="text-xs text-red-400">
-                      Cliff can&apos;t be longer than total duration
-                    </p>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {/* Amount Input */}
+            {/* Amount Input — first so the calculator reacts to it */}
             <section className="w-full space-y-3">
               <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
                 Amount
@@ -579,7 +436,7 @@ function CreateLockInner() {
                   <button
                     disabled={isFormLocked || balance === BigInt(0)}
                     onClick={() => {
-                      const maxDeposit = computeMaxDeposit(balance);
+                      const maxDeposit = computeMaxDeposit(balance, BROKER_FEE);
                       setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
                       setStep("schedule");
                     }}
@@ -623,11 +480,164 @@ function CreateLockInner() {
               )}
             </section>
 
-            {/* Timeline Preview */}
+            {/* Schedule Selection */}
+            <section className="w-full space-y-4">
+              <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
+                Schedule
+              </h3>
+
+              <button
+                disabled={isFormLocked}
+                onClick={() => {
+                  setSelectedPreset(selectedPreset === "custom" ? "hourly1d" : "custom");
+                  setStep("schedule");
+                }}
+                className={`w-full card-gradient rounded-lg p-4 text-left transition-all ${
+                  selectedPreset === "custom"
+                    ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
+                    : ""
+                } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-sm">Custom</div>
+                    <div className="text-xs text-white/40 mt-1">
+                      Set your own duration + claim interval
+                    </div>
+                  </div>
+                  <svg className={`w-4 h-4 text-white/30 transition-transform ${selectedPreset === "custom" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </button>
+
+              {/* Custom schedule builder */}
+              {selectedPreset === "custom" && (
+                <div className="space-y-4 pl-4 border-l border-white/10">
+                  {/* Total duration */}
+                  <div>
+                    <label htmlFor="total-duration" className="block text-xs text-white/50 mb-1">
+                      Total Duration
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="total-duration"
+                        value={customTotal}
+                        disabled={isFormLocked}
+                        onChange={(e) => {
+                          const newTotal = Number(e.target.value);
+                          setCustomTotal(newTotal);
+                          // Auto-adjust interval if it no longer fits
+                          const validIntervals = getIntervalOptions(newTotal);
+                          if (validIntervals.length > 0 && !validIntervals.find((i) => i.seconds === customInterval)) {
+                            setCustomInterval(validIntervals[0].seconds);
+                          }
+                        }}
+                        className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        {DURATION_OPTIONS.filter(
+                          (d) => d.seconds >= customCliff
+                        ).map((d) => (
+                          <option key={d.seconds} value={d.seconds}>
+                            {d.label}
+                          </option>
+                        ))}
+                      </select>
+                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                  </div>
+
+                  {/* Claim interval — dynamic based on duration */}
+                  <div>
+                    <label className="block text-xs text-white/50 mb-2">
+                      Claim Interval
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {getIntervalOptions(customTotal).map((i) => (
+                        <button
+                          key={i.seconds}
+                          type="button"
+                          disabled={isFormLocked}
+                          onClick={() => setCustomInterval(i.seconds)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                            customInterval === i.seconds
+                              ? "border-cyan/60 bg-cyan/10 text-cyan"
+                              : "border-white/10 bg-white/[0.04] text-white/50 hover:border-white/20 hover:text-white/70"
+                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          {i.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cliff (advanced, collapsed) */}
+                  <details className="group">
+                    <summary className="text-xs text-white/30 cursor-pointer hover:text-white/50 transition-colors">
+                      Advanced: add cliff period
+                    </summary>
+                    <div className="mt-2">
+                      <div className="relative">
+                        <select
+                          id="cliff-duration"
+                          value={customCliff}
+                          disabled={isFormLocked}
+                          onChange={(e) =>
+                            setCustomCliff(Number(e.target.value))
+                          }
+                          className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <option value={0}>No cliff</option>
+                          {DURATION_OPTIONS.filter((d) => d.seconds < customTotal).map((d) => (
+                            <option key={d.seconds} value={d.seconds}>
+                              {d.label}
+                            </option>
+                          ))}
+                        </select>
+                        <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </div>
+                  </details>
+
+                  {customCliff > customTotal && (
+                    <p className="text-xs text-red-400">
+                      Cliff can&apos;t be longer than total duration
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedPreset !== "custom" && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {(Object.entries(PRESETS) as [PresetKey, (typeof PRESETS)[PresetKey]][]).map(
+                    ([key, preset]) => (
+                      <button
+                        key={key}
+                        disabled={isFormLocked}
+                        onClick={() => {
+                          setSelectedPreset(key);
+                          setStep("schedule");
+                        }}
+                        className={`card-gradient rounded-lg p-4 text-left transition-all ${
+                          selectedPreset === key
+                            ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
+                            : ""
+                        } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <div className="font-medium text-sm">{preset.label}</div>
+                        <div className="text-xs text-white/40 mt-1">
+                          {preset.description}
+                        </div>
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* Payout Preview */}
             {depositAmount > 0 && (
               <section className="w-full space-y-3">
                 <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                  Timeline Preview
+                  Payout Preview
                 </h3>
                 <TimelinePreview
                   cliffSeconds={schedule.cliffSeconds}
@@ -635,6 +645,14 @@ function CreateLockInner() {
                   isLumpSum={schedule.isLumpSum}
                   depositAmount={depositAmount}
                 />
+                {!schedule.isLumpSum && (
+                  <VestingCalculator
+                    depositAmount={depositAmount}
+                    totalSeconds={schedule.totalSeconds}
+                    cliffSeconds={schedule.cliffSeconds}
+                    intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
+                  />
+                )}
               </section>
             )}
 
@@ -754,6 +772,75 @@ function CreateLockInner() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function VestingCalculator({
+  depositAmount,
+  totalSeconds,
+  cliffSeconds,
+  intervalSeconds,
+}: {
+  depositAmount: bigint;
+  totalSeconds: number;
+  cliffSeconds: number;
+  intervalSeconds: number;
+}) {
+  const vestSeconds = totalSeconds - cliffSeconds;
+  const totalIntervals = vestSeconds > 0 ? Math.floor(vestSeconds / intervalSeconds) : 0;
+  const perInterval = totalIntervals > 0
+    ? Number(formatUnits(depositAmount, USDC_DECIMALS)) / totalIntervals
+    : 0;
+  const intervalLabel = ALL_INTERVALS.find((i) => i.seconds === intervalSeconds)?.label ?? formatDuration(intervalSeconds);
+  const pctPerInterval = totalIntervals > 0 ? (100 / totalIntervals) : 0;
+
+  // Show first few intervals as a mini schedule
+  const previewCount = Math.min(totalIntervals, 5);
+  const previewRows = Array.from({ length: previewCount }, (_, i) => {
+    const elapsed = cliffSeconds + (i + 1) * intervalSeconds;
+    const cumulative = perInterval * (i + 1);
+    return { elapsed, cumulative, payout: perInterval };
+  });
+
+  return (
+    <div className="rounded-lg border border-cyan/20 bg-cyan/[0.04] p-4 space-y-3">
+      {/* Headline payout */}
+      <div className="text-center">
+        <div className="text-2xl font-bold text-cyan">
+          ${perInterval.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
+        <div className="text-xs text-white/50 mt-1">
+          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) &middot; {totalIntervals} claims over {formatDuration(totalSeconds)}
+        </div>
+      </div>
+
+      {/* Mini schedule table */}
+      {previewRows.length > 0 && (
+        <div className="space-y-1">
+          <div className="grid grid-cols-3 text-[10px] text-white/30 uppercase tracking-wider px-1">
+            <span>Time</span>
+            <span className="text-right">Payout</span>
+            <span className="text-right">Cumulative</span>
+          </div>
+          {previewRows.map((row, i) => (
+            <div key={i} className="grid grid-cols-3 text-xs text-white/60 px-1 py-0.5 rounded hover:bg-white/[0.03]">
+              <span>{formatDuration(row.elapsed)}</span>
+              <span className="text-right text-cyan/80">
+                +${row.payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-right">
+                ${row.cumulative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          ))}
+          {totalIntervals > previewCount && (
+            <div className="text-[10px] text-white/25 text-center pt-1">
+              &hellip; {totalIntervals - previewCount} more claims
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

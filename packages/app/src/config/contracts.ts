@@ -43,31 +43,52 @@ export const STREAM_START_BLOCK = IS_TESTNET
   : BigInt(22_000_000); // Base mainnet
 
 // Max block range per getLogs call.
-// Public Base Sepolia RPCs (RainbowKit defaults) reject ranges > ~2k blocks.
+// Public Base Sepolia RPCs allow up to 10k blocks per call.
 // Mainnet paid RPCs (Alchemy etc.) support up to 50k.
-export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(2_000) : BigInt(50_000);
+export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(10_000) : BigInt(50_000);
 
-// Schedule presets
+// Schedule presets — "build your own reloads"
 export const PRESETS = {
-  panicLock7d: {
-    label: "Panic Lock 7D",
-    description: "Lock everything for 7 days",
-    cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 7 * 24 * 60 * 60 + 1, // cliff < total required by Sablier; 1s linear window after cliff
-    isLumpSum: false, // Do NOT set unlockCliff=totalAmount — Sablier rejects when linear stream amount is 0
-  },
-  lock30d: {
-    label: "Lock 30D",
-    description: "Linear vest over 30 days",
+  hourly1d: {
+    label: "1 Day Hourly",
+    description: "Reload every hour for 24 hours",
     cliffSeconds: 0,
-    totalSeconds: 30 * 24 * 60 * 60,
+    totalSeconds: 24 * 60 * 60,
     isLumpSum: false,
   },
-  cliff7dVest90d: {
-    label: "Cliff 7D + Vest 90D",
-    description: "7-day cliff, then linear vest over 90 days",
-    cliffSeconds: 7 * 24 * 60 * 60,
-    totalSeconds: 97 * 24 * 60 * 60, // 7d cliff + 90d vest
+  hourly3d: {
+    label: "3 Days Hourly",
+    description: "Reload every hour for 3 days",
+    cliffSeconds: 0,
+    totalSeconds: 3 * 24 * 60 * 60,
+    isLumpSum: false,
+  },
+  hourly1w: {
+    label: "1 Week Hourly",
+    description: "Reload every hour for 7 days",
+    cliffSeconds: 0,
+    totalSeconds: 7 * 24 * 60 * 60,
+    isLumpSum: false,
+  },
+  daily1w: {
+    label: "1 Week Daily",
+    description: "Reload once a day for 7 days",
+    cliffSeconds: 0,
+    totalSeconds: 7 * 24 * 60 * 60,
+    isLumpSum: false,
+  },
+  panicLock1d: {
+    label: "1 Day Panic Lock",
+    description: "Lock everything for 24 hours",
+    cliffSeconds: 24 * 60 * 60,
+    totalSeconds: 24 * 60 * 60 + 1, // cliff < total required by Sablier
+    isLumpSum: false,
+  },
+  panicThenDaily: {
+    label: "Panic Lock + Daily",
+    description: "1 day lock, then daily reloads for 7 days",
+    cliffSeconds: 24 * 60 * 60,
+    totalSeconds: 8 * 24 * 60 * 60, // 1d cliff + 7d vest
     isLumpSum: false,
   },
 } as const;

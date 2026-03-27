@@ -7,16 +7,14 @@ import { useState, useEffect, useCallback } from "react";
 import { formatUnits } from "viem";
 import {
   useAccount,
-  usePublicClient,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import {
   SABLIER_LOCKUP,
-  STREAM_START_BLOCK,
-  LOG_CHUNK_SIZE,
   EXPLORER_URL,
+  IS_TESTNET,
 } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
@@ -26,6 +24,19 @@ import { trackClaim, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
 
 const USDC_DECIMALS = 6;
+
+// Sablier Envio indexer — single endpoint, no API key, supports all chains
+const SABLIER_SUBGRAPH = "https://indexer.hyperindex.xyz/53b7e25/v1/graphql";
+const CHAIN_ID = IS_TESTNET ? "84532" : "8453";
+
+type SubgraphStream = {
+  tokenId: string;
+  depositAmount: string;
+  withdrawnAmount: string;
+  startTime: string;
+  endTime: string;
+  cliffTime: string | null;
+};
 
 type VaultData = {
   streamId: bigint;
@@ -261,18 +272,17 @@ function VaultSkeleton() {
 
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
-  const publicClient = usePublicClient();
   const { toast } = useToast();
 
-  const [streamIds, setStreamIds] = useState<bigint[]>([]);
+  const [subgraphStreams, setSubgraphStreams] = useState<SubgraphStream[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Fetch ERC-721 Transfer events (mint) from Sablier to discover user's streams
+  // Fetch streams from Sablier subgraph — single query, no block scanning
   useEffect(() => {
-    if (!isConnected || !address || !publicClient) return;
+    if (!isConnected || !address) return;
 
     let cancelled = false;
     setIsLoadingEvents(true);
@@ -280,65 +290,45 @@ function VaultDashboard() {
 
     (async () => {
       try {
-        const CHUNK_SIZE = LOG_CHUNK_SIZE;
-        const toBlock = await publicClient.getBlockNumber();
-        let from = STREAM_START_BLOCK > toBlock ? toBlock : STREAM_START_BLOCK;
-        const allLogs: { args: { tokenId?: bigint } }[] = [];
-        const eventDef = {
-          type: "event" as const,
-          name: "Transfer",
-          inputs: [
-            { name: "from", type: "address" as const, indexed: true },
-            { name: "to", type: "address" as const, indexed: true },
-            { name: "tokenId", type: "uint256" as const, indexed: true },
-          ],
-        };
+        const query = `{
+          Stream(
+            where: {
+              recipient: { _eq: "${address.toLowerCase()}" }
+              chainId: { _eq: "${CHAIN_ID}" }
+              contract: { _eq: "${SABLIER_LOCKUP.toLowerCase()}" }
+            }
+            order_by: { startTime: desc }
+          ) {
+            tokenId
+            depositAmount
+            withdrawnAmount
+            startTime
+            endTime
+            cliffTime
+          }
+        }`;
 
-        while (from <= toBlock) {
-          if (cancelled) return;
-          const to = from + CHUNK_SIZE - BigInt(1) < toBlock
-            ? from + CHUNK_SIZE - BigInt(1)
-            : toBlock;
-          const chunk = await publicClient.getLogs({
-            address: SABLIER_LOCKUP,
-            event: eventDef,
-            args: {
-              from: "0x0000000000000000000000000000000000000000",
-              to: address,
-            },
-            fromBlock: from,
-            toBlock: to,
-          });
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          allLogs.push(...(chunk as any[]));
-          from = to + BigInt(1);
+        const res = await fetch(SABLIER_SUBGRAPH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        });
+
+        if (!res.ok) throw new Error(`Subgraph returned ${res.status}`);
+        const json = await res.json();
+
+        if (json.errors) {
+          throw new Error(json.errors[0]?.message || "Subgraph query failed");
         }
-        const logs = allLogs;
 
         if (!cancelled) {
-          const seen = new Set<string>();
-          const ids = logs
-            .map((log) => log.args.tokenId)
-            .filter((id): id is bigint => {
-              if (id == null) return false;
-              const key = id.toString();
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            })
-            .reverse(); // newest first
-          setStreamIds(ids);
+          setSubgraphStreams(json.data?.Stream ?? []);
         }
       } catch (err) {
         const errStr = String(err);
         trackContractError({ action: "fetchVaults", error: errStr, contract: "SablierLockup" });
         if (!cancelled) {
-          const isRangeError = errStr.toLowerCase().includes("block range") || errStr.toLowerCase().includes("too large") || errStr.toLowerCase().includes("limit exceeded");
-          setFetchError(
-            isRangeError
-              ? "Failed to load vaults — RPC rejected the block range query. Try switching to a different wallet RPC."
-              : "Failed to load vaults. The RPC may be down — try again in a moment."
-          );
+          setFetchError("Failed to load vaults. Try again in a moment.");
         }
       } finally {
         if (!cancelled) setIsLoadingEvents(false);
@@ -348,104 +338,60 @@ function VaultDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [address, isConnected, publicClient, fetchKey]);
+  }, [address, isConnected, fetchKey]);
 
   const retryFetch = useCallback(() => setFetchKey((k) => k + 1), []);
 
   // Clear vault state when wallet disconnects
   useEffect(() => {
     if (!isConnected) {
-      setStreamIds([]);
+      setSubgraphStreams([]);
       setFetchError(null);
       setClaimingId(null);
     }
   }, [isConnected]);
 
-  // Batch read stream data using individual getters (Sablier v2.0 has no getStream())
-  // 6 calls per stream: startTime, endTime, cliffTime, deposited, withdrawn, claimable
-  const streamContracts = streamIds.flatMap((id) => [
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "getStartTime" as const,
-      args: [id] as const,
-    },
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "getEndTime" as const,
-      args: [id] as const,
-    },
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "getCliffTime" as const,
-      args: [id] as const,
-    },
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "getDepositedAmount" as const,
-      args: [id] as const,
-    },
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "getWithdrawnAmount" as const,
-      args: [id] as const,
-    },
-    {
-      address: SABLIER_LOCKUP,
-      abi: sablierLockupAbi,
-      functionName: "withdrawableAmountOf" as const,
-      args: [id] as const,
-    },
-  ]);
+  // Only need on-chain call for live claimable amount (1 call per stream)
+  const streamIds = subgraphStreams.map((s) => BigInt(s.tokenId));
+  const claimableContracts = streamIds.map((id) => ({
+    address: SABLIER_LOCKUP,
+    abi: sablierLockupAbi,
+    functionName: "withdrawableAmountOf" as const,
+    args: [id] as const,
+  }));
 
-  const { data: streamResults, refetch: refetchStreams } = useReadContracts({
-    contracts: streamContracts,
+  const { data: claimableResults, refetch: refetchStreams } = useReadContracts({
+    contracts: claimableContracts,
     query: {
       enabled: streamIds.length > 0,
       refetchInterval: 30_000,
     },
   });
 
-  // Parse vault data — 6 results per stream: startTime, endTime, cliffTime, deposited, withdrawn, claimable
+  // Build vault data from subgraph + on-chain claimable
   let failedStreamCount = 0;
-  const vaults: VaultData[] = streamIds
-    .map((streamId, i) => {
-      const base = i * 6;
-      const startTimeResult  = streamResults?.[base];
-      const endTimeResult    = streamResults?.[base + 1];
-      const cliffTimeResult  = streamResults?.[base + 2];
-      const depositedResult  = streamResults?.[base + 3];
-      const withdrawnResult  = streamResults?.[base + 4];
-      const claimableResult  = streamResults?.[base + 5];
+  const vaults: VaultData[] = subgraphStreams
+    .map((stream, i) => {
+      const startTime = Number(stream.startTime);
+      const endTime = Number(stream.endTime);
+      const cliffTime = stream.cliffTime ? Number(stream.cliffTime) : 0;
+      const deposited = BigInt(stream.depositAmount);
+      const withdrawn = BigInt(stream.withdrawnAmount);
 
-      if (
-        startTimeResult?.status !== "success" ||
-        endTimeResult?.status !== "success" ||
-        cliffTimeResult?.status !== "success" ||
-        depositedResult?.status !== "success" ||
-        withdrawnResult?.status !== "success" ||
-        claimableResult?.status !== "success"
-      ) {
-        if (streamResults) failedStreamCount++;
-        return null;
+      const claimableResult = claimableResults?.[i];
+      const claimable = claimableResult?.status === "success"
+        ? (claimableResult.result as bigint)
+        : BigInt(0);
+
+      if (claimableResults && claimableResult?.status !== "success") {
+        failedStreamCount++;
       }
-
-      const startTime  = startTimeResult.result as number;
-      const endTime    = endTimeResult.result as number;
-      const cliffTime  = cliffTimeResult.result as number;
-      const deposited  = depositedResult.result as bigint;
-      const withdrawn  = withdrawnResult.result as bigint;
-      const claimable  = claimableResult.result as bigint;
 
       const totalSeconds = endTime - startTime;
       const cliffSeconds = cliffTime > 0 ? cliffTime - startTime : 0;
 
       return {
-        streamId,
+        streamId: BigInt(stream.tokenId),
         totalAmount: deposited,
         cliffSeconds,
         totalSeconds,
