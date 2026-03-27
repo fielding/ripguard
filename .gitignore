@@ -24,3 +24,6 @@ packages/contracts/out/
 # IDE
 .vscode/
 .idea/
+
+# Internal / marketing
+ripguard-internal/
