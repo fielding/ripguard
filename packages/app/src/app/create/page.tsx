@@ -27,87 +27,21 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { trackLockCreated, trackLockApproved, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
+import {
+  DURATION_OPTIONS,
+  ALL_INTERVALS,
+  getIntervalOptions,
+  parsePositiveDurationParam,
+  parseAmountParam,
+  formatDuration,
+  computeFee,
+  computeMaxDeposit,
+} from "@/lib/schedule";
 
 type PresetKey = keyof typeof PRESETS;
 
 const USDC_DECIMALS = 6;
 const MIN_DEPOSIT = BigInt(1_000_000); // 1 USDC minimum
-
-// Duration options for custom schedule
-const DURATION_OPTIONS = [
-  { label: "1 hour", seconds: 3600 },
-  { label: "2 hours", seconds: 7200 },
-  { label: "4 hours", seconds: 14400 },
-  { label: "8 hours", seconds: 28800 },
-  { label: "12 hours", seconds: 43200 },
-  { label: "1 day", seconds: 86400 },
-  { label: "3 days", seconds: 259200 },
-  { label: "7 days", seconds: 604800 },
-  { label: "14 days", seconds: 1209600 },
-  { label: "30 days", seconds: 2592000 },
-  { label: "60 days", seconds: 5184000 },
-  { label: "90 days", seconds: 7776000 },
-  { label: "180 days", seconds: 15552000 },
-  { label: "365 days", seconds: 31536000 },
-];
-
-const ALL_INTERVALS = [
-  { label: "1hr", seconds: 3600 },
-  { label: "2hr", seconds: 7200 },
-  { label: "3hr", seconds: 10800 },
-  { label: "6hr", seconds: 21600 },
-  { label: "12hr", seconds: 43200 },
-  { label: "24hr", seconds: 86400 },
-  { label: "48hr", seconds: 172800 },
-  { label: "7 days", seconds: 604800 },
-  { label: "14 days", seconds: 1209600 },
-  { label: "30 days", seconds: 2592000 },
-];
-
-function getIntervalOptions(totalSeconds: number) {
-  // Show intervals that divide evenly into the total and produce at least 2 claims
-  return ALL_INTERVALS.filter(
-    (i) => i.seconds <= totalSeconds / 2
-  );
-}
-
-function parsePositiveDurationParam(value: string | null): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 3600) return null;
-  return parsed;
-}
-
-function parseAmountParam(value: string | null): string {
-  if (!value) return "";
-  return /^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(value) ? value : "";
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    if (mins > 0) return `${hours}h ${mins}m`;
-    return `${hours}h`;
-  }
-  const days = Math.floor(seconds / 86400);
-  if (days >= 365) return `${Math.floor(days / 365)}y ${days % 365}d`;
-  return `${days}d`;
-}
-
-const SCALE = BigInt("1000000000000000000"); // 1e18
-
-function computeFee(amount: bigint): bigint {
-  // totalAmount = amount * 1e18 / (1e18 - BROKER_FEE)
-  // fee = totalAmount - amount
-  return (amount * SCALE) / (SCALE - BROKER_FEE) - amount;
-}
-
-function computeMaxDeposit(walletBalance: bigint): bigint {
-  // Given totalAmount = walletBalance, solve for deposit:
-  // deposit = totalAmount * (1e18 - BROKER_FEE) / 1e18
-  return (walletBalance * (SCALE - BROKER_FEE)) / SCALE;
-}
 
 // ERC-721 Transfer event topic
 const TRANSFER_TOPIC = keccak256(toHex("Transfer(address,address,uint256)"));
@@ -227,7 +161,7 @@ function CreateLockInner() {
     }
   }, [amountInput]);
 
-  const fee = useMemo(() => computeFee(depositAmount), [depositAmount]);
+  const fee = useMemo(() => computeFee(depositAmount, BROKER_FEE), [depositAmount]);
   const totalAmount = depositAmount + fee;
 
   // Unlock amounts for Sablier
@@ -502,7 +436,7 @@ function CreateLockInner() {
                   <button
                     disabled={isFormLocked || balance === BigInt(0)}
                     onClick={() => {
-                      const maxDeposit = computeMaxDeposit(balance);
+                      const maxDeposit = computeMaxDeposit(balance, BROKER_FEE);
                       setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
                       setStep("schedule");
                     }}
