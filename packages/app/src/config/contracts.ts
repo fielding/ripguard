@@ -24,7 +24,7 @@ export const BROKER_FEE =
 // Human-readable fee percentage derived from BROKER_FEE (e.g. "0.5%")
 export const BROKER_FEE_PCT =
   BROKER_FEE > BigInt(0)
-    ? `${Number((BROKER_FEE * BigInt(10000)) / BigInt("10000000000000000")) / 100}%`
+    ? `${Number((BROKER_FEE * BigInt(10000)) / BigInt("1000000000000000000")) / 100}%`
     : "0%";
 
 // Whether we're running on a testnet
