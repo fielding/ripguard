@@ -83,23 +83,27 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Prevent "Cannot redefine property: ethereum" — some wallet
-            extensions set window.ethereum with configurable:false before
-            wagmi's injected connector tries to proxy it. Making the
-            property configurable early avoids the collision. */}
+        {/* Prevent "Cannot redefine property: ethereum" — wallet extensions
+            and wagmi's injected connector both call Object.defineProperty on
+            window.ethereum, and one of them sets configurable:false first.
+            Patch defineProperty to swallow that specific collision. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                if (typeof window !== 'undefined' && !window.ethereum) {
-                  Object.defineProperty(window, 'ethereum', {
-                    configurable: true,
-                    enumerable: true,
-                    get: function() { return this._eth; },
-                    set: function(v) { this._eth = v; },
-                  });
-                }
-              } catch(e) {}
+              (function() {
+                var orig = Object.defineProperty;
+                Object.defineProperty = function(obj, prop, desc) {
+                  try {
+                    return orig.call(Object, obj, prop, desc);
+                  } catch(e) {
+                    if (obj === window && prop === 'ethereum' &&
+                        e instanceof TypeError) {
+                      return obj;
+                    }
+                    throw e;
+                  }
+                };
+              })();
             `,
           }}
         />
