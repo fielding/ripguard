@@ -4,9 +4,10 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { useState, useEffect, useCallback } from "react";
-import { formatUnits } from "viem";
+import { formatUnits, parseAbiItem, type Address, type PublicClient } from "viem";
 import {
   useAccount,
+  usePublicClient,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -15,6 +16,8 @@ import {
   SABLIER_LOCKUP,
   EXPLORER_URL,
   IS_TESTNET,
+  STREAM_START_BLOCK,
+  LOG_CHUNK_SIZE,
 } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
@@ -270,8 +273,102 @@ function VaultSkeleton() {
   );
 }
 
+// ERC-721 Transfer event for stream discovery fallback
+const transferEvent = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
+);
+
+async function fetchFromSubgraph(address: Address): Promise<SubgraphStream[]> {
+  const query = `{
+    LockupStream(
+      where: {
+        recipient: { _eq: "${address.toLowerCase()}" }
+        chainId: { _eq: "${CHAIN_ID}" }
+        contract: { _eq: "${SABLIER_LOCKUP.toLowerCase()}" }
+      }
+      order_by: { startTime: desc }
+    ) {
+      tokenId
+      depositAmount
+      withdrawnAmount
+      startTime
+      endTime
+      cliffTime
+    }
+  }`;
+
+  const res = await fetch(SABLIER_SUBGRAPH, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+
+  if (!res.ok) throw new Error(`Subgraph returned ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0]?.message || "Subgraph query failed");
+  return json.data?.LockupStream ?? [];
+}
+
+async function fetchFromChain(
+  publicClient: PublicClient,
+  address: Address,
+): Promise<SubgraphStream[]> {
+  const toBlock = await publicClient.getBlockNumber();
+  const allTokenIds: bigint[] = [];
+  let from = STREAM_START_BLOCK;
+
+  while (from <= toBlock) {
+    const to = from + LOG_CHUNK_SIZE > toBlock ? toBlock : from + LOG_CHUNK_SIZE;
+    const chunk = await publicClient.getLogs({
+      address: SABLIER_LOCKUP,
+      event: transferEvent,
+      args: { from: "0x0000000000000000000000000000000000000000", to: address },
+      fromBlock: from,
+      toBlock: to,
+    });
+    for (const log of chunk) {
+      if (log.args.tokenId != null) allTokenIds.push(log.args.tokenId);
+    }
+    from = to + BigInt(1);
+  }
+
+  if (allTokenIds.length === 0) return [];
+
+  const ids = allTokenIds;
+
+  // Multicall: 5 reads per stream (startTime, endTime, cliffTime, deposited, withdrawn)
+  const calls = ids.flatMap((id) => [
+    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getStartTime" as const, args: [id] as const },
+    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getEndTime" as const, args: [id] as const },
+    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getCliffTime" as const, args: [id] as const },
+    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getDepositedAmount" as const, args: [id] as const },
+    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getWithdrawnAmount" as const, args: [id] as const },
+  ]);
+
+  const results = await publicClient.multicall({ contracts: calls });
+
+  return ids.map((id, i) => {
+    const base = i * 5;
+    const startTime = results[base].result as number;
+    const endTime = results[base + 1].result as number;
+    const cliffTime = results[base + 2].result as number;
+    const deposited = results[base + 3].result as bigint;
+    const withdrawn = results[base + 4].result as bigint;
+
+    return {
+      tokenId: id.toString(),
+      depositAmount: deposited.toString(),
+      withdrawnAmount: withdrawn.toString(),
+      startTime: startTime.toString(),
+      endTime: endTime.toString(),
+      cliffTime: cliffTime > 0 ? cliffTime.toString() : null,
+    };
+  });
+}
+
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
   const { toast } = useToast();
 
   const [subgraphStreams, setSubgraphStreams] = useState<SubgraphStream[]>([]);
@@ -279,66 +376,52 @@ function VaultDashboard() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
+  const [fetchSource, setFetchSource] = useState<"subgraph" | "onchain" | null>(null);
 
-  // Fetch streams from Sablier subgraph — single query, no block scanning
+  // Fetch streams: subgraph first, on-chain fallback
   useEffect(() => {
     if (!isConnected || !address) return;
 
     let cancelled = false;
     setIsLoadingEvents(true);
     setFetchError(null);
+    setFetchSource(null);
 
     (async () => {
       try {
-        const query = `{
-          LockupStream(
-            where: {
-              recipient: { _eq: "${address.toLowerCase()}" }
-              chainId: { _eq: "${CHAIN_ID}" }
-              contract: { _eq: "${SABLIER_LOCKUP.toLowerCase()}" }
-            }
-            order_by: { startTime: desc }
-          ) {
-            tokenId
-            depositAmount
-            withdrawnAmount
-            startTime
-            endTime
-            cliffTime
+        const streams = await fetchFromSubgraph(address);
+        if (!cancelled) {
+          setSubgraphStreams(streams);
+          setFetchSource("subgraph");
+        }
+      } catch (subgraphErr) {
+        console.warn("[RipGuard] Subgraph failed, falling back to on-chain:", subgraphErr);
+        trackContractError({ action: "fetchVaults", error: String(subgraphErr), contract: "SablierLockup" });
+
+        if (!publicClient) {
+          if (!cancelled) setFetchError("Wallet not connected. Please reconnect and try again.");
+          return;
+        }
+
+        try {
+          const streams = await fetchFromChain(publicClient, address);
+          if (!cancelled) {
+            setSubgraphStreams(streams);
+            setFetchSource("onchain");
           }
-        }`;
-
-        const res = await fetch(SABLIER_SUBGRAPH, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
-        });
-
-        if (!res.ok) throw new Error(`Subgraph returned ${res.status}`);
-        const json = await res.json();
-
-        if (json.errors) {
-          throw new Error(json.errors[0]?.message || "Subgraph query failed");
-        }
-
-        if (!cancelled) {
-          setSubgraphStreams(json.data?.LockupStream ?? []);
-        }
-      } catch (err) {
-        const errStr = String(err);
-        trackContractError({ action: "fetchVaults", error: errStr, contract: "SablierLockup" });
-        if (!cancelled) {
-          setFetchError("Failed to load vaults. Try again in a moment.");
+        } catch (chainErr) {
+          trackContractError({ action: "fetchVaults:onchain", error: String(chainErr), contract: "SablierLockup" });
+          if (!cancelled) {
+            setFetchError("Failed to load vaults. Try again in a moment.");
+          }
         }
       } finally {
         if (!cancelled) setIsLoadingEvents(false);
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [address, isConnected, fetchKey]);
+    return () => { cancelled = true; };
+  }, [address, isConnected, publicClient, fetchKey]);
 
   const retryFetch = useCallback(() => setFetchKey((k) => k + 1), []);
 
@@ -577,6 +660,12 @@ function VaultDashboard() {
               {formatUnits(totals.claimed, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
             </div>
           </div>
+        </div>
+      )}
+      {fetchSource === "onchain" && (
+        <div className="flex items-center gap-2 text-xs text-white/30 px-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+          Loaded from on-chain (indexer unavailable)
         </div>
       )}
       {failedStreamCount > 0 && (
