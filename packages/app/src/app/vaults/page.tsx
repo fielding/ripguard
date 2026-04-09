@@ -291,7 +291,7 @@ function VaultDashboard() {
     (async () => {
       try {
         const query = `{
-          Stream(
+          LockupStream(
             where: {
               recipient: { _eq: "${address.toLowerCase()}" }
               chainId: { _eq: "${CHAIN_ID}" }
@@ -322,7 +322,7 @@ function VaultDashboard() {
         }
 
         if (!cancelled) {
-          setSubgraphStreams(json.data?.Stream ?? []);
+          setSubgraphStreams(json.data?.LockupStream ?? []);
         }
       } catch (err) {
         const errStr = String(err);
