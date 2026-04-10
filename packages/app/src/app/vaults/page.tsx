@@ -150,13 +150,20 @@ function VaultCard({
 
       {/* Progress bar */}
       <div className="space-y-1.5">
-        <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
+        <div
+          className="relative h-2 bg-white/5 rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={Math.round(vestedPct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${Math.round(vestedPct)}% vested`}
+        >
           <div
-            className="absolute inset-y-0 left-0 bg-green-500/30 rounded-full transition-all"
+            className="absolute inset-y-0 left-0 bg-cyan/30 rounded-full transition-[width]"
             style={{ width: `${Math.min(vestedPct, 100)}%` }}
           />
           <div
-            className="absolute inset-y-0 left-0 bg-green-500/70 rounded-full transition-all"
+            className="absolute inset-y-0 left-0 bg-cyan/70 rounded-full transition-[width]"
             style={{ width: `${Math.min(claimedPct, 100)}%` }}
           />
         </div>
@@ -184,7 +191,7 @@ function VaultCard({
       <div className="flex items-center justify-between pt-2 border-t border-white/10">
         <div>
           <div className="text-xs text-white/40">Claimable now</div>
-          <div className="font-semibold text-green-400">
+          <div className="font-semibold text-cyan">
             {formatUnits(vault.claimable, USDC_DECIMALS)} USDC
           </div>
         </div>
@@ -192,7 +199,7 @@ function VaultCard({
           <button
             onClick={() => onClaim(vault.streamId)}
             disabled={vault.claimable === BigInt(0) || claimingId !== null}
-            className="bg-cyan text-black font-semibold rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+            className="bg-cyan text-black font-semibold rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
           >
             {claimingId === vault.streamId ? "Claiming..." : "Claim"}
           </button>
@@ -395,7 +402,7 @@ function VaultDashboard() {
           setFetchSource("subgraph");
         }
       } catch (subgraphErr) {
-        console.warn("[RipGuard] Subgraph failed, falling back to on-chain:", subgraphErr);
+        // Subgraph unavailable — fall back to on-chain
         trackContractError({ action: "fetchVaults", error: String(subgraphErr), contract: "SablierLockup" });
 
         if (!publicClient) {
@@ -590,7 +597,7 @@ function VaultDashboard() {
         <p className="text-white/50 text-sm max-w-sm">{fetchError}</p>
         <button
           onClick={retryFetch}
-          className="border border-white/20 rounded-lg px-5 py-2 text-sm hover:bg-white/5 transition-colors"
+          className="border border-white/20 rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-white/5 transition-colors"
         >
           Retry
         </button>
@@ -618,7 +625,7 @@ function VaultDashboard() {
         </div>
         <Link
           href="/create"
-          className="bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+          className="bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 transition-[background-color,box-shadow] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
         >
           Create a Lock
         </Link>
@@ -650,8 +657,8 @@ function VaultDashboard() {
           </div>
           <div className="card-gradient rounded-xl px-4 py-3 text-center">
             <div className="text-xs text-white/40">Claimable</div>
-            <div className="text-lg font-semibold text-green-400 mt-0.5">
-              {formatUnits(totals.claimable, USDC_DECIMALS)} <span className="text-sm text-green-400/50">USDC</span>
+            <div className="text-lg font-semibold text-cyan mt-0.5">
+              {formatUnits(totals.claimable, USDC_DECIMALS)} <span className="text-sm text-cyan/50">USDC</span>
             </div>
           </div>
           <div className="card-gradient rounded-xl px-4 py-3 text-center">
@@ -706,7 +713,7 @@ function VaultDashboard() {
 
 export default function Vaults() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
       <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">

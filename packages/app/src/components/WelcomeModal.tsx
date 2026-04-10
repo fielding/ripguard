@@ -101,7 +101,7 @@ export function WelcomeModal() {
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#111] p-7 sm:p-8 shadow-2xl animate-[slideUp_0.25s_ease-out]"
+        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-surface-strong p-7 sm:p-8 shadow-2xl animate-[slideUp_0.25s_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
