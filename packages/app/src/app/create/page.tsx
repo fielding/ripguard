@@ -494,7 +494,7 @@ function CreateLockInner() {
                 }}
                 className={`w-full card-gradient rounded-lg p-4 text-left transition-all ${
                   selectedPreset === "custom"
-                    ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
+                    ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(71,180,204,0.08)]"
                     : ""
                 } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
               >
@@ -618,7 +618,7 @@ function CreateLockInner() {
                         }}
                         className={`card-gradient rounded-lg p-4 text-left transition-all ${
                           selectedPreset === key
-                            ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(0,229,255,0.08)]"
+                            ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(71,180,204,0.08)]"
                             : ""
                         } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
@@ -687,7 +687,7 @@ function CreateLockInner() {
                   {isValidForm ? (
                     <button
                       onClick={() => setStep("confirm")}
-                      className="w-full bg-cyan text-black font-semibold rounded-lg py-3 hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+                      className="w-full bg-cyan text-black font-semibold rounded-lg py-3 hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
                     >
                       Review Lock
                     </button>
@@ -1062,7 +1062,7 @@ function ConfirmDialog({
             <button
               onClick={onApprove}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
             >
               Approve USDC
             </button>
@@ -1070,7 +1070,7 @@ function ConfirmDialog({
             <button
               onClick={onLock}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
             >
               Create Lock
             </button>
@@ -1124,20 +1124,20 @@ function SuccessView({
           >
             <path
               d="M32 4L8 16v16c0 15.46 10.24 29.9 24 33.46C45.76 61.9 56 47.46 56 32V16L32 4Z"
-              stroke="#00E5FF"
+              stroke="#47B4CC"
               strokeWidth="2"
-              fill="rgba(0,229,255,0.06)"
+              fill="rgba(71,180,204,0.06)"
             />
             <path
               d="M32 10L12 20v12c0 13.2 8.53 25.5 20 28.6C43.47 57.5 52 45.2 52 32V20L32 10Z"
-              stroke="#00E5FF"
+              stroke="#47B4CC"
               strokeWidth="0.5"
               strokeOpacity="0.3"
               fill="none"
             />
             <path
               d="M22 33l7 7 13-13"
-              stroke="#00E5FF"
+              stroke="#47B4CC"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -1171,7 +1171,7 @@ function SuccessView({
         </a>
         <Link
           href="/vaults"
-          className="inline-block bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+          className="inline-block bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
         >
           View Your Vaults
         </Link>

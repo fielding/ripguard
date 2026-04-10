@@ -145,7 +145,7 @@ export function WelcomeModal() {
         <Link
           href="/create"
           onClick={dismiss}
-          className="block w-full bg-cyan text-black font-bold rounded-xl py-3.5 text-center text-sm hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)] active:scale-[0.98]"
+          className="block w-full bg-cyan text-black font-bold rounded-xl py-3.5 text-center text-sm hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(71,180,204,0.25)] active:scale-[0.98]"
         >
           Create Your First Lock
         </Link>

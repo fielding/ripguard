@@ -9,20 +9,14 @@ dist/
 # Foundry
 packages/contracts/cache/
 packages/contracts/out/
-<<<<<<< HEAD
 packages/contracts/broadcast/
-=======
->>>>>>> testnet
 
 # Env
 .env
 .env.local
-<<<<<<< HEAD
 .env*.local
 .env.testnet
-=======
 .env.production.local
->>>>>>> testnet
 
 # Vercel
 .vercel/
@@ -34,10 +28,10 @@ packages/contracts/broadcast/
 .vscode/
 .idea/
 
-<<<<<<< HEAD
 # Test
 test-results/
-=======
+
 # Internal / marketing
 ripguard-internal/
->>>>>>> testnet
+
+.impeccable.md

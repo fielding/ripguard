@@ -14,7 +14,7 @@ export function RipGuardMark({ className }: { className?: string }) {
       <path
         d="M80 10L121 26L149 59V101L121 134L80 150L39 134L11 101V59L39 26L80 10Z"
         fill="#07161C"
-        stroke="#20E5F7"
+        stroke="#3DAFC2"
         strokeWidth="3"
         strokeLinejoin="round"
       />
@@ -28,13 +28,13 @@ export function RipGuardMark({ className }: { className?: string }) {
       <path
         d="M80 45L55 57V80C55 94 65 109 80 114C95 109 105 94 105 80V57L80 45Z"
         fill="#0D252D"
-        stroke="#1ED8EA"
+        stroke="#38A8BA"
         strokeWidth="2"
         strokeLinejoin="round"
       />
       <path
         d="M66 79V68C66 60.268 72.268 54 80 54C87.732 54 94 60.268 94 68V79"
-        stroke="#7CF6FF"
+        stroke="#7AD2E2"
         strokeWidth="4"
         strokeLinecap="round"
       />
@@ -45,14 +45,14 @@ export function RipGuardMark({ className }: { className?: string }) {
         height="34"
         rx="8"
         fill="#12303A"
-        stroke="#7CF6FF"
+        stroke="#7AD2E2"
         strokeWidth="3"
       />
-      <circle cx="80" cy="91" r="4.5" fill="#7CF6FF" />
-      <path d="M80 95.5V101.5" stroke="#7CF6FF" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="80" cy="91" r="4.5" fill="#7AD2E2" />
+      <path d="M80 95.5V101.5" stroke="#7AD2E2" strokeWidth="3" strokeLinecap="round" />
       <path d="M38 80H49" stroke="#184F59" strokeWidth="2" strokeLinecap="round" />
       <path d="M111 80H122" stroke="#184F59" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="80" cy="26" r="3" fill="#7CF6FF" fillOpacity="0.9" />
+      <circle cx="80" cy="26" r="3" fill="#7AD2E2" fillOpacity="0.9" />
     </svg>
   );
 }

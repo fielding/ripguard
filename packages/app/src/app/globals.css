@@ -3,14 +3,14 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
-  --cyan: #00e5ff;
-  --cyan-dim: #00e5ff80;
-  --cyan-glow: #00e5ff33;
+  --cyan: #47b4cc;
+  --cyan-dim: #47b4cc80;
+  --cyan-glow: #47b4cc33;
   --surface: #0b1115;
   --surface-strong: #11191f;
   --surface-elevated: rgba(10, 23, 29, 0.84);
-  --line: rgba(124, 246, 255, 0.16);
-  --line-strong: rgba(124, 246, 255, 0.34);
+  --line: rgba(122, 210, 226, 0.16);
+  --line-strong: rgba(122, 210, 226, 0.34);
   --text-muted: rgba(237, 245, 247, 0.62);
   --text-subtle: rgba(237, 245, 247, 0.42);
 }
@@ -65,18 +65,18 @@ html {
 
 .button-primary {
   color: #031318;
-  border: 1px solid rgba(124, 246, 255, 0.55);
+  border: 1px solid rgba(122, 210, 226, 0.55);
   background:
     linear-gradient(180deg, rgba(172, 252, 255, 0.98) 0%, rgba(57, 230, 242, 0.96) 100%);
   box-shadow:
-    0 18px 40px rgba(0, 229, 255, 0.18),
+    0 18px 40px rgba(71, 180, 204, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .button-primary:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 24px 54px rgba(0, 229, 255, 0.24),
+    0 24px 54px rgba(71, 180, 204, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
@@ -90,8 +90,8 @@ html {
 
 .button-secondary:hover {
   transform: translateY(-1px);
-  color: #7cf6ff;
-  border-color: rgba(124, 246, 255, 0.28);
+  color: #7ad2e2;
+  border-color: rgba(122, 210, 226, 0.28);
   background: rgba(9, 27, 33, 0.72);
 }
 
@@ -105,7 +105,7 @@ html {
   align-items: center;
   gap: 0.45rem;
   border-radius: 999px;
-  border: 1px solid rgba(124, 246, 255, 0.14);
+  border: 1px solid rgba(122, 210, 226, 0.14);
   background: rgba(8, 20, 25, 0.82);
   padding: 0.55rem 0.85rem;
   color: rgba(237, 245, 247, 0.76);
@@ -128,8 +128,8 @@ html {
 }
 
 .brand-wordmark-accent {
-  color: #5ef2ff;
-  text-shadow: 0 0 26px rgba(0, 229, 255, 0.2);
+  color: #5fc5d8;
+  text-shadow: 0 0 26px rgba(71, 180, 204, 0.2);
 }
 
 .brand-tagline {
@@ -152,7 +152,7 @@ html {
   position: relative;
   overflow: hidden;
   border-radius: 1.75rem;
-  border: 1px solid rgba(124, 246, 255, 0.14);
+  border: 1px solid rgba(122, 210, 226, 0.14);
   background:
     linear-gradient(180deg, rgba(14, 27, 33, 0.96) 0%, rgba(8, 15, 19, 0.96) 100%);
   box-shadow:
@@ -166,13 +166,13 @@ html {
   inset: 0;
   background:
     radial-gradient(circle at top, rgba(94, 242, 255, 0.16), transparent 38%),
-    linear-gradient(135deg, rgba(124, 246, 255, 0.08), transparent 52%);
+    linear-gradient(135deg, rgba(122, 210, 226, 0.08), transparent 52%);
   pointer-events: none;
 }
 
 .hero-stat-card {
   border-radius: 1.25rem;
-  border: 1px solid rgba(124, 246, 255, 0.12);
+  border: 1px solid rgba(122, 210, 226, 0.12);
   background: rgba(9, 18, 23, 0.78);
   padding: 1rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -217,8 +217,8 @@ html {
 
 .card-gradient:hover {
   border-color: var(--cyan-dim);
-  background: linear-gradient(180deg, rgba(0,229,255,0.06) 0%, rgba(0,229,255,0.01) 100%);
-  box-shadow: 0 0 30px rgba(0,229,255,0.08), inset 0 1px 0 rgba(0,229,255,0.1);
+  background: linear-gradient(180deg, rgba(71,180,204,0.06) 0%, rgba(71,180,204,0.01) 100%);
+  box-shadow: 0 0 30px rgba(71,180,204,0.08), inset 0 1px 0 rgba(71,180,204,0.1);
 }
 
 /* Step number circle */
@@ -232,9 +232,9 @@ html {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--cyan);
-  border: 1.5px solid rgba(0,229,255,0.25);
-  background: rgba(0,229,255,0.06);
-  box-shadow: 0 0 24px rgba(0,229,255,0.12), 0 0 60px rgba(0,229,255,0.04);
+  border: 1.5px solid rgba(71,180,204,0.25);
+  background: rgba(71,180,204,0.06);
+  box-shadow: 0 0 24px rgba(71,180,204,0.12), 0 0 60px rgba(71,180,204,0.04);
   position: relative;
 }
 
@@ -243,7 +243,7 @@ html {
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 1px solid rgba(0,229,255,0.08);
+  border: 1px solid rgba(71,180,204,0.08);
 }
 
 /* Connector line between steps (desktop only) */
@@ -259,7 +259,7 @@ html {
     left: calc(50% + 36px);
     width: calc(100% - 72px);
     height: 1px;
-    background: linear-gradient(90deg, rgba(0,229,255,0.25), rgba(0,229,255,0.06));
+    background: linear-gradient(90deg, rgba(71,180,204,0.25), rgba(71,180,204,0.06));
   }
 
   .step-connector::after {
@@ -269,8 +269,8 @@ html {
     top: -3px;
     width: 6px;
     height: 6px;
-    border-right: 1.5px solid rgba(0,229,255,0.25);
-    border-bottom: 1.5px solid rgba(0,229,255,0.25);
+    border-right: 1.5px solid rgba(71,180,204,0.25);
+    border-bottom: 1.5px solid rgba(71,180,204,0.25);
     transform: rotate(-45deg);
   }
 }

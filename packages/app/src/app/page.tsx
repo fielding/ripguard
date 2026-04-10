@@ -159,7 +159,7 @@ export default function Home() {
               <div className="mt-6 flex flex-wrap gap-2.5">
                 {HERO_PROOF_POINTS.map((point) => (
                   <span key={point} className="surface-pill text-xs font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan shadow-[0_0_12px_rgba(0,229,255,0.45)]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan shadow-[0_0_12px_rgba(71,180,204,0.45)]" />
                     {point}
                   </span>
                 ))}
@@ -326,7 +326,7 @@ export default function Home() {
                   href={`/create?preset=${key}`}
                   className="card-gradient rounded-2xl p-7 text-center group flex flex-col items-center gap-5 hover:translate-y-[-2px] transition-all duration-300 focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2"
                 >
-                  <div className="w-14 h-14 rounded-full border border-cyan/15 bg-cyan/[0.06] flex items-center justify-center group-hover:border-cyan/30 group-hover:bg-cyan/10 group-hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-all duration-300">
+                  <div className="w-14 h-14 rounded-full border border-cyan/15 bg-cyan/[0.06] flex items-center justify-center group-hover:border-cyan/30 group-hover:bg-cyan/10 group-hover:shadow-[0_0_24px_rgba(71,180,204,0.15)] transition-all duration-300">
                     {PRESET_ICONS[key]}
                   </div>
                   <div className="space-y-2">

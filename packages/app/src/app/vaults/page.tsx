@@ -199,7 +199,7 @@ function VaultCard({
           <button
             onClick={() => onClaim(vault.streamId)}
             disabled={vault.claimable === BigInt(0) || claimingId !== null}
-            className="bg-cyan text-black font-semibold rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+            className="bg-cyan text-black font-semibold rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
           >
             {claimingId === vault.streamId ? "Claiming..." : "Claim"}
           </button>
@@ -554,8 +554,8 @@ function VaultDashboard() {
       <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 px-6">
         <div className="relative">
           <svg aria-hidden="true" className="w-16 h-16 text-cyan/30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="rgba(0,229,255,0.04)" />
-            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="rgba(0,229,255,0.03)" />
+            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="rgba(71,180,204,0.04)" />
+            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="rgba(71,180,204,0.03)" />
             <path d="M13.5 12V10a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 blur-2xl bg-cyan/[0.06] rounded-full" />
@@ -625,7 +625,7 @@ function VaultDashboard() {
         </div>
         <Link
           href="/create"
-          className="bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 transition-[background-color,box-shadow] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+          className="bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 transition-[background-color,box-shadow] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
         >
           Create a Lock
         </Link>

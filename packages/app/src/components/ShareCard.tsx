@@ -32,8 +32,8 @@ function drawCard(
 
   // Accent line at top
   const gradient = ctx.createLinearGradient(0, 0, CARD_W, 0);
-  gradient.addColorStop(0, "#00E5FF");
-  gradient.addColorStop(1, "#00B8D4");
+  gradient.addColorStop(0, "#47B4CC");
+  gradient.addColorStop(1, "#3A99AB");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CARD_W, 3);
 
@@ -82,7 +82,7 @@ function drawCard(
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = "11px system-ui, -apple-system, sans-serif";
   ctx.fillText("NEXT UNLOCK", col1, infoY);
-  ctx.fillStyle = "#00E5FF";
+  ctx.fillStyle = "#47B4CC";
   ctx.font = "16px system-ui, -apple-system, sans-serif";
   ctx.fillText(nextUnlock, col1, infoY + 22);
 
