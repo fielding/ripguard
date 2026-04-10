@@ -359,7 +359,7 @@ function CreateLockInner() {
   const isFormLocked = step !== "schedule";
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
       {/* Trust signal */}
@@ -687,7 +687,7 @@ function CreateLockInner() {
                   {isValidForm ? (
                     <button
                       onClick={() => setStep("confirm")}
-                      className="w-full bg-cyan text-black font-semibold rounded-lg py-3 hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+                      className="w-full bg-cyan text-black font-semibold rounded-lg py-3 hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
                     >
                       Review Lock
                     </button>
@@ -992,7 +992,7 @@ function ConfirmDialog({
     >
       <div
         ref={dialogRef}
-        className="bg-[#111] border border-white/15 rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col"
+        className="bg-surface-strong border border-white/15 rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
@@ -1062,7 +1062,7 @@ function ConfirmDialog({
             <button
               onClick={onApprove}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
               Approve USDC
             </button>
@@ -1070,7 +1070,7 @@ function ConfirmDialog({
             <button
               onClick={onLock}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
             >
               Create Lock
             </button>
@@ -1171,7 +1171,7 @@ function SuccessView({
         </a>
         <Link
           href="/vaults"
-          className="inline-block bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
+          className="inline-block bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(0,229,255,0.25)]"
         >
           View Your Vaults
         </Link>

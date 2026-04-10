@@ -307,8 +307,8 @@ html {
 /* Dark-themed native select/option elements */
 select,
 option {
-  background-color: #111;
-  color: #ededed;
+  background-color: var(--surface-strong);
+  color: var(--foreground);
 }
 
 /* Success icon pop animation */
@@ -332,4 +332,22 @@ option {
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.5rem;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  .animate-glow-pulse,
+  .animate-float,
+  .animate-success-pop,
+  .skeleton {
+    animation: none;
+  }
+
+  .card-gradient,
+  .button-primary,
+  .button-secondary {
+    transition-duration: 0s;
+  }
 }
