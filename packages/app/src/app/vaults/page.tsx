@@ -123,35 +123,45 @@ function VaultCard({
   const nextUnlockLabel =
     nextUnlock.time > 0 ? formatCountdown(nextUnlock.time) : "Now";
 
+  const canClaim = vault.claimable > BigInt(0);
+  const isClaimingThis = claimingId === vault.streamId;
+  const claimStatus =
+    now < vault.cliffTime
+      ? "Locked until cliff"
+      : now < vault.endTime
+        ? "Vesting"
+        : "Nothing to claim";
+
   return (
-    <div className="card-gradient rounded-xl p-5 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        <div>
-          <div className="text-xs text-white/40 font-mono">
+    <div className="border border-line bg-background p-6 sm:p-7 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="space-y-1.5">
+          <div className="eyebrow text-cyan/70 tabular">
             Stream #{vault.streamId.toString()}
           </div>
-          <div className="text-sm text-white/60 mt-0.5">
+          <div className="font-display text-xl tracking-tight">
             {getScheduleType(vault.cliffSeconds, vault.totalSeconds)}
           </div>
         </div>
         <div className="sm:text-right">
-          <div className="text-lg font-semibold">
-            {formatUnits(vault.deposited, USDC_DECIMALS)} USDC
+          <div className="font-display text-2xl tabular tracking-tight">
+            {formatUnits(vault.deposited, USDC_DECIMALS)}
+            <span className="text-sm text-muted font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
-          <div className="text-xs text-white/40">total locked</div>
+          <div className="eyebrow mt-1">Total locked</div>
         </div>
       </div>
 
       {/* Dates */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/40">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-faint tabular">
         <span>Started {formatDate(vault.startTime)}</span>
         <span>Ends {formatDate(vault.endTime)}</span>
       </div>
 
       {/* Progress bar */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div
-          className="relative h-2 bg-white/5 rounded-full overflow-hidden"
+          className="relative h-1.5 bg-surface rounded-full overflow-hidden"
           role="progressbar"
           aria-valuenow={Math.round(vestedPct)}
           aria-valuemin={0}
@@ -163,71 +173,68 @@ function VaultCard({
             style={{ width: `${Math.min(vestedPct, 100)}%` }}
           />
           <div
-            className="absolute inset-y-0 left-0 bg-cyan/70 rounded-full transition-[width]"
+            className="absolute inset-y-0 left-0 bg-cyan rounded-full transition-[width]"
             style={{ width: `${Math.min(claimedPct, 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-white/40">
-          <span>
+        <div className="flex justify-between text-xs tabular">
+          <span className="text-muted">
             {formatUnits(vested, USDC_DECIMALS)} vested
           </span>
-          <span>
+          <span className="text-faint">
             {formatUnits(remaining, USDC_DECIMALS)} remaining
           </span>
         </div>
       </div>
 
       {/* Next unlock countdown */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-white/50">{nextUnlock.label}</span>
-        <span className="font-medium">
-          {nextUnlock.time > 0
-            ? formatCountdown(nextUnlock.time)
-            : "---"}
+      <div className="flex items-center justify-between text-sm tabular">
+        <span className="text-muted">{nextUnlock.label}</span>
+        <span className="text-foreground font-semibold">
+          {nextUnlock.time > 0 ? formatCountdown(nextUnlock.time) : "---"}
         </span>
       </div>
 
       {/* Claimable + button */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/10">
+      <div className="flex items-center justify-between gap-4 pt-5 border-t border-line">
         <div>
-          <div className="text-xs text-white/40">Claimable now</div>
-          <div className="font-semibold text-cyan">
-            {formatUnits(vault.claimable, USDC_DECIMALS)} USDC
+          <div className="eyebrow mb-1.5">Claimable now</div>
+          <div className="font-display text-3xl text-cyan tabular tracking-tight">
+            {formatUnits(vault.claimable, USDC_DECIMALS)}
+            <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={() => onClaim(vault.streamId)}
-            disabled={vault.claimable === BigInt(0) || claimingId !== null}
-            className="bg-cyan text-black font-semibold rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
-          >
-            {claimingId === vault.streamId ? "Claiming..." : "Claim"}
-          </button>
-          {vault.claimable === BigInt(0) && claimingId !== vault.streamId && (
-            <span className="text-[10px] text-white/30">
-              {now < vault.cliffTime ? "Locked until cliff" : now < vault.endTime ? "Vesting in progress" : "Nothing to claim"}
+          {!canClaim && !isClaimingThis && (
+            <span className="text-[11px] text-faint mt-1 block tabular">
+              {claimStatus}
             </span>
           )}
         </div>
+        <button
+          onClick={() => onClaim(vault.streamId)}
+          disabled={!canClaim || claimingId !== null}
+          className="btn-primary disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+        >
+          {isClaimingThis ? "Claiming…" : "Claim reload"}
+        </button>
       </div>
 
       {/* Share + verify links */}
-      <div className="flex items-center justify-center gap-4 pt-1">
+      <div className="flex items-center gap-5 text-xs pt-1">
         <button
           onClick={() => setShowShare(!showShare)}
-          className="text-xs text-white/40 hover:text-white/60 transition-colors"
+          className="text-muted hover:text-cyan transition-colors"
           aria-expanded={showShare}
         >
           {showShare ? "Hide share card" : "Share proof of lock"}
         </button>
-        <span className="text-white/15">|</span>
+        <span className="text-faint/50">·</span>
         <a
           href={`${EXPLORER_URL}/nft/${SABLIER_LOCKUP}/${vault.streamId.toString()}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-white/40 hover:text-cyan/70 transition-colors"
+          className="text-muted hover:text-cyan transition-colors"
         >
-          Verify on-chain
+          Verify on-chain →
         </a>
       </div>
 
@@ -247,34 +254,34 @@ function VaultCard({
 
 function VaultSkeleton() {
   return (
-    <div className="card-gradient rounded-xl p-5 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+    <div className="border border-line bg-background p-6 sm:p-7 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="space-y-2">
           <div className="skeleton h-3 w-24" />
-          <div className="skeleton h-3 w-16" />
+          <div className="skeleton h-6 w-32" />
         </div>
         <div className="space-y-2 sm:text-right">
-          <div className="skeleton h-5 w-32 sm:ml-auto" />
-          <div className="skeleton h-3 w-16 sm:ml-auto" />
+          <div className="skeleton h-8 w-40 sm:ml-auto" />
+          <div className="skeleton h-3 w-20 sm:ml-auto" />
         </div>
       </div>
-      <div className="space-y-1.5">
-        <div className="skeleton h-2 w-full rounded-full" />
+      <div className="space-y-2">
+        <div className="skeleton h-1.5 w-full rounded-full" />
         <div className="flex justify-between">
-          <div className="skeleton h-3 w-20" />
-          <div className="skeleton h-3 w-20" />
+          <div className="skeleton h-3 w-24" />
+          <div className="skeleton h-3 w-24" />
         </div>
       </div>
       <div className="flex justify-between">
         <div className="skeleton h-4 w-28" />
         <div className="skeleton h-4 w-16" />
       </div>
-      <div className="flex items-center justify-between pt-2 border-t border-white/10">
-        <div className="space-y-1">
-          <div className="skeleton h-3 w-20" />
-          <div className="skeleton h-5 w-24" />
+      <div className="flex items-center justify-between pt-5 border-t border-line">
+        <div className="space-y-2">
+          <div className="skeleton h-3 w-24" />
+          <div className="skeleton h-8 w-32" />
         </div>
-        <div className="skeleton h-9 w-20 rounded-lg" />
+        <div className="skeleton h-12 w-32 rounded-lg" />
       </div>
     </div>
   );
@@ -551,19 +558,23 @@ function VaultDashboard() {
   // Not connected
   if (!isConnected) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 px-6">
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 py-20 px-6">
         <div className="relative">
-          <svg aria-hidden="true" className="w-16 h-16 text-cyan/30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="rgba(71,180,204,0.04)" />
-            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="rgba(71,180,204,0.03)" />
+          <div className="absolute inset-0 blur-[40px] bg-cyan/[0.08] rounded-full" />
+          <svg aria-hidden="true" className="relative w-16 h-16 text-cyan" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.06" />
+            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.04" />
             <path d="M13.5 12V10a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          <div className="absolute inset-0 blur-2xl bg-cyan/[0.06] rounded-full" />
         </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold text-white/80">Connect to view your vaults</h3>
-          <p className="text-sm text-white/40 max-w-xs">
-            See your locked USDC, track vesting progress, and claim when ready.
+        <div className="text-center space-y-3 max-w-md">
+          <div className="eyebrow text-cyan/70">Wallet required</div>
+          <h3 className="font-display text-3xl tracking-tight">
+            Connect to see your vaults.
+          </h3>
+          <p className="text-sm text-muted leading-relaxed">
+            Your locks live on-chain. Plug in the wallet that signed them to
+            track vesting and claim reloads.
           </p>
         </div>
         <ConnectButton />
@@ -574,7 +585,7 @@ function VaultDashboard() {
   // Loading with skeletons
   if (isLoadingEvents) {
     return (
-      <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-8 space-y-4">
+      <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-px bg-line border border-line rounded-lg overflow-hidden">
         <VaultSkeleton />
         <VaultSkeleton />
         <VaultSkeleton />
@@ -585,20 +596,15 @@ function VaultDashboard() {
   // RPC / fetch error
   if (fetchError) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-        <div className="w-12 h-12 rounded-full border border-yellow-500/30 flex items-center justify-center">
-          <svg aria-hidden="true" className="w-6 h-6 text-yellow-500/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-semibold">Connection error</h3>
-        <p className="text-white/50 text-sm max-w-sm">{fetchError}</p>
-        <button
-          onClick={retryFetch}
-          className="border border-white/20 rounded-lg px-5 py-2.5 min-h-[44px] text-sm hover:bg-white/5 transition-colors"
-        >
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 px-6 text-center">
+        <div className="eyebrow text-warning/80">Connection error</div>
+        <h3 className="font-display text-3xl tracking-tight max-w-md">
+          Couldn&apos;t reach the chain.
+        </h3>
+        <p className="text-muted text-sm max-w-sm leading-relaxed">
+          {fetchError} Your vaults are unaffected. They live in Sablier.
+        </p>
+        <button onClick={retryFetch} className="btn-secondary">
           Retry
         </button>
       </div>
@@ -608,25 +614,27 @@ function VaultDashboard() {
   // Empty state
   if (streamIds.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 px-6">
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 py-20 px-6">
         <div className="relative">
-          <svg aria-hidden="true" className="w-14 h-14 text-white/20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="rgba(255,255,255,0.02)" />
-            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="rgba(255,255,255,0.02)" />
+          <div className="absolute inset-0 blur-[40px] bg-cyan/[0.04] rounded-full" />
+          <svg aria-hidden="true" className="relative w-14 h-14 text-subtle" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2L4 8v8c0 7.73 5.12 14.95 12 16.73C22.88 30.95 28 23.73 28 16V8L16 2Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.03" />
+            <rect x="12" y="12" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.03" />
             <path d="M13.5 12V10a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          <div className="absolute inset-0 blur-2xl bg-white/[0.03] rounded-full" />
         </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold">No locks yet</h3>
-          <p className="text-white/40 text-sm max-w-xs">
-            Lock your gains before you YOLO them away.
+        <div className="text-center space-y-3 max-w-md">
+          <div className="eyebrow">Nothing locked yet</div>
+          <h3 className="font-display text-3xl tracking-tight">
+            No vaults.
+            <br />
+            <span className="text-cyan">Start with $5.</span>
+          </h3>
+          <p className="text-muted text-sm leading-relaxed">
+            Cash out. Lock it. Thank yourself later.
           </p>
         </div>
-        <Link
-          href="/create"
-          className="bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 min-h-[44px] text-sm hover:bg-cyan/90 transition-[background-color,box-shadow] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
-        >
+        <Link href="/create" className="btn-primary btn-lg">
           Create a Lock
         </Link>
       </div>
@@ -646,37 +654,39 @@ function VaultDashboard() {
     : null;
 
   return (
-    <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-8 space-y-4">
+    <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
       {totals && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
-          <div className="card-gradient rounded-xl px-4 py-3 text-center">
-            <div className="text-xs text-white/40">Total Locked</div>
-            <div className="text-lg font-semibold mt-0.5">
-              {formatUnits(totals.locked, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
-            </div>
-          </div>
-          <div className="card-gradient rounded-xl px-4 py-3 text-center">
-            <div className="text-xs text-white/40">Claimable</div>
-            <div className="text-lg font-semibold text-cyan mt-0.5">
-              {formatUnits(totals.claimable, USDC_DECIMALS)} <span className="text-sm text-cyan/50">USDC</span>
-            </div>
-          </div>
-          <div className="card-gradient rounded-xl px-4 py-3 text-center">
-            <div className="text-xs text-white/40">Claimed</div>
-            <div className="text-lg font-semibold mt-0.5">
-              {formatUnits(totals.claimed, USDC_DECIMALS)} <span className="text-sm text-white/40">USDC</span>
-            </div>
-          </div>
+        <div className="border-y border-line py-7">
+          <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
+            <li className="flex items-baseline gap-2.5">
+              <span className="font-display text-cyan text-3xl tabular tracking-tight">
+                {formatUnits(totals.locked, USDC_DECIMALS)}
+              </span>
+              <span className="eyebrow">Total locked</span>
+            </li>
+            <li className="flex items-baseline gap-2.5">
+              <span className="font-display text-cyan text-3xl tabular tracking-tight">
+                {formatUnits(totals.claimable, USDC_DECIMALS)}
+              </span>
+              <span className="eyebrow">Claimable now</span>
+            </li>
+            <li className="flex items-baseline gap-2.5">
+              <span className="font-display text-foreground text-3xl tabular tracking-tight">
+                {formatUnits(totals.claimed, USDC_DECIMALS)}
+              </span>
+              <span className="eyebrow">Claimed</span>
+            </li>
+          </ul>
         </div>
       )}
       {fetchSource === "onchain" && (
-        <div className="flex items-center gap-2 text-xs text-white/30 px-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+        <div className="flex items-center gap-2 text-xs text-faint tabular">
+          <span className="w-1.5 h-1.5 rounded-full bg-warning/70" />
           Loaded from on-chain (indexer unavailable)
         </div>
       )}
       {failedStreamCount > 0 && (
-        <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-sm text-yellow-400">
+        <div className="bg-warning/10 border border-warning/25 rounded-lg px-4 py-3 text-sm text-warning flex items-center gap-3">
           <svg aria-hidden="true" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
@@ -684,27 +694,29 @@ function VaultDashboard() {
           </svg>
           <span>
             {failedStreamCount} {failedStreamCount === 1 ? "vault" : "vaults"} failed to load.{" "}
-            <button onClick={retryFetch} className="underline hover:text-yellow-300 transition-colors">
+            <button onClick={retryFetch} className="underline hover:text-foreground transition-colors">
               Retry
             </button>
           </span>
         </div>
       )}
-      {vaults.map((vault) => (
-        <CardErrorBoundary key={vault.streamId.toString()} label={`Stream #${vault.streamId.toString()}`}>
-          <VaultCard
-            vault={vault}
-            onClaim={handleClaim}
-            claimingId={claimingId}
-          />
-        </CardErrorBoundary>
-      ))}
-      <div className="text-center pt-4">
+      <div className="space-y-px bg-line border border-line rounded-lg overflow-hidden">
+        {vaults.map((vault) => (
+          <CardErrorBoundary key={vault.streamId.toString()} label={`Stream #${vault.streamId.toString()}`}>
+            <VaultCard
+              vault={vault}
+              onClaim={handleClaim}
+              claimingId={claimingId}
+            />
+          </CardErrorBoundary>
+        ))}
+      </div>
+      <div className="pt-2">
         <Link
           href="/create"
-          className="text-sm text-white/40 hover:text-cyan transition-colors underline decoration-white/15 hover:decoration-cyan/40"
+          className="text-sm text-muted hover:text-cyan transition-colors"
         >
-          Create another lock
+          Lock another win →
         </Link>
       </div>
     </div>
@@ -716,17 +728,38 @@ export default function Vaults() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">
-        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks
+      <div className="border-b border-line px-6 py-2.5 text-center text-xs tabular text-subtle">
+        RipGuard is the UI. Sablier is the bank. Non-custodial. Immutable.
       </div>
 
-      <main className="flex-1 flex flex-col">
-        <div className="px-6 pt-8 pb-4 text-center">
-          <h2 className="text-2xl font-bold">Your Vaults</h2>
+      <main className="relative flex-1 flex flex-col">
+        {/* Ambient backdrop */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-[520px] pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,oklch(0.30_0.060_200/0.35),transparent_70%)]" />
+          <div className="absolute inset-0 grid-overlay" />
         </div>
-        <ErrorBoundary fallbackTitle="Failed to load vaults">
-          <VaultDashboard />
-        </ErrorBoundary>
+
+        <div className="relative w-full max-w-4xl mx-auto px-5 sm:px-8 pt-14 sm:pt-20 pb-10">
+          <div className="eyebrow mb-5 flex items-center gap-3">
+            <span className="h-px w-10 bg-cyan/60" />
+            Your vaults
+          </div>
+          <h1 className="text-display max-w-2xl">
+            Your past self
+            <br />
+            <span className="text-cyan">paying you back.</span>
+          </h1>
+          <p className="mt-5 text-muted leading-relaxed max-w-[52ch]">
+            Every lock you signed, in one place. Watch them vest. Claim when
+            the schedule says you can.
+          </p>
+        </div>
+
+        <div className="relative flex-1 flex flex-col">
+          <ErrorBoundary fallbackTitle="Failed to load vaults">
+            <VaultDashboard />
+          </ErrorBoundary>
+        </div>
       </main>
     </div>
   );
