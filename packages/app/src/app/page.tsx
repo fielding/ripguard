@@ -361,7 +361,7 @@ export default function Home() {
               </div>
               <Link
                 href="/create"
-                className="text-sm text-muted hover:text-cyan transition-colors shrink-0"
+                className="inline-flex items-center min-h-[2.75rem] px-2 -mx-2 text-sm text-muted hover:text-cyan transition-colors shrink-0"
               >
                 Or build a custom one →
               </Link>
@@ -375,15 +375,15 @@ export default function Home() {
                   className="group relative bg-background p-8 flex flex-col gap-6 hover:bg-surface preset-card-hover focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px]"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-lg border border-line flex items-center justify-center text-cyan group-hover:border-cyan/40 transition-colors">
+                    <div className="w-12 h-12 rounded-lg border border-line flex items-center justify-center text-cyan group-hover:border-cyan/40 transition-colors duration-300">
                       <PresetIcon variant={PRESET_ICONS[key]} />
                     </div>
-                    <span className="eyebrow group-hover:text-cyan transition-colors">
+                    <span className="eyebrow group-hover:text-cyan transition-colors duration-300">
                       Select
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-display text-2xl tracking-tight group-hover:text-cyan transition-colors">
+                    <h3 className="font-display text-2xl tracking-tight group-hover:text-cyan transition-colors duration-300">
                       {preset.label}
                     </h3>
                     <p className="mt-2 text-sm text-muted leading-relaxed">
@@ -687,7 +687,10 @@ export default function Home() {
               You already know you need this. Lock now, thank yourself later.
             </p>
             <div className="mt-12">
-              <Link href="/create" className="btn-primary btn-lg">
+              <Link
+                href="/create"
+                className="btn-primary btn-lg hero-cta-beacon"
+              >
                 Create a Lock
               </Link>
             </div>
@@ -701,15 +704,18 @@ export default function Home() {
               <RipGuardMark className="h-6 w-6" />
               <span className="font-display text-lg tracking-tight">RipGuard</span>
             </div>
-            <nav className="flex items-center gap-8 text-sm text-muted">
-              <Link href="/vaults" className="hover:text-cyan transition-colors">
+            <nav className="flex items-center gap-2 sm:gap-4 text-sm text-muted">
+              <Link
+                href="/vaults"
+                className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
+              >
                 My Vaults
               </Link>
               <a
                 href={githubUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-cyan transition-colors"
+                className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
               >
                 GitHub
               </a>
@@ -717,7 +723,7 @@ export default function Home() {
                 href="https://x.com/ripguardxyz"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-cyan transition-colors"
+                className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
               >
                 X
               </a>
@@ -725,7 +731,7 @@ export default function Home() {
                 href={sablierExplorerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-cyan transition-colors"
+                className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
               >
                 BaseScan
               </a>
