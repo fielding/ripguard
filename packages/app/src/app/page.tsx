@@ -136,7 +136,10 @@ export default function Home() {
 
           <div className="relative mx-auto max-w-6xl px-5 sm:px-8 pt-20 pb-24 sm:pt-28 sm:pb-32">
             {/* Eyebrow */}
-            <div className="eyebrow mb-10 flex items-center gap-3">
+            <div
+              className="eyebrow mb-10 flex items-center gap-3 animate-hero-enter"
+              style={{ animationDelay: "0ms" }}
+            >
               <span className="h-px w-10 bg-cyan/60" />
               Built on Sablier&apos;s audited contracts
             </div>
@@ -144,7 +147,10 @@ export default function Home() {
             {/* Main hero grid — wordmark & copy left, floating 3D mark right */}
             <div className="grid gap-12 lg:grid-cols-[1.3fr_1fr] lg:gap-12 items-center">
               <div>
-                <h1 className="text-hero">
+                <h1
+                  className="text-hero animate-hero-enter"
+                  style={{ animationDelay: "140ms" }}
+                >
                   Lock your
                   <br />
                   winnings before
@@ -152,7 +158,10 @@ export default function Home() {
                   <span className="text-cyan">you give them back.</span>
                 </h1>
 
-                <p className="mt-8 max-w-[52ch] text-lg sm:text-xl leading-relaxed text-muted">
+                <p
+                  className="mt-8 max-w-[52ch] text-lg sm:text-xl leading-relaxed text-muted animate-hero-enter"
+                  style={{ animationDelay: "300ms" }}
+                >
                   The &ldquo;cash this out, don&apos;t let me play&rdquo; button.
                   Drop USDC into a vault that pays you back on your own schedule,
                   like a reload you designed for yourself. Non-custodial.
@@ -168,8 +177,14 @@ export default function Home() {
                   .
                 </p>
 
-                <div className="mt-10 flex flex-col sm:flex-row gap-3">
-                  <Link href="/create" className="btn-primary btn-lg">
+                <div
+                  className="mt-10 flex flex-col sm:flex-row gap-3 animate-hero-enter"
+                  style={{ animationDelay: "460ms" }}
+                >
+                  <Link
+                    href="/create"
+                    className="btn-primary btn-lg hero-cta-beacon"
+                  >
                     Create a Lock
                   </Link>
                   <a
@@ -185,7 +200,8 @@ export default function Home() {
                 {!IS_TESTNET && (
                   <a
                     href="https://testnet.ripguard.xyz"
-                    className="mt-6 inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors"
+                    className="mt-6 inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors animate-hero-enter"
+                    style={{ animationDelay: "620ms" }}
                   >
                     Test the flow on Base Sepolia
                     <span aria-hidden>→</span>
@@ -193,13 +209,21 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 3D mark — floats free, no card frame */}
+              {/* 3D mark — floats free, no card frame. Outer wrapper handles
+                  the one-shot mount animation (scale + fade); inner wrapper
+                  keeps the continuous float. They don't conflict because
+                  they use different transform targets. */}
               <div className="relative flex items-center justify-center lg:justify-end">
-                <div className="animate-float">
-                  <RipGuardMark3D
-                    pulse
-                    className="h-64 w-64 sm:h-80 sm:w-80 lg:h-[26rem] lg:w-[26rem]"
-                  />
+                <div
+                  className="animate-hero-mark-enter"
+                  style={{ animationDelay: "140ms" }}
+                >
+                  <div className="animate-float">
+                    <RipGuardMark3D
+                      pulse
+                      className="h-64 w-64 sm:h-80 sm:w-80 lg:h-[26rem] lg:w-[26rem]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -348,7 +372,7 @@ export default function Home() {
                 <Link
                   key={key}
                   href={`/create?preset=${key}`}
-                  className="group relative bg-background p-8 flex flex-col gap-6 hover:bg-surface transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px]"
+                  className="group relative bg-background p-8 flex flex-col gap-6 hover:bg-surface preset-card-hover focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="w-12 h-12 rounded-lg border border-line flex items-center justify-center text-cyan group-hover:border-cyan/40 transition-colors">
