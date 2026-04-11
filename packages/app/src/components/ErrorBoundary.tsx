@@ -38,13 +38,13 @@ export class CardErrorBoundary extends Component<CardProps, CardState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="card-gradient rounded-xl p-5 flex items-center justify-between">
-          <span className="text-sm text-white/40">
-            {this.props.label ?? "Card"} failed to load
+        <div className="border border-line rounded-xl p-5 flex items-center justify-between bg-surface">
+          <span className="text-sm text-muted">
+            {this.props.label ?? "Card"} failed to load.
           </span>
           <button
             onClick={() => this.setState({ hasError: false })}
-            className="text-xs border border-white/20 rounded px-3 py-1 hover:bg-white/5 transition-colors"
+            className="text-xs border border-line-strong text-muted rounded px-3 py-1.5 hover:border-cyan hover:text-cyan transition-colors"
           >
             Retry
           </button>
@@ -83,25 +83,22 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-          <div className="text-4xl">&#x26A0;&#xFE0F;</div>
-          <h3 className="text-xl font-semibold">
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 py-16 px-6 text-center">
+          <div className="eyebrow text-cyan/70">Something broke</div>
+          <h3 className="font-display text-2xl tracking-tight">
             {this.props.fallbackTitle || "Something went wrong"}
           </h3>
-          <p className="text-white/50 text-sm max-w-sm">
-            An unexpected error occurred. Please try again or return home.
+          <p className="text-muted text-sm max-w-sm leading-relaxed">
+            An unexpected error hit. Your funds are not affected. Retry, or head home.
           </p>
           <div className="flex gap-3">
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
-              className="border border-white/20 rounded-lg px-5 py-2 text-sm hover:bg-white/5 transition-colors"
+              className="btn-secondary"
             >
               Try again
             </button>
-            <Link
-              href="/"
-              className="bg-cyan text-black font-semibold rounded-lg px-5 py-2 text-sm hover:bg-cyan/90 transition-all"
-            >
+            <Link href="/" className="btn-primary">
               Go home
             </Link>
           </div>
