@@ -1,31 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Archivo_Black } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClientProviders } from "@/components/ClientProviders";
 import { TestnetBanner } from "@/components/TestnetBanner";
 import { IS_TESTNET } from "@/config/contracts";
+import { BRAND, getSiteTitle } from "@/content/brand";
 import "./globals.css";
 
 // Force dynamic rendering — web3 app needs client-side wallet state
 export const dynamic = "force-dynamic";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const archivo = Archivo({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const archivoBlack = Archivo_Black({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: "400",
+  display: "swap",
 });
 
 const siteUrl = IS_TESTNET
   ? "https://testnet.ripguard.xyz"
   : "https://ripguard.xyz";
-const siteTitle = IS_TESTNET
-  ? "RipGuard Testnet — Lock your winnings before you give them back"
-  : "RipGuard — Lock your winnings before you give them back";
+const siteTitle = getSiteTitle({ testnet: IS_TESTNET });
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -36,8 +39,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: siteTitle,
-  description:
-    "The \"I'm up, get me out\" button. Lock USDC into time-locked vaults on Base. Non-cancelable. Self-custodial. Powered by Sablier v2.0 audited contracts.",
+  description: BRAND.metaDescription,
   icons: {
     icon: "/logo-icon.png",
     apple: "/logo-icon.png",
@@ -51,11 +53,10 @@ export const metadata: Metadata = {
     : { index: true, follow: true },
   openGraph: {
     title: siteTitle,
-    description:
-      "The \"I'm up, get me out\" button. Lock USDC into time-locked vaults on Base. Non-cancelable. Self-custodial. Powered by Sablier v2.0 audited contracts.",
+    description: BRAND.metaDescription,
     type: "website",
     url: siteUrl,
-    siteName: IS_TESTNET ? "RipGuard Testnet" : "RipGuard",
+    siteName: IS_TESTNET ? BRAND.testnetName : BRAND.name,
     images: [
       {
         url: "/og-image.png",
@@ -69,8 +70,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@ripguardxyz",
     title: siteTitle,
-    description:
-      "The \"I'm up, get me out\" button. Lock USDC into time-locked vaults on Base. Non-cancelable. Self-custodial. Powered by Sablier v2.0 audited contracts.",
+    description: BRAND.metaDescription,
     images: ["/og-image.png"],
   },
 };
@@ -109,7 +109,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${archivo.variable} ${archivoBlack.variable} antialiased bg-background text-foreground`}
       >
         <TestnetBanner />
         <ClientProviders>{children}</ClientProviders>

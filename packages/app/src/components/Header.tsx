@@ -5,14 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RipGuardMark } from "@/components/Brand";
 
-const APP_NAV_LINKS = [
-  { href: "/create", label: "Create Lock" },
-  { href: "/vaults", label: "My Vaults" },
+type NavLink = { href: string; label: string; hash?: boolean };
+
+const APP_NAV_LINKS: NavLink[] = [
+  { href: "/create", label: "Create" },
+  { href: "/vaults", label: "Vaults" },
 ];
 
-const HOME_NAV_LINKS = [
-  { href: "/#how-it-works", label: "How it works" },
-  { href: "/#trust", label: "Why trust it" },
+const HOME_NAV_LINKS: NavLink[] = [
+  { href: "#how-it-works", label: "How it works", hash: true },
+  { href: "#trust", label: "Trust", hash: true },
   { href: "/vaults", label: "Vaults" },
 ];
 
@@ -22,60 +24,65 @@ export function Header() {
   const navLinks = isHome ? HOME_NAV_LINKS : APP_NAV_LINKS;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#060a0d]/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3">
-            <RipGuardMark className="h-9 w-9 shrink-0" />
-            <div className="leading-none">
-              <span className="block text-sm font-semibold uppercase tracking-[0.22em] text-white/88">
-                Rip<span className="text-cyan">Guard</span>
-              </span>
-              <span className="mt-1 block text-[10px] uppercase tracking-[0.3em] text-white/28">
-                Non-cancelable vaults
-              </span>
-            </div>
-          </Link>
-          <nav className="hidden sm:flex items-center gap-1">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`rounded-full px-4 py-2 text-sm transition-colors ${
-                    isActive
-                      ? "bg-cyan/[0.09] text-cyan"
-                      : "text-white/45 hover:text-white/78"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <nav className="flex sm:hidden items-center gap-1">
+    <header className="sticky top-0 z-50 border-b border-line bg-background/85 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+        {/* Brand lockup */}
+        <Link
+          href="/"
+          className="flex items-center gap-3 shrink-0 focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-4 focus-visible:rounded"
+          aria-label="RipGuard home"
+        >
+          <RipGuardMark className="h-9 w-9 shrink-0" />
+          <span className="font-display text-xl tracking-tight leading-none">
+            Rip<span className="text-cyan">Guard</span>
+          </span>
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+          {navLinks.map((link) => {
+            const isActive = !link.hash && pathname === link.href;
+            const className = `px-4 py-2 text-sm font-medium transition-colors ${
+              isActive
+                ? "text-cyan"
+                : "text-foreground/70 hover:text-foreground"
+            }`;
+            return link.hash ? (
+              <a key={link.href} href={link.href} className={className}>
+                {link.label}
+              </a>
+            ) : (
+              <Link key={link.href} href={link.href} className={className}>
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Right side: mobile nav + CTA */}
+        <div className="flex items-center gap-2 shrink-0">
+          <nav className="flex md:hidden items-center gap-0">
             {navLinks.slice(0, 2).map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`rounded-full px-3 py-1.5 text-xs transition-colors ${
-                    isActive
-                      ? "bg-cyan/[0.09] text-cyan"
-                      : "text-white/35 hover:text-white/60"
-                  }`}
-                >
+              const isActive = !link.hash && pathname === link.href;
+              const className = `px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                isActive ? "text-cyan" : "text-foreground/60 hover:text-foreground"
+              }`;
+              return link.hash ? (
+                <a key={link.href} href={link.href} className={className}>
+                  {link.label}
+                </a>
+              ) : (
+                <Link key={link.href} href={link.href} className={className}>
                   {link.label}
                 </Link>
               );
             })}
           </nav>
           {isHome ? (
-            <Link href="/create" className="button-primary px-5 py-2.5 text-sm min-h-0">
+            <Link
+              href="/create"
+              className="btn-primary !min-h-0 !py-2.5 !px-5 !text-[0.8125rem] !font-semibold"
+            >
               Create a Lock
             </Link>
           ) : (
