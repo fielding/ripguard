@@ -1,131 +1,105 @@
 # RipGuard
 
-Self-custodial profit locking on Base. Lock USDC into time-locked vaults so you can't panic-sell your gains.
+The "cash this out, don't let me play" button. Lock USDC into a Sablier stream that pays you back on your own schedule, so the degen you're about to be can't undo the win you just had.
 
-<<<<<<< HEAD
-> **Built on [Sablier v2.0](https://docs.sablier.com) audited contracts. Non-custodial. Immutable locks.**
-=======
-> Unaudited beta. Not an investment product. Use at your own risk.
->>>>>>> testnet
+> Non-custodial. Non-cancelable. Enforced on-chain by [Sablier](https://sablier.com) v2.0 audited contracts. Not financial advice. DYOR.
+
+**Live:** [ripguard.xyz](https://ripguard.xyz) (Base mainnet) · [testnet.ripguard.xyz](https://testnet.ripguard.xyz) (Base Sepolia)
 
 ## What is this
 
-You hit a 10x. You know you should take profit. You also know you'll "let it ride" and give it all back.
+You hit a W. Your brain says "one more play." You know how this ends.
 
-RipGuard locks your USDC into [Sablier](https://sablier.com) Lockup streams on Base. Non-cancelable, non-custodial, immutable. Your future self can't touch it until the schedule says so.
+RipGuard drops your USDC into a non-cancelable [Sablier Lockup](https://docs.sablier.com) stream on Base. Your past self sets the unlock schedule. Your future self claims it back on the clock. The degen in the middle begs, and the on-chain answer is no.
 
-<<<<<<< HEAD
-No admin keys. No upgradeability. No fund custody. Just Sablier's battle-tested lockup protocol with a UI that makes it easy.
-=======
-No custom contracts. No custody. No admin keys. Just Sablier's battle-tested lockup protocol with a UI that makes it easy.
->>>>>>> testnet
+No admin keys. No upgrade path. No RipGuard custody. We deploy zero custom contracts — the frontend calls Sablier directly. If RipGuard the site disappears tomorrow, your lock keeps counting down on-chain and you can claim it through BaseScan or the Sablier app.
 
 ## How it works
 
-1. **Deposit** — Pick an amount of USDC and a lock schedule
-2. **Lock** — Approve USDC, then create a Sablier Lockup stream (non-cancelable)
-3. **Claim** — When the schedule unlocks, withdraw directly from Sablier
+1. **Pick an amount and a reload schedule.** USDC on Base.
+2. **Sign the lock.** One transaction. The USDC routes directly into Sablier's Lockup contract with the sender, recipient, and unlock schedule you chose. Non-cancelable. Non-transferable.
+3. **Come back and claim.** Vaults show the live countdown and claimable amount. Claim when the schedule unlocks.
 
-### Presets
+## Reloads
+
+Six built-in presets plus custom:
 
 | Preset | What it does |
-|--------|-------------|
-| Panic Lock 7D | Lump-sum cliff — locked for 7 days, then fully available |
-| Lock 30D | Linear vest over 30 days — drip unlocks daily |
-| Cliff 7D + Vest 90D | 7-day cliff, then linear unlock over 90 days |
+|---|---|
+| **Hourly Payouts (24h)** | Reload every hour for 24 hours |
+| **Hourly Payouts (3d)** | Reload every hour for 3 days |
+| **Hourly Payouts (1w)** | Reload every hour for 7 days |
+| **Daily Payouts (1w)** | Reload once a day for 7 days |
+| **Panic Lock (24h)** | Lock everything for 24 hours, one-shot unlock |
+| **Panic Lock + Daily Payouts** | 1-day cliff, then daily reloads for 7 days |
 
-Or set a custom schedule.
+Or build your own: pick a total window, a reload cadence, and optionally a waiting period before reloads start.
 
 ## Fees
 
-0.5% broker fee on each lock, routed to the RipGuard Audit Fund. The fee is passed through Sablier's native broker mechanism — no separate contract.
+0.5% broker fee on each lock, collected via Sablier's native broker mechanism and routed directly to the RipGuard treasury during stream creation. Shown before you sign. No withdraw fees. No subscriptions. No yield cuts. No upside share.
 
 ## Architecture
 
-<<<<<<< HEAD
-The `RipGuardRouter` is a stateless, non-upgradeable wrapper around Sablier Lockup. It:
+**Zero custom contracts.** The frontend calls [`SablierLockup.createWithDurationsLL()`](https://docs.sablier.com/api/reference) directly. Every lock is a non-cancelable, non-transferable Lockup Linear stream with the sender and recipient both set to the depositor.
 
-- Pulls USDC from the user
-- Creates a non-cancelable Sablier Lockup Linear stream
-- Routes a 0.5% broker fee to the treasury via Sablier's native mechanism
-- Never holds funds beyond a single transaction
-- Has no admin functions, no owner, no pause
+**Contracts:**
 
-**On-chain contracts (Base Mainnet):**
+| Chain | Contract | Address |
+|---|---|---|
+| Base mainnet | Sablier Lockup v2.0 | [`0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B`](https://basescan.org/address/0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B) |
+| Base mainnet | USDC | [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) |
+| Base Sepolia | Sablier Lockup v2.0 | [`0xa4777ca525d43a7af55d45b11b430606d7416f8d`](https://sepolia.basescan.org/address/0xa4777ca525d43a7af55d45b11b430606d7416f8d) |
+| Base Sepolia | TestUSDC (mintable) | [`0x54C0f145D70ca4792e695697B6498552F1EC0009`](https://sepolia.basescan.org/address/0x54C0f145D70ca4792e695697B6498552F1EC0009) |
 
-- **RipGuardRouter**: [`packages/contracts/src/RipGuardRouter.sol`](packages/contracts/src/RipGuardRouter.sol)
-- **Sablier Lockup**: [`0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B`](https://basescan.org/address/0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B) (Sablier Lockup v2.0)
-- **USDC**: [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
-
-All streams are created as **non-cancelable, non-transferable** Lockup Linear streams with both sender and recipient set to the depositor.
+The `packages/contracts/` directory holds an unused `RipGuardRouter.sol` from an earlier iteration. It is not deployed and not called by the frontend — kept around only as a reference for a potential Phase 2.
 
 ## Stack
 
-- **Frontend**: Next.js 15, React 19, TailwindCSS 4
-- **Web3**: wagmi, viem, RainbowKit
-- **Contracts**: Solidity 0.8.22, Foundry, OpenZeppelin
-=======
-RipGuard has zero custom smart contracts. The frontend calls Sablier's `SablierLockup` directly:
-
-- **Lockup contract**: [`0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B`](https://basescan.org/address/0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B) (Sablier Lockup v2.0, Base)
-- **USDC**: [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) (Base)
-
-All streams are created as **non-cancelable** Lockup Linear streams with the sender set to the depositor.
-
-## Stack
-
-- **Frontend**: Next.js, React 19, TailwindCSS 4
-- **Web3**: wagmi, viem, RainbowKit
->>>>>>> testnet
-- **Protocol**: Sablier Lockup v2.0 on Base
-- **Token**: USDC on Base
-- **Monorepo**: pnpm workspaces (`packages/app`, `packages/contracts`)
+- **Frontend:** Next.js 16, React 19, Tailwind 4
+- **Web3:** wagmi 2, viem 2, RainbowKit 2
+- **Protocol:** Sablier Lockup v2.0 on Base
+- **Token:** USDC on Base
+- **Indexer:** Sablier Envio indexer (primary), on-chain `getLogs` fallback
+- **Monorepo:** pnpm workspaces (`packages/app`, `packages/contracts`)
 
 ## Development
 
+Requires Node 22 (see `.node-version`). Node 24 causes SSR hydration errors.
+
 ```bash
-<<<<<<< HEAD
-# Install dependencies
 pnpm install
-
-# Copy environment config
 cp packages/app/.env.example packages/app/.env.local
-
-# Run the frontend
 pnpm --filter app dev
 ```
 
-See [`packages/app/.env.example`](packages/app/.env.example) for required environment variables.
+Key env vars in `packages/app/.env.local`:
 
-### Contracts
+- `NEXT_PUBLIC_CHAIN` — `base` (default) or `base-sepolia`
+- `NEXT_PUBLIC_SABLIER_LOCKUP` — override for testnet address
+- `NEXT_PUBLIC_USDC_ADDRESS` — override for testnet address
+- `NEXT_PUBLIC_TREASURY_ADDRESS` — broker fee recipient. Set to zero address to disable the fee (useful on testnet).
+- `NEXT_PUBLIC_WC_PROJECT_ID` — WalletConnect project ID
 
 ```bash
-cd packages/contracts
-
-# Build
-forge build
-
-# Test
-forge test
+pnpm --filter app test        # vitest, 56 tests
+pnpm --filter app exec tsc --noEmit
+pnpm --filter app build
 ```
 
 ## Security
 
-The `RipGuardRouter` is intentionally minimal — it holds no state, has no admin functions, and cannot be upgraded. All funds flow through [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security). RipGuard never custodies funds; the router is stateless and all locks are enforced by Sablier's battle-tested on-chain contracts.
+RipGuard custodies nothing. Every lock is created directly in [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security) — an immutable, non-upgradeable contract that's been multi-audited and secures hundreds of millions in vesting streams. The RipGuard frontend is a UI. We deploy no custom contracts, hold no admin keys, and have no path to pause, rug, or freeze your funds.
 
-If you find a vulnerability, please report it responsibly by emailing the team rather than opening a public issue.
-=======
-pnpm install
-pnpm --filter app dev
-```
+That said: smart contracts carry risk. Start with $5. Verify the Sablier Lockup contract yourself on BaseScan before committing real size. The presets are designed around real-session behavior, but they're opinions, not financial advice.
 
-Requires a `NEXT_PUBLIC_TREASURY_ADDRESS` env var for the broker fee recipient. Without it, the broker fee is disabled (zero address).
->>>>>>> testnet
+If you find a vulnerability in RipGuard itself, please report it by opening a GitHub issue or reaching out before public disclosure.
 
 ## Links
 
-- [ripguard.xyz](https://ripguard.xyz)
-- [Sablier Lockup docs](https://docs.sablier.com)
+- [ripguard.xyz](https://ripguard.xyz) — mainnet
+- [testnet.ripguard.xyz](https://testnet.ripguard.xyz) — Base Sepolia
+- [Sablier docs](https://docs.sablier.com)
 - [Base](https://base.org)
 
 ## License
