@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { IS_TESTNET } from "@/config/contracts";
 import { BRAND } from "@/content/brand";
 
@@ -10,27 +12,39 @@ export const ogSize = { width: 1200, height: 630 };
 
 /**
  * Fetch a Google Font at edge runtime and return its TTF bytes.
+ *
+ * Two tricks to make this reliable against Google Fonts' defaults:
+ *
+ * 1. Use an old Chrome User-Agent. Modern UAs get woff2, which Satori
+ *    does not support. Chrome 41 (2015) predates woff2 support and
+ *    forces Google Fonts to serve TTF instead.
+ * 2. Use the `text=` query parameter to request only the glyphs we
+ *    actually render on the card. Smaller subset, faster fetch, and
+ *    Google Fonts' subset API is TTF-friendly with the old UA.
+ *
  * Returns null on any failure so the caller can fall back to Satori's
  * bundled default fonts instead of crashing the OG route.
  */
 async function loadGoogleFont(
   family: string,
+  text: string,
   weight = 400,
 ): Promise<ArrayBuffer | null> {
   try {
-    const url = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}:wght@${weight}&display=swap`;
+    const url = `https://fonts.googleapis.com/css2?family=${family.replace(
+      / /g,
+      "+",
+    )}:wght@${weight}&text=${encodeURIComponent(text)}`;
     const cssRes = await fetch(url, {
       headers: {
-        // Google Fonts serves different font files based on UA.
-        // Asking for a modern browser gets us TTF-compatible files.
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36",
       },
     });
     if (!cssRes.ok) return null;
     const css = await cssRes.text();
     const match = css.match(
-      /src:\s*url\((https:\/\/[^)]+?)\)\s+format\(['"](?:truetype|opentype)['"]\)/,
+      /src:\s*url\((https:\/\/[^)]+?)\)\s*format\(['"]?(truetype|opentype)['"]?\)/,
     );
     if (!match) return null;
     const fontRes = await fetch(match[1]);
@@ -42,78 +56,53 @@ async function loadGoogleFont(
 }
 
 /**
- * Inline RipGuard flat SVG mark. Satori supports basic SVG via <svg>, so
- * we duplicate the path set from `components/Brand.tsx` here rather than
- * importing, keeping the OG route self-contained on edge runtime.
+ * Read a local image file from the Next.js public folder and return
+ * it as a base64 data URL for embedding in Satori `<img>`. Uses
+ * `node:fs/promises` so the OG routes need to run on the nodejs
+ * runtime (not edge). Returns null on any failure so the caller can
+ * render without the image.
  */
-function RipGuardMarkSVG({ size }: { size: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 160 160"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M80 10L121 26L149 59V101L121 134L80 150L39 134L11 101V59L39 26L80 10Z"
-        fill="#07161C"
-        stroke="#3DAFC2"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M80 26L111 38L133 64V96L111 122L80 134L49 122L27 96V64L49 38L80 26Z"
-        fill="#0B1D24"
-        stroke="#11414C"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M80 45L55 57V80C55 94 65 109 80 114C95 109 105 94 105 80V57L80 45Z"
-        fill="#0D252D"
-        stroke="#38A8BA"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M66 79V68C66 60.268 72.268 54 80 54C87.732 54 94 60.268 94 68V79"
-        stroke="#7AD2E2"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-      <rect
-        x="58"
-        y="76"
-        width="44"
-        height="34"
-        rx="8"
-        fill="#12303A"
-        stroke="#7AD2E2"
-        strokeWidth="3"
-      />
-      <circle cx="80" cy="91" r="4.5" fill="#7AD2E2" />
-      <path d="M80 95.5V101.5" stroke="#7AD2E2" strokeWidth="3" strokeLinecap="round" />
-      <path d="M38 80H49" stroke="#184F59" strokeWidth="2" strokeLinecap="round" />
-      <path d="M111 80H122" stroke="#184F59" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="80" cy="26" r="3" fill="#7AD2E2" fillOpacity="0.9" />
-    </svg>
-  );
+async function loadPublicImageAsDataUrl(
+  publicRelativePath: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const buffer = await readFile(
+      join(process.cwd(), "public", publicRelativePath),
+    );
+    const base64 = buffer.toString("base64");
+    return `data:${mimeType};base64,${base64}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Render the shared RipGuard OG / Twitter card. Brand-consistent with
  * the landing page: tinted dark neutral background, steel-cyan accent,
- * asymmetric layout (copy left, mark right), Archivo Black headline.
+ * asymmetric layout (copy left, 3D padlock right), Archivo Black headline.
  */
 export async function renderSiteOGImage() {
   const siteHost = IS_TESTNET ? "testnet.ripguard.xyz" : "ripguard.xyz";
 
-  // Fonts are best-effort. If Google Fonts is unreachable, Satori falls
-  // back to its bundled defaults and the card still renders correctly.
-  const [archivoBlackData, archivoData] = await Promise.all([
-    loadGoogleFont("Archivo Black"),
-    loadGoogleFont("Archivo", 500),
+  // All rendered text, combined. Passed to Google Fonts as the subset
+  // hint so both font files only carry the glyphs this card needs.
+  const allText = [
+    "Lock your winnings before you give them back.",
+    "Built on Sablier",
+    BRAND.tagline,
+    siteHost,
+    "Powered by Sablier v2.0",
+    "Non-custodial · Immutable",
+  ].join(" ");
+
+  // Load fonts and the 3D padlock in parallel. Each is best-effort: if
+  // any fails, we fall back to Satori's default font and/or drop the
+  // mark rather than crashing the OG route.
+  const [archivoBlackData, archivoData, markDataUrl] = await Promise.all([
+    loadGoogleFont("Archivo Black", allText),
+    loadGoogleFont("Archivo", allText, 500),
+    loadPublicImageAsDataUrl("mark-288.png", "image/png"),
   ]);
 
   const fonts: Array<{
@@ -168,17 +157,17 @@ export async function renderSiteOGImage() {
             display: "flex",
           }}
         />
-        {/* Secondary softer glow behind the mark */}
+        {/* Secondary softer glow directly behind the mark */}
         <div
           style={{
             position: "absolute",
-            top: "140px",
-            right: "60px",
-            width: "420px",
-            height: "420px",
+            top: "110px",
+            right: "40px",
+            width: "460px",
+            height: "460px",
             borderRadius: "50%",
             background:
-              "radial-gradient(circle, rgba(71,180,204,0.16) 0%, transparent 65%)",
+              "radial-gradient(circle, rgba(71,180,204,0.22) 0%, rgba(71,180,204,0.08) 40%, transparent 70%)",
             display: "flex",
           }}
         />
@@ -223,7 +212,7 @@ export async function renderSiteOGImage() {
               <span
                 style={{
                   fontSize: "18px",
-                  fontWeight: 600,
+                  fontWeight: 500,
                   color: "#a6b2b8",
                   textTransform: "uppercase",
                   letterSpacing: "3px",
@@ -269,17 +258,26 @@ export async function renderSiteOGImage() {
             </div>
           </div>
 
-          {/* Right column: flat brand mark */}
+          {/* Right column: 3D padlock mark */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "280px",
-              marginLeft: "40px",
+              width: "320px",
+              marginLeft: "32px",
             }}
           >
-            <RipGuardMarkSVG size={260} />
+            {markDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={markDataUrl}
+                width={300}
+                height={300}
+                alt=""
+                style={{ display: "flex" }}
+              />
+            ) : null}
           </div>
         </div>
 
