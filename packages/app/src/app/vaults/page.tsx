@@ -522,6 +522,7 @@ function VaultDashboard() {
     data: withdrawTxHash,
     isError: isWithdrawError,
     error: withdrawError,
+    reset: resetWithdrawWrite,
   } = useWriteContract();
 
   const { isSuccess: isWithdrawConfirmed } = useWaitForTransactionReceipt({
@@ -531,6 +532,10 @@ function VaultDashboard() {
   const handleClaim = useCallback(
     (streamId: bigint) => {
       if (!address) return;
+      // Clear stale success/error state from a previous claim so the
+      // post-confirm effect doesn't fire against leftover data when the
+      // user claims a second stream in the same session.
+      resetWithdrawWrite();
       setClaimingId(streamId);
       writeWithdraw({
         address: SABLIER_LOCKUP,
@@ -539,13 +544,15 @@ function VaultDashboard() {
         args: [streamId, address],
       });
     },
-    [address, writeWithdraw]
+    [address, writeWithdraw, resetWithdrawWrite]
   );
 
-  // Toast + refresh after successful claim
+  // Toast + refresh after successful claim. We guard on `claimingId !== null`
+  // so this effect can't re-fire after the body sets claimingId back to
+  // null (which would otherwise double-toast because claimingId is in deps).
   useEffect(() => {
-    if (isWithdrawConfirmed && withdrawTxHash) {
-      if (claimingId !== null) trackClaim(claimingId.toString());
+    if (isWithdrawConfirmed && withdrawTxHash && claimingId !== null) {
+      trackClaim(claimingId.toString());
       setClaimingId(null);
       refetchStreams();
       toast("Claim successful!", "success", {
