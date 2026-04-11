@@ -5,24 +5,6 @@ import Link from "next/link";
 
 const STORAGE_KEY = "ripguard-onboarding-seen";
 
-const STEPS = [
-  {
-    num: "1",
-    title: "Pick a schedule",
-    desc: "Choose a preset or build a custom lock. Panic Lock, 30-day hold, cliff + vest, whatever fits your vibe.",
-  },
-  {
-    num: "2",
-    title: "Lock your USDC",
-    desc: "Approve and lock in one flow. Your funds go directly into the Sablier protocol. Never through us.",
-  },
-  {
-    num: "3",
-    title: "Claim when it unlocks",
-    desc: "Time passes, you claim. No cancel button. No exceptions. Your future self stays disciplined.",
-  },
-];
-
 export function WelcomeModal() {
   const [show, setShow] = useState(false);
 
@@ -93,7 +75,7 @@ export function WelcomeModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-background/85 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
       onClick={dismiss}
       role="dialog"
       aria-modal="true"
@@ -101,63 +83,62 @@ export function WelcomeModal() {
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-surface-strong p-7 sm:p-8 shadow-2xl animate-[slideUp_0.25s_ease-out]"
+        className="relative w-full sm:max-w-md bg-surface-strong border border-line-strong rounded-t-xl sm:rounded-xl p-7 sm:p-8 animate-[slideUp_0.25s_ease-out] pb-safe"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={dismiss}
-          className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition-colors text-lg"
+          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center text-subtle hover:text-foreground transition-colors rounded focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2"
           aria-label="Close"
         >
-          &#x2715;
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
         </button>
 
         {/* Header */}
-        <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-cyan/20 bg-cyan/[0.08] mb-4">
-            <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-            </svg>
-          </div>
-          <h2 id="welcome-title" className="text-xl font-bold">Welcome to RipGuard</h2>
-          <p className="text-sm text-white/40 mt-2">
-            Lock your crypto winnings so you can&apos;t YOLO them back.
+        <div className="eyebrow mb-5 flex items-center gap-3">
+          <span className="h-px w-8 bg-cyan/60" />
+          Before you start
+        </div>
+        <h2 id="welcome-title" className="font-display text-3xl sm:text-4xl tracking-tight leading-[0.95]">
+          Lock it
+          <br />
+          <span className="text-cyan">before you touch it.</span>
+        </h2>
+
+        <div className="mt-6 space-y-4 text-sm text-muted leading-relaxed max-w-[46ch]">
+          <p>
+            You already know the drill. Hit a win, give it back. The answer
+            is a vault the degen in the middle can&apos;t open.
+          </p>
+          <p>
+            One signature. Routes directly into Sablier. Non-cancelable.
+            Non-transferable. No support ticket, no early exit.{" "}
+            <span className="text-foreground">Start with $5.</span>
           </p>
         </div>
 
-        {/* Steps */}
-        <div className="space-y-4 mb-7">
-          {STEPS.map((step) => (
-            <div key={step.num} className="flex gap-3.5">
-              <div className="w-8 h-8 rounded-full border border-cyan/20 bg-cyan/[0.06] flex items-center justify-center text-cyan text-sm font-bold shrink-0 mt-0.5">
-                {step.num}
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm">{step.title}</h3>
-                <p className="text-xs text-white/40 mt-1 leading-relaxed">{step.desc}</p>
-              </div>
-            </div>
-          ))}
+        {/* CTA */}
+        <div className="mt-8 space-y-3">
+          <Link
+            href="/create"
+            onClick={dismiss}
+            className="btn-primary w-full"
+          >
+            Create a Lock
+          </Link>
+          <button
+            onClick={dismiss}
+            className="block w-full text-center text-xs text-faint hover:text-muted transition-colors py-1"
+          >
+            I&apos;ll look around first
+          </button>
         </div>
 
-        {/* CTA */}
-        <Link
-          href="/create"
-          onClick={dismiss}
-          className="block w-full bg-cyan text-black font-bold rounded-xl py-3.5 text-center text-sm hover:bg-cyan/90 transition-all hover:shadow-[0_0_30px_rgba(71,180,204,0.25)] active:scale-[0.98]"
-        >
-          Create Your First Lock
-        </Link>
-        <button
-          onClick={dismiss}
-          className="block w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors mt-3 py-1"
-        >
-          I&apos;ll look around first
-        </button>
-
-        <p className="text-[10px] text-white/15 text-center mt-4">
-          Powered by Sablier v2.0 audited contracts
+        <p className="mt-6 text-[10px] tabular text-faint text-center tracking-wider uppercase">
+          RipGuard is the UI · Sablier is the bank
         </p>
       </div>
     </div>
