@@ -65,9 +65,23 @@ function formatCountdown(seconds: number): string {
 }
 
 function getScheduleType(cliffSeconds: number, totalSeconds: number): string {
-  if (cliffSeconds === totalSeconds && cliffSeconds > 0) return "Lump Sum";
-  if (cliffSeconds > 0) return "Cliff + Vest";
-  return "Linear Vest";
+  if (cliffSeconds === totalSeconds && cliffSeconds > 0) return "One Drop";
+  if (cliffSeconds > 0) return "Wait, then reloads";
+  return "Steady reloads";
+}
+
+// Prefer the preset label the user picked on /create (stored at lock time).
+// Falls back to the generic schedule-type label when no preset is remembered.
+function getLockLabel(streamId: bigint, cliffSeconds: number, totalSeconds: number): string {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.localStorage.getItem(`ripguard:lock:${streamId.toString()}`);
+      if (stored) return stored;
+    } catch {
+      // localStorage unavailable, fall through
+    }
+  }
+  return getScheduleType(cliffSeconds, totalSeconds);
 }
 
 function formatDate(timestamp: number): string {
@@ -110,12 +124,12 @@ function VaultCard({
 
   const nextUnlock = (() => {
     if (vault.cliffTime > 0 && now < vault.cliffTime) {
-      return { label: "Cliff unlocks in", time: vault.cliffTime - now };
+      return { label: "Reloads start in", time: vault.cliffTime - now };
     }
     if (now < vault.endTime) {
-      return { label: "Fully vested in", time: vault.endTime - now };
+      return { label: "Fully reloaded in", time: vault.endTime - now };
     }
-    return { label: "Fully vested", time: 0 };
+    return { label: "Fully reloaded", time: 0 };
   })();
 
   const [showShare, setShowShare] = useState(false);
@@ -127,20 +141,20 @@ function VaultCard({
   const isClaimingThis = claimingId === vault.streamId;
   const claimStatus =
     now < vault.cliffTime
-      ? "Locked until cliff"
+      ? "Waiting"
       : now < vault.endTime
-        ? "Vesting"
-        : "Nothing to claim";
+        ? "Reloading"
+        : "All claimed";
 
   return (
-    <div className="border border-line bg-background p-6 sm:p-7 space-y-6">
+    <div className="bg-background p-6 sm:p-7 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="space-y-1.5">
           <div className="eyebrow text-cyan/70 tabular">
-            Stream #{vault.streamId.toString()}
+            Lock #{vault.streamId.toString()}
           </div>
           <div className="font-display text-xl tracking-tight">
-            {getScheduleType(vault.cliffSeconds, vault.totalSeconds)}
+            {getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
           </div>
         </div>
         <div className="sm:text-right">
@@ -179,7 +193,7 @@ function VaultCard({
         </div>
         <div className="flex justify-between text-xs tabular">
           <span className="text-muted">
-            {formatUnits(vested, USDC_DECIMALS)} vested
+            {formatUnits(vested, USDC_DECIMALS)} unlocked
           </span>
           <span className="text-faint">
             {formatUnits(remaining, USDC_DECIMALS)} remaining
@@ -242,7 +256,7 @@ function VaultCard({
         <ShareCard
           streamId={vault.streamId}
           amountLocked={formatUnits(vault.deposited, USDC_DECIMALS)}
-          scheduleType={getScheduleType(vault.cliffSeconds, vault.totalSeconds)}
+          scheduleType={getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
           sablierAddress={SABLIER_LOCKUP}
@@ -254,7 +268,7 @@ function VaultCard({
 
 function VaultSkeleton() {
   return (
-    <div className="border border-line bg-background p-6 sm:p-7 space-y-6">
+    <div className="bg-background p-6 sm:p-7 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="space-y-2">
           <div className="skeleton h-3 w-24" />
@@ -574,7 +588,7 @@ function VaultDashboard() {
           </h3>
           <p className="text-sm text-muted leading-relaxed">
             Your locks live on-chain. Plug in the wallet that signed them to
-            track vesting and claim reloads.
+            track reloads and claim.
           </p>
         </div>
         <ConnectButton />
@@ -657,24 +671,26 @@ function VaultDashboard() {
     <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
       {totals && (
         <div className="border-y border-line py-7">
-          <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
-            <li className="flex items-baseline gap-2.5">
-              <span className="font-display text-cyan text-3xl tabular tracking-tight">
-                {formatUnits(totals.locked, USDC_DECIMALS)}
-              </span>
-              <span className="eyebrow">Total locked</span>
-            </li>
-            <li className="flex items-baseline gap-2.5">
-              <span className="font-display text-cyan text-3xl tabular tracking-tight">
+          <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-5">
+            {/* Primary: the actionable number */}
+            <li className="flex items-baseline gap-3">
+              <span className="font-display text-cyan text-4xl tabular tracking-tight leading-none">
                 {formatUnits(totals.claimable, USDC_DECIMALS)}
               </span>
               <span className="eyebrow">Claimable now</span>
             </li>
-            <li className="flex items-baseline gap-2.5">
-              <span className="font-display text-foreground text-3xl tabular tracking-tight">
+            {/* Context: what's behind it */}
+            <li className="flex items-baseline gap-2">
+              <span className="font-display text-foreground text-xl tabular tracking-tight">
+                {formatUnits(totals.locked, USDC_DECIMALS)}
+              </span>
+              <span className="eyebrow text-faint">Total locked</span>
+            </li>
+            <li className="flex items-baseline gap-2">
+              <span className="font-display text-foreground text-xl tabular tracking-tight">
                 {formatUnits(totals.claimed, USDC_DECIMALS)}
               </span>
-              <span className="eyebrow">Claimed</span>
+              <span className="eyebrow text-faint">Claimed</span>
             </li>
           </ul>
         </div>
@@ -702,7 +718,7 @@ function VaultDashboard() {
       )}
       <div className="space-y-px bg-line border border-line rounded-lg overflow-hidden">
         {vaults.map((vault) => (
-          <CardErrorBoundary key={vault.streamId.toString()} label={`Stream #${vault.streamId.toString()}`}>
+          <CardErrorBoundary key={vault.streamId.toString()} label={`Lock #${vault.streamId.toString()}`}>
             <VaultCard
               vault={vault}
               onClaim={handleClaim}
@@ -750,8 +766,8 @@ export default function Vaults() {
             <span className="text-cyan">paying you back.</span>
           </h1>
           <p className="mt-5 text-muted leading-relaxed max-w-[52ch]">
-            Every lock you signed, in one place. Watch them vest. Claim when
-            the schedule says you can.
+            Every lock you signed, in one place. Watch them reload. Claim
+            when the clock says you can.
           </p>
         </div>
 
