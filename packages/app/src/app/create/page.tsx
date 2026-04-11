@@ -89,6 +89,16 @@ function Spinner() {
   );
 }
 
+function SectionLabel({ index, children }: { index: string; children: React.ReactNode }) {
+  return (
+    <div className="eyebrow flex items-center gap-3">
+      <span className="tabular text-cyan/70">{index}</span>
+      <span className="h-px w-8 bg-cyan/40" />
+      {children}
+    </div>
+  );
+}
+
 function CreateLockInner() {
   const searchParams = useSearchParams();
   const presetParam = searchParams.get("preset") as PresetKey | null;
@@ -363,414 +373,425 @@ function CreateLockInner() {
       <Header />
 
       {/* Trust signal */}
-      <div className="bg-cyan/[0.06] border-b border-cyan/10 px-6 py-2 text-center text-sm text-cyan/60">
-        Powered by Sablier v2.0 audited contracts &middot; Non-custodial &middot; Immutable locks
+      <div className="border-b border-line px-6 py-2.5 text-center text-xs tabular text-subtle">
+        RipGuard is the UI. Sablier is the bank. Non-custodial. Immutable.
       </div>
 
-      <main className="relative flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 max-w-xl mx-auto w-full">
-        {/* Ambient glow — dual layer for richer bloom */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] rounded-full bg-cyan/[0.04] blur-[100px] sm:blur-[140px] pointer-events-none animate-glow-pulse" />
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[200px] h-[200px] sm:w-[350px] sm:h-[350px] rounded-full bg-cyan/[0.06] blur-[60px] sm:blur-[80px] pointer-events-none animate-glow-pulse" style={{ animationDelay: "2s" }} />
-        {/* Grid overlay for depth */}
-        <div className="absolute inset-0 grid-overlay pointer-events-none" />
+      <main className="relative flex-1 px-5 sm:px-8 pt-14 sm:pt-20 pb-24 sm:pb-32">
+        {/* Ambient glow — quiet backdrop */}
+        <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[720px] h-[520px] bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,oklch(0.30_0.060_200/0.40),transparent_70%)]" />
+          <div className="absolute inset-0 grid-overlay" />
+        </div>
 
-        <h2 className="relative text-2xl font-bold mb-8">Create Lock</h2>
-
-        {step === "success" ? (
-          <SuccessView
-            txHash={lockTxHash!}
-            streamId={parseStreamIdFromReceipt(lockReceipt)}
-            depositAmount={depositAmount}
-            schedule={schedule}
-            onCreateAnother={resetForm}
-          />
-        ) : (
-          <div className="relative w-full card-gradient rounded-2xl p-6 sm:p-8 space-y-8">
-            {/* Amount Input — first so the calculator reacts to it */}
-            <section className="w-full space-y-3">
-              <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                Amount
-              </h3>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  aria-label="Amount in USDC"
-                  placeholder="0.00"
-                  value={amountInput}
-                  disabled={isFormLocked}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (/^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(v) || v === "") {
-                      setAmountInput(v);
-                      setStep("schedule");
-                    }
-                  }}
-                  className={`w-full bg-white/[0.04] border border-white/10 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors pr-16 sm:pr-20 ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">
-                  USDC
-                </span>
+        <div className="relative mx-auto max-w-2xl w-full">
+          {step === "success" ? (
+            <SuccessView
+              txHash={lockTxHash!}
+              streamId={parseStreamIdFromReceipt(lockReceipt)}
+              depositAmount={depositAmount}
+              schedule={schedule}
+              onCreateAnother={resetForm}
+            />
+          ) : (
+            <>
+              <div className="mb-14">
+                <div className="eyebrow mb-5 flex items-center gap-3">
+                  <span className="h-px w-10 bg-cyan/60" />
+                  New lock
+                </div>
+                <h1 className="text-display max-w-xl">
+                  Lock the win
+                  <br />
+                  <span className="text-cyan">before you touch it.</span>
+                </h1>
+                <p className="mt-5 text-muted leading-relaxed max-w-[52ch]">
+                  One signature. Routes directly into Sablier. Non-cancelable.
+                  Non-transferable. No going back.
+                </p>
               </div>
-              {isConnected && balance === undefined && !isBalanceError && (
-                <div className="text-xs text-white/30 animate-pulse">
-                  Loading balance...
-                </div>
-              )}
-              {isConnected && isBalanceError && (
-                <div className="flex items-center gap-2 text-xs text-red-400/80">
-                  <span>Failed to load balance</span>
-                  <button
-                    onClick={() => refetchBalance()}
-                    className="underline hover:text-red-300 transition-colors"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {isConnected && balance !== undefined && (
-                <div className="flex items-center justify-between text-xs text-white/40">
-                  <span>
-                    Balance: {formatUnits(balance, USDC_DECIMALS)} USDC
-                  </span>
-                  <button
-                    disabled={isFormLocked || balance === BigInt(0)}
-                    onClick={() => {
-                      const maxDeposit = computeMaxDeposit(balance, BROKER_FEE);
-                      setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
-                      setStep("schedule");
-                    }}
-                    className={`text-white/60 hover:text-white underline ${isFormLocked || balance === BigInt(0) ? "opacity-50 cursor-not-allowed" : ""}`}
-                    title={`Max lock amount after ${BROKER_FEE_PCT} fee`}
-                  >
-                    Max{BROKER_FEE > BigInt(0) ? " (net of fee)" : ""}
-                  </button>
-                </div>
-              )}
-              {isConnected && depositAmount > 0 && !meetsMinimum && (
-                <p className="text-xs text-red-400">
-                  Minimum lock amount is 1 USDC
-                </p>
-              )}
-              {isConnected && !hasEnoughBalance && depositAmount > 0 && meetsMinimum && (
-                <p className="text-xs text-red-400">
-                  Insufficient balance — you have{" "}
-                  {balance !== undefined ? formatUnits(balance, USDC_DECIMALS) : "—"} USDC
-                  but need {formatUnits(totalAmount, USDC_DECIMALS)} USDC (incl. {BROKER_FEE_PCT} fee)
-                </p>
-              )}
-              {IS_TESTNET && isConnected && (
-                <button
-                  onClick={() =>
-                    writeFaucet({
-                      address: USDC_ADDRESS,
-                      abi: testUsdcAbi,
-                      functionName: "faucet",
-                    })
-                  }
-                  disabled={isFauceting || isFaucetConfirming}
-                  className="text-xs text-cyan/70 hover:text-cyan underline transition-colors disabled:opacity-50"
-                >
-                  {isFauceting
-                    ? "Confirm in wallet..."
-                    : isFaucetConfirming
-                      ? "Minting..."
-                      : "Mint 10,000 test USDC"}
-                </button>
-              )}
-            </section>
 
-            {/* Schedule Selection */}
-            <section className="w-full space-y-4">
-              <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                Schedule
-              </h3>
-
-              <button
-                disabled={isFormLocked}
-                onClick={() => {
-                  setSelectedPreset(selectedPreset === "custom" ? "hourly1d" : "custom");
-                  setStep("schedule");
-                }}
-                className={`w-full card-gradient rounded-lg p-4 text-left transition-all ${
-                  selectedPreset === "custom"
-                    ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(71,180,204,0.08)]"
-                    : ""
-                } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">Custom</div>
-                    <div className="text-xs text-white/40 mt-1">
-                      Set your own duration + claim interval
-                    </div>
+              <div className="space-y-14 sm:space-y-16">
+                {/* Amount Input — first so the calculator reacts to it */}
+                <section className="space-y-4">
+                  <SectionLabel index="01">Amount</SectionLabel>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      aria-label="Amount in USDC"
+                      placeholder="0.00"
+                      value={amountInput}
+                      disabled={isFormLocked}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (/^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(v) || v === "") {
+                          setAmountInput(v);
+                          setStep("schedule");
+                        }
+                      }}
+                      className={`w-full bg-surface border border-line rounded-lg px-5 py-5 text-3xl font-display tabular tracking-tight focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors pr-20 ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    />
+                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-subtle text-sm font-semibold tracking-wider">
+                      USDC
+                    </span>
                   </div>
-                  <svg className={`w-4 h-4 text-white/30 transition-transform ${selectedPreset === "custom" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </button>
-
-              {/* Custom schedule builder */}
-              {selectedPreset === "custom" && (
-                <div className="space-y-4 pl-4 border-l border-white/10">
-                  {/* Total duration */}
-                  <div>
-                    <label htmlFor="total-duration" className="block text-xs text-white/50 mb-1">
-                      Total Duration
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="total-duration"
-                        value={customTotal}
-                        disabled={isFormLocked}
-                        onChange={(e) => {
-                          const newTotal = Number(e.target.value);
-                          setCustomTotal(newTotal);
-                          // Auto-adjust interval if it no longer fits
-                          const validIntervals = getIntervalOptions(newTotal);
-                          if (validIntervals.length > 0 && !validIntervals.find((i) => i.seconds === customInterval)) {
-                            setCustomInterval(validIntervals[0].seconds);
-                          }
-                        }}
-                        className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        {DURATION_OPTIONS.filter(
-                          (d) => d.seconds >= customCliff
-                        ).map((d) => (
-                          <option key={d.seconds} value={d.seconds}>
-                            {d.label}
-                          </option>
-                        ))}
-                      </select>
-                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  {isConnected && balance === undefined && !isBalanceError && (
+                    <div className="text-xs text-faint animate-pulse">
+                      Loading balance…
                     </div>
-                  </div>
-
-                  {/* Claim interval — dynamic based on duration */}
-                  <div>
-                    <label className="block text-xs text-white/50 mb-2">
-                      Claim Interval
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {getIntervalOptions(customTotal).map((i) => (
-                        <button
-                          key={i.seconds}
-                          type="button"
-                          disabled={isFormLocked}
-                          onClick={() => setCustomInterval(i.seconds)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                            customInterval === i.seconds
-                              ? "border-cyan/60 bg-cyan/10 text-cyan"
-                              : "border-white/10 bg-white/[0.04] text-white/50 hover:border-white/20 hover:text-white/70"
-                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          {i.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Cliff (advanced, collapsed) */}
-                  <details className="group">
-                    <summary className="text-xs text-white/30 cursor-pointer hover:text-white/50 transition-colors">
-                      Advanced: add cliff period
-                    </summary>
-                    <div className="mt-2">
-                      <div className="relative">
-                        <select
-                          id="cliff-duration"
-                          value={customCliff}
-                          disabled={isFormLocked}
-                          onChange={(e) =>
-                            setCustomCliff(Number(e.target.value))
-                          }
-                          className={`w-full appearance-none bg-white/[0.04] border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan/40 focus:bg-white/[0.06] transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          <option value={0}>No cliff</option>
-                          {DURATION_OPTIONS.filter((d) => d.seconds < customTotal).map((d) => (
-                            <option key={d.seconds} value={d.seconds}>
-                              {d.label}
-                            </option>
-                          ))}
-                        </select>
-                        <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </div>
-                  </details>
-
-                  {customCliff > customTotal && (
-                    <p className="text-xs text-red-400">
-                      Cliff can&apos;t be longer than total duration
-                    </p>
                   )}
-                </div>
-              )}
-
-              {selectedPreset !== "custom" && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {(Object.entries(PRESETS) as [PresetKey, (typeof PRESETS)[PresetKey]][]).map(
-                    ([key, preset]) => (
+                  {isConnected && isBalanceError && (
+                    <div className="flex items-center gap-2 text-xs text-danger">
+                      <span>Failed to load balance.</span>
                       <button
-                        key={key}
-                        disabled={isFormLocked}
+                        onClick={() => refetchBalance()}
+                        className="underline hover:text-foreground transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {isConnected && balance !== undefined && (
+                    <div className="flex items-center justify-between text-xs text-faint tabular">
+                      <span>
+                        Balance: {formatUnits(balance, USDC_DECIMALS)} USDC
+                      </span>
+                      <button
+                        disabled={isFormLocked || balance === BigInt(0)}
                         onClick={() => {
-                          setSelectedPreset(key);
+                          const maxDeposit = computeMaxDeposit(balance, BROKER_FEE);
+                          setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
                           setStep("schedule");
                         }}
-                        className={`card-gradient rounded-lg p-4 text-left transition-all ${
-                          selectedPreset === key
-                            ? "!border-cyan/60 !bg-gradient-to-b !from-cyan/[0.08] !to-transparent shadow-[0_0_20px_rgba(71,180,204,0.08)]"
-                            : ""
-                        } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`text-muted hover:text-cyan underline transition-colors ${isFormLocked || balance === BigInt(0) ? "opacity-50 cursor-not-allowed" : ""}`}
+                        title={`Max lock amount after ${BROKER_FEE_PCT} fee`}
                       >
-                        <div className="font-medium text-sm">{preset.label}</div>
-                        <div className="text-xs text-white/40 mt-1">
-                          {preset.description}
-                        </div>
+                        Max{BROKER_FEE > BigInt(0) ? " (net of fee)" : ""}
                       </button>
-                    )
+                    </div>
                   )}
-                </div>
-              )}
-            </section>
+                  {isConnected && depositAmount > 0 && !meetsMinimum && (
+                    <p className="text-xs text-danger">
+                      Minimum lock is 1 USDC. Start with $5 if this is your first one.
+                    </p>
+                  )}
+                  {isConnected && !hasEnoughBalance && depositAmount > 0 && meetsMinimum && (
+                    <p className="text-xs text-danger">
+                      Not enough in the wallet. You have{" "}
+                      {balance !== undefined ? formatUnits(balance, USDC_DECIMALS) : "—"} USDC,
+                      need {formatUnits(totalAmount, USDC_DECIMALS)} USDC (incl. {BROKER_FEE_PCT} fee).
+                    </p>
+                  )}
+                  {IS_TESTNET && isConnected && (
+                    <button
+                      onClick={() =>
+                        writeFaucet({
+                          address: USDC_ADDRESS,
+                          abi: testUsdcAbi,
+                          functionName: "faucet",
+                        })
+                      }
+                      disabled={isFauceting || isFaucetConfirming}
+                      className="text-xs text-cyan/80 hover:text-cyan underline transition-colors disabled:opacity-50"
+                    >
+                      {isFauceting
+                        ? "Confirm in wallet…"
+                        : isFaucetConfirming
+                          ? "Minting…"
+                          : "Mint 10,000 test USDC"}
+                    </button>
+                  )}
+                </section>
 
-            {/* Payout Preview */}
-            {depositAmount > 0 && (
-              <section className="w-full space-y-3">
-                <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">
-                  Payout Preview
-                </h3>
-                <TimelinePreview
-                  cliffSeconds={schedule.cliffSeconds}
-                  totalSeconds={schedule.totalSeconds}
-                  isLumpSum={schedule.isLumpSum}
-                  depositAmount={depositAmount}
-                />
-                {!schedule.isLumpSum && (
-                  <VestingCalculator
-                    depositAmount={depositAmount}
-                    totalSeconds={schedule.totalSeconds}
-                    cliffSeconds={schedule.cliffSeconds}
-                    intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
-                  />
+                {/* Schedule Selection */}
+                <section className="space-y-5">
+                  <div className="flex items-end justify-between gap-4">
+                    <SectionLabel index="02">Reload</SectionLabel>
+                    <button
+                      disabled={isFormLocked}
+                      onClick={() => {
+                        setSelectedPreset(selectedPreset === "custom" ? "hourly1d" : "custom");
+                        setStep("schedule");
+                      }}
+                      className={`text-xs text-muted hover:text-cyan transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {selectedPreset === "custom" ? "← Back to presets" : "Build your own →"}
+                    </button>
+                  </div>
+
+                  {/* Custom schedule builder */}
+                  {selectedPreset === "custom" && (
+                    <div className="space-y-5 border border-line rounded-lg p-5 bg-surface">
+                      {/* Total duration */}
+                      <div>
+                        <label htmlFor="total-duration" className="eyebrow block mb-2">
+                          Total duration
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="total-duration"
+                            value={customTotal}
+                            disabled={isFormLocked}
+                            onChange={(e) => {
+                              const newTotal = Number(e.target.value);
+                              setCustomTotal(newTotal);
+                              // Auto-adjust interval if it no longer fits
+                              const validIntervals = getIntervalOptions(newTotal);
+                              if (validIntervals.length > 0 && !validIntervals.find((i) => i.seconds === customInterval)) {
+                                setCustomInterval(validIntervals[0].seconds);
+                              }
+                            }}
+                            className={`w-full appearance-none bg-background border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            {DURATION_OPTIONS.filter(
+                              (d) => d.seconds >= customCliff
+                            ).map((d) => (
+                              <option key={d.seconds} value={d.seconds}>
+                                {d.label}
+                              </option>
+                            ))}
+                          </select>
+                          <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </div>
+
+                      {/* Claim interval — dynamic based on duration */}
+                      <div>
+                        <label className="eyebrow block mb-2">
+                          Claim cadence
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {getIntervalOptions(customTotal).map((i) => (
+                            <button
+                              key={i.seconds}
+                              type="button"
+                              disabled={isFormLocked}
+                              onClick={() => setCustomInterval(i.seconds)}
+                              className={`px-3.5 py-2 rounded-lg text-xs font-semibold tabular border transition-colors ${
+                                customInterval === i.seconds
+                                  ? "border-cyan bg-cyan/10 text-cyan"
+                                  : "border-line bg-background text-muted hover:border-line-strong hover:text-foreground"
+                              } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              {i.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Cliff (advanced, collapsed) */}
+                      <details className="group">
+                        <summary className="text-xs text-faint cursor-pointer hover:text-muted transition-colors">
+                          Advanced: add cliff period
+                        </summary>
+                        <div className="mt-3">
+                          <div className="relative">
+                            <select
+                              id="cliff-duration"
+                              value={customCliff}
+                              disabled={isFormLocked}
+                              onChange={(e) =>
+                                setCustomCliff(Number(e.target.value))
+                              }
+                              className={`w-full appearance-none bg-background border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              <option value={0}>No cliff</option>
+                              {DURATION_OPTIONS.filter((d) => d.seconds < customTotal).map((d) => (
+                                <option key={d.seconds} value={d.seconds}>
+                                  {d.label}
+                                </option>
+                              ))}
+                            </select>
+                            <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </div>
+                      </details>
+
+                      {customCliff > customTotal && (
+                        <p className="text-xs text-danger">
+                          Cliff can&apos;t be longer than the total duration.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedPreset !== "custom" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-line border border-line rounded-lg overflow-hidden">
+                      {(Object.entries(PRESETS) as [PresetKey, (typeof PRESETS)[PresetKey]][]).map(
+                        ([key, preset]) => {
+                          const selected = selectedPreset === key;
+                          return (
+                            <button
+                              key={key}
+                              disabled={isFormLocked}
+                              onClick={() => {
+                                setSelectedPreset(key);
+                                setStep("schedule");
+                              }}
+                              className={`relative p-5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                                selected
+                                  ? "bg-cyan/[0.08] text-foreground"
+                                  : "bg-background text-foreground hover:bg-surface"
+                              } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-display text-base tracking-tight">{preset.label}</div>
+                                  <div className="text-xs text-muted mt-1 leading-relaxed">
+                                    {preset.description}
+                                  </div>
+                                </div>
+                                {selected && (
+                                  <span className="eyebrow text-cyan shrink-0">On</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                {/* Payout Preview */}
+                {depositAmount > 0 && (
+                  <section className="space-y-4">
+                    <SectionLabel index="03">Payout</SectionLabel>
+                    <TimelinePreview
+                      cliffSeconds={schedule.cliffSeconds}
+                      totalSeconds={schedule.totalSeconds}
+                      isLumpSum={schedule.isLumpSum}
+                      depositAmount={depositAmount}
+                    />
+                    {!schedule.isLumpSum && (
+                      <VestingCalculator
+                        depositAmount={depositAmount}
+                        totalSeconds={schedule.totalSeconds}
+                        cliffSeconds={schedule.cliffSeconds}
+                        intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
+                      />
+                    )}
+                  </section>
                 )}
-              </section>
-            )}
 
-            {/* Fee Breakdown */}
-            {depositAmount > 0 && (
-              <section className="w-full border border-white/10 rounded-lg p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-white/50">Lock amount</span>
-                  <span>{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-white/50">
-                    Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
-                  </span>
-                  <span>{formatUnits(fee, USDC_DECIMALS)} USDC</span>
-                </div>
-                <div className="flex justify-between font-medium border-t border-white/10 pt-2">
-                  <span>Total</span>
-                  <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
-                </div>
-              </section>
-            )}
+                {/* Fee Breakdown */}
+                {depositAmount > 0 && (
+                  <section className="border border-line rounded-lg p-5 space-y-2.5 text-sm tabular">
+                    <div className="flex justify-between">
+                      <span className="text-muted">Lock amount</span>
+                      <span className="text-foreground">{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted">
+                        Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
+                      </span>
+                      <span className="text-foreground">{formatUnits(fee, USDC_DECIMALS)} USDC</span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t border-line pt-3 mt-1">
+                      <span>Total from wallet</span>
+                      <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
+                    </div>
+                  </section>
+                )}
 
-            {/* Action Buttons */}
-            <section className="w-full space-y-3">
-              {!isConnected ? (
-                <div className="text-center text-white/50 text-sm">
-                  Connect your wallet to continue
-                </div>
-              ) : step === "schedule" || step === "confirm" ? (
-                <>
-                  {isValidForm ? (
-                    <button
-                      onClick={() => setStep("confirm")}
-                      className="w-full bg-cyan text-black font-semibold rounded-lg py-3 hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
-                    >
-                      Review Lock
-                    </button>
-                  ) : (
-                    <button
-                      disabled
-                      className="w-full bg-white/10 text-white/30 font-semibold rounded-lg py-3 cursor-not-allowed"
-                    >
-                      {depositAmount === BigInt(0)
-                        ? "Enter an amount"
-                        : !meetsMinimum
-                          ? "Minimum 1 USDC"
-                          : !hasEnoughBalance
-                            ? "Insufficient balance (incl. fee)"
-                            : "Review Lock"}
-                    </button>
-                  )}
-                </>
-              ) : step === "approve" ? (
-                <div className="flex flex-col items-center gap-3 py-2">
-                  <Spinner />
-                  <div className="text-sm text-white/60">
-                    {isApproving
-                      ? "Confirm in wallet..."
-                      : isApproveConfirming
-                        ? "Waiting for confirmation..."
-                        : "Approving USDC..."}
-                  </div>
-                  {isApproveConfirming && approveTxHash && (
-                    <a
-                      href={`${EXPLORER_URL}/tx/${approveTxHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-white/30 hover:text-cyan/60 transition-colors underline"
-                    >
-                      View on BaseScan
-                    </a>
-                  )}
-                </div>
-              ) : step === "lock" ? (
-                <div className="flex flex-col items-center gap-3 py-2">
-                  <Spinner />
-                  <div className="text-sm text-white/60">
-                    {isLocking
-                      ? "Confirm in wallet..."
-                      : isLockConfirming
-                        ? "Waiting for confirmation..."
-                        : "Creating lock..."}
-                  </div>
-                  {isLockConfirming && lockTxHash && (
-                    <a
-                      href={`${EXPLORER_URL}/tx/${lockTxHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-white/30 hover:text-cyan/60 transition-colors underline"
-                    >
-                      View on BaseScan
-                    </a>
-                  )}
-                </div>
-              ) : null}
-            </section>
+                {/* Action Buttons */}
+                <section>
+                  {!isConnected ? (
+                    <div className="text-center text-muted text-sm">
+                      Connect your wallet to continue.
+                    </div>
+                  ) : step === "schedule" || step === "confirm" ? (
+                    <>
+                      {isValidForm ? (
+                        <button
+                          onClick={() => setStep("confirm")}
+                          className="btn-primary btn-lg w-full"
+                        >
+                          Review the lock
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="btn-secondary btn-lg w-full opacity-40 cursor-not-allowed"
+                        >
+                          {depositAmount === BigInt(0)
+                            ? "Enter an amount"
+                            : !meetsMinimum
+                              ? "Minimum 1 USDC"
+                              : !hasEnoughBalance
+                                ? "Not enough in the wallet"
+                                : "Review the lock"}
+                        </button>
+                      )}
+                    </>
+                  ) : step === "approve" ? (
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <Spinner />
+                      <div className="text-sm text-muted">
+                        {isApproving
+                          ? "Confirm in wallet…"
+                          : isApproveConfirming
+                            ? "Waiting for confirmation…"
+                            : "Approving USDC…"}
+                      </div>
+                      {isApproveConfirming && approveTxHash && (
+                        <a
+                          href={`${EXPLORER_URL}/tx/${approveTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-faint hover:text-cyan underline transition-colors"
+                        >
+                          View on BaseScan
+                        </a>
+                      )}
+                    </div>
+                  ) : step === "lock" ? (
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <Spinner />
+                      <div className="text-sm text-muted">
+                        {isLocking
+                          ? "Confirm in wallet…"
+                          : isLockConfirming
+                            ? "Waiting for confirmation…"
+                            : "Writing the lock to Sablier…"}
+                      </div>
+                      {isLockConfirming && lockTxHash && (
+                        <a
+                          href={`${EXPLORER_URL}/tx/${lockTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-faint hover:text-cyan underline transition-colors"
+                        >
+                          View on BaseScan
+                        </a>
+                      )}
+                    </div>
+                  ) : null}
+                </section>
+              </div>
 
-            {/* Confirmation Modal */}
-            {step === "confirm" && (
-              <ConfirmDialog
-                schedule={schedule}
-                depositAmount={depositAmount}
-                fee={fee}
-                totalAmount={totalAmount}
-                hasEnoughAllowance={hasEnoughAllowance}
-                confirmed={confirmed}
-                onConfirmedChange={setConfirmed}
-                onApprove={handleApprove}
-                onLock={handleLock}
-                onCancel={() => {
-                  setStep("schedule");
-                  setConfirmed(false);
-                }}
-              />
-            )}
-          </div>
-        )}
+              {/* Confirmation Modal */}
+              {step === "confirm" && (
+                <ConfirmDialog
+                  schedule={schedule}
+                  depositAmount={depositAmount}
+                  fee={fee}
+                  totalAmount={totalAmount}
+                  hasEnoughAllowance={hasEnoughAllowance}
+                  confirmed={confirmed}
+                  onConfirmedChange={setConfirmed}
+                  onApprove={handleApprove}
+                  onLock={handleLock}
+                  onCancel={() => {
+                    setStep("schedule");
+                    setConfirmed(false);
+                  }}
+                />
+              )}
+            </>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -804,39 +825,39 @@ function VestingCalculator({
   });
 
   return (
-    <div className="rounded-lg border border-cyan/20 bg-cyan/[0.04] p-4 space-y-3">
+    <div className="rounded-lg border border-cyan/30 bg-cyan/[0.04] p-5 space-y-4">
       {/* Headline payout */}
-      <div className="text-center">
-        <div className="text-2xl font-bold text-cyan">
+      <div>
+        <div className="font-display text-4xl sm:text-5xl text-cyan tabular leading-none">
           ${perInterval.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
-        <div className="text-xs text-white/50 mt-1">
-          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) &middot; {totalIntervals} claims over {formatDuration(totalSeconds)}
+        <div className="mt-3 text-xs text-muted tabular">
+          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) · {totalIntervals} reloads over {formatDuration(totalSeconds)}
         </div>
       </div>
 
       {/* Mini schedule table */}
       {previewRows.length > 0 && (
-        <div className="space-y-1">
-          <div className="grid grid-cols-3 text-[10px] text-white/30 uppercase tracking-wider px-1">
+        <div className="space-y-1 border-t border-cyan/15 pt-4">
+          <div className="grid grid-cols-3 eyebrow text-faint px-1">
             <span>Time</span>
             <span className="text-right">Payout</span>
             <span className="text-right">Cumulative</span>
           </div>
           {previewRows.map((row, i) => (
-            <div key={i} className="grid grid-cols-3 text-xs text-white/60 px-1 py-0.5 rounded hover:bg-white/[0.03]">
+            <div key={i} className="grid grid-cols-3 text-xs tabular text-muted px-1 py-0.5">
               <span>{formatDuration(row.elapsed)}</span>
-              <span className="text-right text-cyan/80">
+              <span className="text-right text-cyan">
                 +${row.payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-              <span className="text-right">
+              <span className="text-right text-foreground">
                 ${row.cumulative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           ))}
           {totalIntervals > previewCount && (
-            <div className="text-[10px] text-white/25 text-center pt-1">
-              &hellip; {totalIntervals - previewCount} more claims
+            <div className="text-[10px] text-faint text-center pt-2 tabular">
+              … {totalIntervals - previewCount} more reloads
             </div>
           )}
         </div>
@@ -859,17 +880,17 @@ function TimelinePreview({
   const cliffPct = totalSeconds > 0 ? (cliffSeconds / totalSeconds) * 100 : 0;
 
   return (
-    <div className="border border-white/10 rounded-lg p-4 space-y-3">
+    <div className="border border-line rounded-lg p-5 space-y-3">
       {/* Visual bar */}
-      <div className="relative h-6 bg-white/5 rounded-full overflow-hidden">
+      <div className="relative h-6 bg-surface rounded-full overflow-hidden">
         {cliffSeconds > 0 && (
           <div
-            className="absolute inset-y-0 left-0 bg-amber-500/30 border-r border-amber-500/50"
+            className="absolute inset-y-0 left-0 bg-warning/30 border-r border-warning/60"
             style={{ width: `${cliffPct}%` }}
           />
         )}
         <div
-          className="absolute inset-y-0 bg-cyan/30"
+          className="absolute inset-y-0 bg-cyan/40"
           style={{
             left: `${cliffPct}%`,
             width: `${100 - cliffPct}%`,
@@ -878,7 +899,7 @@ function TimelinePreview({
       </div>
 
       {/* Labels */}
-      <div className="flex justify-between text-xs text-white/40">
+      <div className="flex justify-between text-xs text-faint tabular">
         <span>Now</span>
         {cliffSeconds > 0 && cliffSeconds < totalSeconds && (
           <span>Cliff: {formatDuration(cliffSeconds)}</span>
@@ -889,22 +910,22 @@ function TimelinePreview({
       </div>
 
       {/* Description */}
-      <p className="text-xs text-white/50">
+      <p className="text-xs text-muted leading-relaxed">
         {isLumpSum ? (
           <>
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC unlocks all at
-            once after {formatDuration(totalSeconds)}
+            {formatUnits(depositAmount, USDC_DECIMALS)} USDC unlocks in one drop
+            after {formatDuration(totalSeconds)}.
           </>
         ) : cliffSeconds > 0 ? (
           <>
-            Nothing unlocks for {formatDuration(cliffSeconds)}, then{" "}
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly
-            over {formatDuration(totalSeconds - cliffSeconds)}
+            Nothing for {formatDuration(cliffSeconds)}, then{" "}
+            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly over{" "}
+            {formatDuration(totalSeconds - cliffSeconds)}.
           </>
         ) : (
           <>
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly
-            over {formatDuration(totalSeconds)}
+            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly over{" "}
+            {formatDuration(totalSeconds)}.
           </>
         )}
       </p>
@@ -984,7 +1005,7 @@ function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 px-0 sm:px-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/85 backdrop-blur-sm px-0 sm:px-4"
       role="dialog"
       aria-modal="true"
       aria-label="Confirm lock"
@@ -992,49 +1013,53 @@ function ConfirmDialog({
     >
       <div
         ref={dialogRef}
-        className="bg-surface-strong border border-white/15 rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col"
+        className="bg-surface-strong border border-line-strong rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
-          <h3 className="text-lg font-bold">Confirm Lock</h3>
+        <div className="p-6 sm:p-7 space-y-5 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
+          <div>
+            <div className="eyebrow mb-3">Last step</div>
+            <h3 className="font-display text-2xl tracking-tight">
+              Lock it in.
+            </h3>
+          </div>
 
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2.5 text-sm tabular">
             <div className="flex justify-between">
-              <span className="text-white/50">Schedule</span>
-              <span>{schedule.label}</span>
+              <span className="text-muted">Reload</span>
+              <span className="text-foreground">{schedule.label}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/50">Lock amount</span>
-              <span>{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
+              <span className="text-muted">Lock amount</span>
+              <span className="text-foreground">{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/50">Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
-              <span>{formatUnits(fee, USDC_DECIMALS)} USDC</span>
+              <span className="text-muted">Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
+              <span className="text-foreground">{formatUnits(fee, USDC_DECIMALS)} USDC</span>
             </div>
-            <div className="flex justify-between font-medium border-t border-white/10 pt-2">
+            <div className="flex justify-between font-semibold border-t border-line pt-3 mt-1">
               <span>Total from wallet</span>
               <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
             </div>
             {schedule.cliffSeconds > 0 && (
-              <div className="flex justify-between">
-                <span className="text-white/50">Cliff</span>
-                <span>{formatDuration(schedule.cliffSeconds)}</span>
+              <div className="flex justify-between pt-2">
+                <span className="text-muted">Cliff</span>
+                <span className="text-foreground">{formatDuration(schedule.cliffSeconds)}</span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-white/50">
+              <span className="text-muted">
                 {schedule.isLumpSum ? "Unlock after" : "Vest duration"}
               </span>
-              <span>{formatDuration(schedule.totalSeconds)}</span>
+              <span className="text-foreground">{formatDuration(schedule.totalSeconds)}</span>
             </div>
           </div>
 
           {/* Non-cancelable warning */}
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
-            This lock is <strong>non-cancelable</strong> and{" "}
-            <strong>non-transferable</strong>. Once created, you cannot withdraw
-            early or move the stream. You will only receive funds according to
-            the vesting schedule.
+          <div className="bg-danger/10 border border-danger/25 rounded-lg p-4 text-sm text-danger leading-relaxed">
+            <strong className="font-semibold">Non-cancelable. Non-transferable.</strong>
+            {" "}Once you sign, there is no early exit, no support ticket, no
+            undo. The degen in the middle is going to beg. The answer is no.
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer">
@@ -1042,19 +1067,18 @@ function ConfirmDialog({
               type="checkbox"
               checked={confirmed}
               onChange={(e) => onConfirmedChange(e.target.checked)}
-              className="mt-1 accent-white focus:ring-2 focus:ring-cyan/50 focus:ring-offset-1 focus:ring-offset-black rounded"
+              className="mt-1 accent-cyan focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 rounded"
             />
-            <span className="text-sm text-white/70">
-              I understand this lock is permanent and non-cancelable. Locks are
-              enforced by Sablier&apos;s audited on-chain contracts.
+            <span className="text-sm text-muted leading-relaxed">
+              I understand. Enforced on-chain by Sablier. No going back.
             </span>
           </label>
         </div>
 
-        <div className="flex gap-3 p-5 sm:p-6 pt-0 sm:pt-0 pb-safe border-t border-white/10 shrink-0">
+        <div className="flex gap-3 p-6 sm:p-7 pt-0 sm:pt-0 pb-safe border-t border-line shrink-0">
           <button
             onClick={onCancel}
-            className="flex-1 border border-white/20 rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-white/5 transition-colors"
+            className="btn-secondary flex-1"
           >
             Cancel
           </button>
@@ -1062,7 +1086,7 @@ function ConfirmDialog({
             <button
               onClick={onApprove}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
+              className="btn-primary flex-1 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Approve USDC
             </button>
@@ -1070,9 +1094,9 @@ function ConfirmDialog({
             <button
               onClick={onLock}
               disabled={!confirmed}
-              className="flex-1 bg-cyan text-black font-semibold rounded-lg min-h-[44px] py-2.5 text-sm hover:bg-cyan/90 disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
+              className="btn-primary flex-1 disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              Create Lock
+              Lock it in
             </button>
           )}
         </div>
@@ -1110,13 +1134,13 @@ function SuccessView({
   })();
 
   return (
-    <div className="space-y-5 sm:space-y-6 py-4 sm:py-8 w-full">
-      <div className="text-center space-y-4">
+    <div className="space-y-10 py-4 sm:py-8 w-full">
+      <div className="space-y-6">
         {/* Animated shield + check icon */}
         <div className="relative inline-flex items-center justify-center">
-          <div className="absolute w-28 h-28 rounded-full bg-cyan/[0.08] blur-[40px] animate-glow-pulse" />
+          <div className="absolute w-32 h-32 rounded-full bg-cyan/[0.10] blur-[50px] animate-glow-pulse" />
           <svg
-            className="relative w-20 h-20 glow-cyan animate-success-pop"
+            className="relative w-20 h-20 text-cyan glow-cyan animate-success-pop"
             viewBox="0 0 64 64"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -1124,31 +1148,32 @@ function SuccessView({
           >
             <path
               d="M32 4L8 16v16c0 15.46 10.24 29.9 24 33.46C45.76 61.9 56 47.46 56 32V16L32 4Z"
-              stroke="#47B4CC"
+              stroke="currentColor"
               strokeWidth="2"
-              fill="rgba(71,180,204,0.06)"
-            />
-            <path
-              d="M32 10L12 20v12c0 13.2 8.53 25.5 20 28.6C43.47 57.5 52 45.2 52 32V20L32 10Z"
-              stroke="#47B4CC"
-              strokeWidth="0.5"
-              strokeOpacity="0.3"
-              fill="none"
+              fill="currentColor"
+              fillOpacity="0.08"
             />
             <path
               d="M22 33l7 7 13-13"
-              stroke="#47B4CC"
+              stroke="currentColor"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </div>
-        <h3 className="text-2xl font-bold">Lock Created!</h3>
-        <p className="text-white/50 text-sm max-w-sm mx-auto">
-          Your funds are now locked in a Sablier stream. They will vest according
-          to your chosen schedule.
-        </p>
+        <div>
+          <div className="eyebrow mb-3 text-cyan/70">Locked</div>
+          <h2 className="text-display max-w-xl">
+            Your past self just paid
+            <br />
+            <span className="text-cyan">your future self back.</span>
+          </h2>
+          <p className="mt-5 text-muted leading-relaxed max-w-[52ch]">
+            In Sablier. Non-cancelable. Non-transferable. The degen in the
+            middle can&apos;t touch it. Come back and claim on the schedule you set.
+          </p>
+        </div>
       </div>
 
       <ShareCard
@@ -1160,27 +1185,26 @@ function SuccessView({
         sablierAddress={SABLIER_LOCKUP}
       />
 
-      <div className="space-y-3 text-center">
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/vaults" className="btn-primary btn-lg flex-1">
+            See your vaults
+          </Link>
+          <button
+            onClick={onCreateAnother}
+            className="btn-secondary btn-lg flex-1"
+          >
+            Lock another win
+          </button>
+        </div>
         <a
           href={`${EXPLORER_URL}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-sm text-white/60 hover:text-white underline"
+          className="block text-xs text-faint hover:text-cyan underline transition-colors text-center"
         >
-          View on BaseScan
+          View transaction on BaseScan
         </a>
-        <Link
-          href="/vaults"
-          className="inline-block bg-cyan text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-cyan/90 transition-[background-color,box-shadow,opacity] hover:shadow-[0_0_30px_rgba(71,180,204,0.25)]"
-        >
-          View Your Vaults
-        </Link>
-        <button
-          onClick={onCreateAnother}
-          className="block text-sm text-white/40 hover:text-white/60 underline mx-auto"
-        >
-          Create another lock
-        </button>
       </div>
     </div>
   );
@@ -1191,8 +1215,8 @@ export default function CreateLock() {
     <ErrorBoundary fallbackTitle="Failed to load lock creator">
       <Suspense
         fallback={
-          <div className="min-h-screen flex items-center justify-center text-white/50">
-            Loading...
+          <div className="min-h-screen flex items-center justify-center text-muted">
+            Loading…
           </div>
         }
       >
