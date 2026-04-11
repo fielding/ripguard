@@ -72,7 +72,7 @@ type Step = "schedule" | "confirm" | "approve" | "lock" | "success";
 function Spinner() {
   return (
     <svg
-      className="w-6 h-6 text-cyan animate-spin"
+      className="w-6 h-6 text-cyan animate-spin glow-cyan"
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -878,16 +878,22 @@ function CreateLockInner() {
                       )}
                     </>
                   ) : step === "approve" ? (
+                    (() => {
+                      const approveStatus = isApproving
+                        ? "Confirm in wallet…"
+                        : isApproveConfirming
+                          ? "Waiting for confirmation…"
+                          : "Approving USDC…";
+                      return (
                     <div className="flex flex-col items-center gap-3 py-4">
                       <Spinner />
-                      <div className="text-sm text-muted">
-                        {isApproving
-                          ? "Confirm in wallet…"
-                          : isApproveConfirming
-                            ? "Waiting for confirmation…"
-                            : "Approving USDC…"}
+                      <div
+                        key={approveStatus}
+                        className="text-sm text-muted animate-text-fade-in"
+                      >
+                        {approveStatus}
                       </div>
-                      <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed">
+                      <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed animate-fade-in-up">
                         Just permission. The lock is the next signature.
                       </div>
                       {isApproveConfirming && approveTxHash && (
@@ -901,22 +907,39 @@ function CreateLockInner() {
                         </a>
                       )}
                     </div>
+                      );
+                    })()
                   ) : step === "lock" ? (
+                    (() => {
+                      const lockStatus = isPrimingLock
+                        ? "Lining up the lock…"
+                        : isLocking
+                          ? "Confirm in wallet…"
+                          : isLockConfirming
+                            ? "Waiting for confirmation…"
+                            : "Writing the lock to Sablier…";
+                      return (
                     <div className="flex flex-col items-center gap-3 py-4">
                       <Spinner />
-                      <div className="text-sm text-muted">
-                        {isPrimingLock
-                          ? "Lining up the lock…"
-                          : isLocking
-                            ? "Confirm in wallet…"
-                            : isLockConfirming
-                              ? "Waiting for confirmation…"
-                              : "Writing the lock to Sablier…"}
+                      <div
+                        key={lockStatus}
+                        className="text-sm text-muted animate-text-fade-in"
+                      >
+                        {lockStatus}
                       </div>
                       <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed space-y-0.5">
-                        <div>Routes directly into Sablier.</div>
-                        <div>Enforced on-chain.</div>
-                        <div className="text-muted">No going back. Your future self thanks you.</div>
+                        <div className="animate-fade-in-up" style={{ animationDelay: "0ms" }}>
+                          Routes directly into Sablier.
+                        </div>
+                        <div className="animate-fade-in-up" style={{ animationDelay: "90ms" }}>
+                          Enforced on-chain.
+                        </div>
+                        <div
+                          className="text-muted animate-fade-in-up"
+                          style={{ animationDelay: "180ms" }}
+                        >
+                          No going back. Your future self thanks you.
+                        </div>
                       </div>
                       {isLockConfirming && lockTxHash && (
                         <a
@@ -929,6 +952,8 @@ function CreateLockInner() {
                         </a>
                       )}
                     </div>
+                      );
+                    })()
                   ) : null}
                 </section>
               </div>
@@ -1167,7 +1192,7 @@ function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/92 backdrop-blur-sm px-0 sm:px-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/92 backdrop-blur-sm px-0 sm:px-4 animate-backdrop-enter"
       role="dialog"
       aria-modal="true"
       aria-label="Confirm lock"
@@ -1175,7 +1200,7 @@ function ConfirmDialog({
     >
       <div
         ref={dialogRef}
-        className="bg-surface-strong border border-line-strong rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col"
+        className="bg-surface-strong border border-line-strong rounded-t-xl sm:rounded-xl max-w-md w-full max-h-[90vh] flex flex-col animate-dialog-enter"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 sm:p-7 space-y-5 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
@@ -1301,6 +1326,13 @@ function SuccessView({
         {/* Animated shield + check icon */}
         <div className="relative inline-flex items-center justify-center">
           <div className="absolute w-32 h-32 rounded-full bg-cyan/[0.10] blur-[50px] animate-glow-pulse" />
+          {/* Follow-through halo: a thin cyan ring that expands out once and
+              fades, landing just after the shield pop settles. */}
+          <div
+            className="absolute w-20 h-20 rounded-full border-2 border-cyan animate-shield-halo"
+            style={{ animationDelay: "280ms" }}
+            aria-hidden="true"
+          />
           <svg
             className="relative w-20 h-20 text-cyan glow-cyan animate-success-pop"
             viewBox="0 0 64 64"

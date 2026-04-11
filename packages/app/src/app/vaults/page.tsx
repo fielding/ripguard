@@ -96,10 +96,12 @@ function VaultCard({
   vault,
   onClaim,
   claimingId,
+  index,
 }: {
   vault: VaultData;
   onClaim: (streamId: bigint) => void;
   claimingId: bigint | null;
+  index: number;
 }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -147,7 +149,10 @@ function VaultCard({
         : "All claimed";
 
   return (
-    <div className="bg-background p-6 sm:p-7 space-y-6">
+    <div
+      className="bg-background p-6 sm:p-7 space-y-6 animate-fade-in-up"
+      style={{ animationDelay: `${Math.min(index * 60, 320)}ms` }}
+    >
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="space-y-1.5">
           <div className="eyebrow text-cyan/70 tabular">
@@ -175,7 +180,7 @@ function VaultCard({
       {/* Progress bar */}
       <div className="space-y-2">
         <div
-          className="relative h-1.5 bg-surface rounded-full overflow-hidden"
+          className={`relative h-1.5 bg-surface rounded-full overflow-hidden ${canClaim ? "animate-progress-glow" : ""}`}
           role="progressbar"
           aria-valuenow={Math.round(vestedPct)}
           aria-valuemin={0}
@@ -213,7 +218,9 @@ function VaultCard({
       <div className="flex items-center justify-between gap-4 pt-5 border-t border-line">
         <div>
           <div className="eyebrow mb-1.5">Claimable now</div>
-          <div className="font-display text-3xl text-cyan tabular tracking-tight">
+          <div
+            className={`font-display text-3xl text-cyan tabular tracking-tight ${canClaim ? "animate-claim-pulse" : ""}`}
+          >
             {formatUnits(vault.claimable, USDC_DECIMALS)}
             <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
@@ -681,7 +688,9 @@ function VaultDashboard() {
           <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-5">
             {/* Primary: the actionable number */}
             <li className="flex items-baseline gap-3">
-              <span className="font-display text-cyan text-4xl tabular tracking-tight leading-none">
+              <span
+                className={`font-display text-cyan text-4xl tabular tracking-tight leading-none ${totals.claimable > BigInt(0) ? "animate-claim-pulse" : ""}`}
+              >
                 {formatUnits(totals.claimable, USDC_DECIMALS)}
               </span>
               <span className="eyebrow">Claimable now</span>
@@ -724,12 +733,13 @@ function VaultDashboard() {
         </div>
       )}
       <div className="space-y-px bg-line border border-line rounded-lg overflow-hidden">
-        {vaults.map((vault) => (
+        {vaults.map((vault, i) => (
           <CardErrorBoundary key={vault.streamId.toString()} label={`Lock #${vault.streamId.toString()}`}>
             <VaultCard
               vault={vault}
               onClaim={handleClaim}
               claimingId={claimingId}
+              index={i}
             />
           </CardErrorBoundary>
         ))}
