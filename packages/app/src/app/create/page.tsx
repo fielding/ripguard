@@ -42,6 +42,12 @@ type PresetKey = keyof typeof PRESETS;
 
 const USDC_DECIMALS = 6;
 const MIN_DEPOSIT = BigInt(1_000_000); // 1 USDC minimum
+// Infinite allowance. Approving max uint256 once means future locks skip
+// the approve step entirely — one signature instead of two on every repeat
+// lock. Standard pattern for trusted, non-upgradeable DeFi protocols.
+const MAX_UINT256 = BigInt(
+  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+);
 
 // ERC-721 Transfer event topic
 const TRANSFER_TOPIC = keccak256(toHex("Transfer(address,address,uint256)"));
@@ -308,9 +314,11 @@ function CreateLockInner() {
       address: USDC_ADDRESS,
       abi: erc20Abi,
       functionName: "approve",
-      args: [SABLIER_LOCKUP, totalAmount],
+      // Infinite allowance so future locks skip the approve step entirely.
+      // Users can still manually edit the cap down in MetaMask at sign time.
+      args: [SABLIER_LOCKUP, MAX_UINT256],
     });
-  }, [writeApprove, totalAmount, address, resetApproveWrite]);
+  }, [writeApprove, address, resetApproveWrite]);
 
   const handleLock = useCallback(() => {
     if (!address || lockInFlightRef.current) return;
