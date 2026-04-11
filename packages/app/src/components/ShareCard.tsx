@@ -200,13 +200,13 @@ export function ShareCard(props: ShareCardProps) {
       <div className="relative">
         <canvas
           ref={canvasRef}
-          className="w-full max-w-[600px] rounded-lg border border-white/10"
+          className="w-full max-w-[600px] rounded-lg border border-line"
           style={{ aspectRatio: `${CARD_W} / ${CARD_H}` }}
         />
         <button
           onClick={() => setMasked(!masked)}
           aria-label={masked ? "Show locked amount" : "Hide locked amount"}
-          className="absolute top-3 right-3 text-xs bg-black/60 border border-white/20 rounded px-2 py-1 text-white/60 hover:text-white transition-colors"
+          className="absolute top-3 right-3 inline-flex items-center min-h-[2.25rem] text-xs bg-background/80 border border-line-strong rounded px-3 text-muted hover:text-foreground transition-colors"
         >
           {masked ? "Show" : "Hide"} amount
         </button>
@@ -214,13 +214,13 @@ export function ShareCard(props: ShareCardProps) {
       <div className="flex gap-2">
         <button
           onClick={handleDownload}
-          className="flex-1 border border-white/20 rounded-lg py-2 text-sm hover:bg-white/5 transition-colors"
+          className="flex-1 inline-flex items-center justify-center min-h-[2.75rem] border border-line-strong rounded-lg px-3 text-sm text-muted hover:text-foreground hover:border-cyan transition-colors"
         >
           Download PNG
         </button>
         <button
           onClick={handleCopy}
-          className="flex-1 border border-white/20 rounded-lg py-2 text-sm hover:bg-white/5 transition-colors"
+          className="flex-1 inline-flex items-center justify-center min-h-[2.75rem] border border-line-strong rounded-lg px-3 text-sm text-muted hover:text-foreground hover:border-cyan transition-colors"
         >
           {copied ? "Copied!" : copyFailed ? "Copy not supported" : "Copy to Clipboard"}
         </button>
