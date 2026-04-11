@@ -309,7 +309,7 @@ export default function Home() {
                 <div className="max-w-2xl">
                   <h3 className="text-h2 text-foreground">Design your reload</h3>
                   <p className="mt-4 text-muted leading-relaxed">
-                    Hourly drip, daily drop, weekly paycheck, or one-time unlock.
+                    Hourly drip, daily drop, weekly payout, or one-time unlock.
                     Set the terms{" "}
                     <span className="text-foreground italic">
                       the degen in the middle will hate you for

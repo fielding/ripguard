@@ -628,11 +628,11 @@ function CreateLockInner() {
                       Minimum lock is 1 USDC. Start with $5 if this is your first one.
                     </p>
                   )}
-                  {isConnected && !hasEnoughBalance && depositAmount > 0 && meetsMinimum && (
+                  {isConnected && balance !== undefined && !hasEnoughBalance && depositAmount > 0 && meetsMinimum && (
                     <p className="text-xs text-danger">
                       Not enough in the wallet. You have{" "}
-                      {balance !== undefined ? formatUnits(balance, USDC_DECIMALS) : "—"} USDC,
-                      need {formatUnits(totalAmount, USDC_DECIMALS)} USDC (incl. {BROKER_FEE_PCT} fee).
+                      {formatUnits(balance, USDC_DECIMALS)} USDC, need{" "}
+                      {formatUnits(totalAmount, USDC_DECIMALS)} USDC (incl. {BROKER_FEE_PCT} fee).
                     </p>
                   )}
                   {IS_TESTNET && isConnected && (

@@ -26,7 +26,7 @@ export const BRAND = {
   // Social share image
   ogHeadline: "Lock your winnings before you give them back.",
   ogSubhead: `The "cash this out, don't let me play" button. Powered by Sablier.`,
-  ogAlt: "RipGuard — Lock your winnings before you give them back",
+  ogAlt: "RipGuard. Lock your winnings before you give them back.",
 
   // PWA install description
   manifestDescription:
@@ -36,11 +36,13 @@ export const BRAND = {
 /**
  * Build the full page title for a given context.
  * Landing page uses the headline; sub-pages can pass their own suffix.
+ * Uses middle-dot separators everywhere for visual consistency and to
+ * keep em dashes out of user-facing strings (brand rule).
  */
 export function getSiteTitle(options: { testnet: boolean; pageTitle?: string }): string {
   const brand = options.testnet ? BRAND.testnetName : BRAND.name;
   if (options.pageTitle) {
     return `${options.pageTitle} · ${brand}`;
   }
-  return `${brand} — ${BRAND.headline.replace(/\.$/, "")}`;
+  return `${brand} · ${BRAND.headline.replace(/\.$/, "")}`;
 }
