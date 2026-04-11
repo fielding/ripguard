@@ -11,45 +11,31 @@ import { BRAND } from "@/content/brand";
 export const ogSize = { width: 1200, height: 630 };
 
 /**
- * Fetch a Google Font at edge runtime and return its TTF bytes.
+ * Load a TTF font that's bundled in `src/lib/fonts/`. Reads from disk
+ * via `node:fs/promises` and converts the Node Buffer to an ArrayBuffer
+ * slice (Satori's font.data type is ArrayBuffer, not Buffer).
  *
- * Two tricks to make this reliable against Google Fonts' defaults:
+ * We ship TTFs directly from Omnibus-Type/Archivo upstream rather than
+ * fetching from Google Fonts at runtime. Google's CSS2 API returns
+ * woff/woff2 even with old User-Agents and `text=` subset hints, and
+ * Satori only supports TTF/OTF. Bundling is the only reliable path.
  *
- * 1. Use an old Chrome User-Agent. Modern UAs get woff2, which Satori
- *    does not support. Chrome 41 (2015) predates woff2 support and
- *    forces Google Fonts to serve TTF instead.
- * 2. Use the `text=` query parameter to request only the glyphs we
- *    actually render on the card. Smaller subset, faster fetch, and
- *    Google Fonts' subset API is TTF-friendly with the old UA.
- *
- * Returns null on any failure so the caller can fall back to Satori's
- * bundled default fonts instead of crashing the OG route.
+ * Returns null on any failure so the caller falls back to Satori's
+ * bundled default rather than crashing the OG route.
  */
-async function loadGoogleFont(
-  family: string,
-  text: string,
-  weight = 400,
+async function loadBundledFont(
+  filename: string,
 ): Promise<ArrayBuffer | null> {
   try {
-    const url = `https://fonts.googleapis.com/css2?family=${family.replace(
-      / /g,
-      "+",
-    )}:wght@${weight}&text=${encodeURIComponent(text)}`;
-    const cssRes = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36",
-      },
-    });
-    if (!cssRes.ok) return null;
-    const css = await cssRes.text();
-    const match = css.match(
-      /src:\s*url\((https:\/\/[^)]+?)\)\s*format\(['"]?(truetype|opentype)['"]?\)/,
-    );
-    if (!match) return null;
-    const fontRes = await fetch(match[1]);
-    if (!fontRes.ok) return null;
-    return await fontRes.arrayBuffer();
+    const path = join(process.cwd(), "src/lib/fonts", filename);
+    const buffer = await readFile(path);
+    // Buffer -> ArrayBuffer slice. Buffers share memory with their
+    // underlying ArrayBuffer (potentially with other Buffers), so we
+    // slice out just this Buffer's bytes to get a clean ArrayBuffer.
+    return buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength,
+    ) as ArrayBuffer;
   } catch {
     return null;
   }
@@ -85,23 +71,12 @@ async function loadPublicImageAsDataUrl(
 export async function renderSiteOGImage() {
   const siteHost = IS_TESTNET ? "testnet.ripguard.xyz" : "ripguard.xyz";
 
-  // All rendered text, combined. Passed to Google Fonts as the subset
-  // hint so both font files only carry the glyphs this card needs.
-  const allText = [
-    "Lock your winnings before you give them back.",
-    "Built on Sablier",
-    BRAND.tagline,
-    siteHost,
-    "Powered by Sablier v2.0",
-    "Non-custodial · Immutable",
-  ].join(" ");
-
   // Load fonts and the 3D padlock in parallel. Each is best-effort: if
   // any fails, we fall back to Satori's default font and/or drop the
   // mark rather than crashing the OG route.
   const [archivoBlackData, archivoData, markDataUrl] = await Promise.all([
-    loadGoogleFont("Archivo Black", allText),
-    loadGoogleFont("Archivo", allText, 500),
+    loadBundledFont("Archivo-Black.ttf"),
+    loadBundledFont("Archivo-Medium.ttf"),
     loadPublicImageAsDataUrl("mark-288.png", "image/png"),
   ]);
 
