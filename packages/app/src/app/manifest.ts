@@ -9,8 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description: BRAND.manifestDescription,
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0a",
-    theme_color: "#000000",
+    // sRGB equivalents of --background oklch(0.14 0.008 200), tinted toward brand cyan
+    background_color: "#0a1014",
+    theme_color: "#0a1014",
     icons: [
       {
         src: "/logo-icon.png",

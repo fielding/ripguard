@@ -34,7 +34,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#000000",
+  // sRGB equivalent of --background oklch(0.14 0.008 200), tinted toward brand cyan
+  themeColor: "#0a1014",
 };
 
 export const metadata: Metadata = {
