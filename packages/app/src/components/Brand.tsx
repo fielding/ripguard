@@ -1,7 +1,13 @@
-function cn(...parts: Array<string | undefined>) {
+import Image from "next/image";
+
+function cn(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+/**
+ * Flat SVG mark — used at small sizes (header, footer) where the 3D padlock
+ * detail would get muddy. Stays tight and legible at 20-36px.
+ */
 export function RipGuardMark({ className }: { className?: string }) {
   return (
     <svg
@@ -57,6 +63,40 @@ export function RipGuardMark({ className }: { className?: string }) {
   );
 }
 
+/**
+ * 3D raster padlock mark — used at large sizes where the detail can breathe.
+ * Wraps a cyan glow halo behind it since the transparent PNG lost its baked-in
+ * ambient glow. The halo is animated with a gentle pulse at hero scale.
+ */
+export function RipGuardMark3D({
+  className,
+  pulse = false,
+}: {
+  className?: string;
+  pulse?: boolean;
+}) {
+  return (
+    <div className={cn("relative inline-flex items-center justify-center", className)}>
+      <div
+        className={cn(
+          "absolute inset-[-35%] rounded-full bg-cyan/25 blur-[48px]",
+          pulse && "animate-glow-pulse"
+        )}
+      />
+      <div className="absolute inset-[-10%] rounded-full bg-cyan/15 blur-[20px]" />
+      <Image
+        src="/mark-1024.png"
+        alt=""
+        width={1024}
+        height={1024}
+        className="relative w-full h-full drop-shadow-[0_0_32px_rgba(71,180,204,0.5)]"
+        aria-hidden="true"
+        priority
+      />
+    </div>
+  );
+}
+
 export function RipGuardWordmark({
   className,
   showTagline = true,
@@ -85,8 +125,8 @@ export function RipGuardLockup({
   showTagline?: boolean;
 }) {
   return (
-    <div className={cn("flex items-center gap-4", className)}>
-      <RipGuardMark className="h-16 w-16 sm:h-20 sm:w-20 shrink-0" />
+    <div className={cn("flex items-center gap-5", className)}>
+      <RipGuardMark3D className="h-24 w-24 sm:h-28 sm:w-28 shrink-0" />
       <RipGuardWordmark showTagline={showTagline} />
     </div>
   );
