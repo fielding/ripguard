@@ -58,21 +58,15 @@ export const metadata: Metadata = {
     type: "website",
     url: siteUrl,
     siteName: IS_TESTNET ? BRAND.testnetName : BRAND.name,
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: siteTitle,
-      },
-    ],
+    // Image comes from `src/app/opengraph-image.tsx` (file-based convention).
+    // Next.js auto-injects the og:image meta tag — no static reference needed.
   },
   twitter: {
     card: "summary_large_image",
     site: "@ripguardxyz",
     title: siteTitle,
     description: BRAND.metaDescription,
-    images: ["/og-image.png"],
+    // Image comes from `src/app/twitter-image.tsx` (file-based convention).
   },
 };
 
