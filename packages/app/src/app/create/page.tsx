@@ -156,7 +156,7 @@ function CreateLockInner() {
       // Sablier requires cliff < total strictly; add 1s so linear stream amount is non-zero
       totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
       isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
-      label: "Custom Schedule",
+      label: "Custom Reloads",
     };
   }, [selectedPreset, customCliff, customTotal]);
 
@@ -305,7 +305,7 @@ function CreateLockInner() {
   }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount]);
 
   useEffect(() => {
-    if (isLockConfirmed && step === "lock" && lockTxHash) {
+    if (isLockConfirmed && step === "lock" && lockTxHash && lockReceipt) {
       setStep("success");
       toast("Lock created!", "success", {
         label: "View on BaseScan",
@@ -317,8 +317,22 @@ function CreateLockInner() {
         cliffSeconds: schedule.cliffSeconds,
         totalSeconds: schedule.totalSeconds,
       });
+
+      // Remember the picked preset so /vaults can show the casino-voice label
+      // instead of the generic schedule-type fallback.
+      try {
+        const streamId = parseStreamIdFromReceipt(lockReceipt);
+        if (streamId > BigInt(0) && typeof window !== "undefined") {
+          window.localStorage.setItem(
+            `ripguard:lock:${streamId.toString()}`,
+            schedule.label
+          );
+        }
+      } catch {
+        // localStorage unavailable; /vaults falls back to schedule-type label
+      }
     }
-  }, [isLockConfirmed, step, lockTxHash, toast, schedule, depositAmount]);
+  }, [isLockConfirmed, step, lockTxHash, lockReceipt, toast, schedule, depositAmount]);
 
   // Reset step if user rejects wallet prompt or tx fails
   useEffect(() => {
@@ -526,7 +540,7 @@ function CreateLockInner() {
                       {/* Total duration */}
                       <div>
                         <label htmlFor="total-duration" className="eyebrow block mb-2">
-                          Total duration
+                          Reload window
                         </label>
                         <div className="relative">
                           <select
@@ -559,7 +573,7 @@ function CreateLockInner() {
                       {/* Claim interval — dynamic based on duration */}
                       <div>
                         <label className="eyebrow block mb-2">
-                          Claim cadence
+                          Reload cadence
                         </label>
                         <div className="flex flex-wrap gap-2">
                           {getIntervalOptions(customTotal).map((i) => (
@@ -583,7 +597,7 @@ function CreateLockInner() {
                       {/* Cliff (advanced, collapsed) */}
                       <details className="group">
                         <summary className="text-xs text-faint cursor-pointer hover:text-muted transition-colors">
-                          Advanced: add cliff period
+                          Advanced: add a waiting period before reloads start
                         </summary>
                         <div className="mt-3">
                           <div className="relative">
@@ -596,7 +610,7 @@ function CreateLockInner() {
                               }
                               className={`w-full appearance-none bg-background border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
-                              <option value={0}>No cliff</option>
+                              <option value={0}>No wait</option>
                               {DURATION_OPTIONS.filter((d) => d.seconds < customTotal).map((d) => (
                                 <option key={d.seconds} value={d.seconds}>
                                   {d.label}
@@ -610,7 +624,7 @@ function CreateLockInner() {
 
                       {customCliff > customTotal && (
                         <p className="text-xs text-danger">
-                          Cliff can&apos;t be longer than the total duration.
+                          The wait can&apos;t be longer than the reload window.
                         </p>
                       )}
                     </div>
@@ -735,6 +749,9 @@ function CreateLockInner() {
                             ? "Waiting for confirmation…"
                             : "Approving USDC…"}
                       </div>
+                      <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed">
+                        Just permission. The lock is the next signature.
+                      </div>
                       {isApproveConfirming && approveTxHash && (
                         <a
                           href={`${EXPLORER_URL}/tx/${approveTxHash}`}
@@ -755,6 +772,11 @@ function CreateLockInner() {
                           : isLockConfirming
                             ? "Waiting for confirmation…"
                             : "Writing the lock to Sablier…"}
+                      </div>
+                      <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed space-y-0.5">
+                        <div>Routes directly into Sablier.</div>
+                        <div>Enforced on-chain.</div>
+                        <div className="text-muted">No going back. Your future self thanks you.</div>
                       </div>
                       {isLockConfirming && lockTxHash && (
                         <a
@@ -825,7 +847,7 @@ function VestingCalculator({
   });
 
   return (
-    <div className="rounded-lg border border-cyan/30 bg-cyan/[0.04] p-5 space-y-4">
+    <div className="space-y-5">
       {/* Headline payout */}
       <div>
         <div className="font-display text-4xl sm:text-5xl text-cyan tabular leading-none">
@@ -838,14 +860,14 @@ function VestingCalculator({
 
       {/* Mini schedule table */}
       {previewRows.length > 0 && (
-        <div className="space-y-1 border-t border-cyan/15 pt-4">
-          <div className="grid grid-cols-3 eyebrow text-faint px-1">
+        <div className="space-y-1 border-t border-line pt-5">
+          <div className="grid grid-cols-3 eyebrow text-faint">
             <span>Time</span>
             <span className="text-right">Payout</span>
             <span className="text-right">Cumulative</span>
           </div>
           {previewRows.map((row, i) => (
-            <div key={i} className="grid grid-cols-3 text-xs tabular text-muted px-1 py-0.5">
+            <div key={i} className="grid grid-cols-3 text-xs tabular text-muted py-0.5">
               <span>{formatDuration(row.elapsed)}</span>
               <span className="text-right text-cyan">
                 +${row.payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -902,10 +924,10 @@ function TimelinePreview({
       <div className="flex justify-between text-xs text-faint tabular">
         <span>Now</span>
         {cliffSeconds > 0 && cliffSeconds < totalSeconds && (
-          <span>Cliff: {formatDuration(cliffSeconds)}</span>
+          <span>Wait: {formatDuration(cliffSeconds)}</span>
         )}
         <span>
-          {isLumpSum ? "Unlock" : "Fully vested"}: {formatDuration(totalSeconds)}
+          {isLumpSum ? "Unlock" : "Fully reloaded"}: {formatDuration(totalSeconds)}
         </span>
       </div>
 
@@ -918,13 +940,13 @@ function TimelinePreview({
           </>
         ) : cliffSeconds > 0 ? (
           <>
-            Nothing for {formatDuration(cliffSeconds)}, then{" "}
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly over{" "}
+            Nothing for {formatDuration(cliffSeconds)}. Then{" "}
+            {formatUnits(depositAmount, USDC_DECIMALS)} USDC drips out over{" "}
             {formatDuration(totalSeconds - cliffSeconds)}.
           </>
         ) : (
           <>
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC vests linearly over{" "}
+            {formatUnits(depositAmount, USDC_DECIMALS)} USDC drips out over{" "}
             {formatDuration(totalSeconds)}.
           </>
         )}
@@ -1005,7 +1027,7 @@ function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/85 backdrop-blur-sm px-0 sm:px-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/92 backdrop-blur-sm px-0 sm:px-4"
       role="dialog"
       aria-modal="true"
       aria-label="Confirm lock"
@@ -1019,7 +1041,7 @@ function ConfirmDialog({
         <div className="p-6 sm:p-7 space-y-5 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
           <div>
             <div className="eyebrow mb-3">Last step</div>
-            <h3 className="font-display text-2xl tracking-tight">
+            <h3 className="text-h2">
               Lock it in.
             </h3>
           </div>
@@ -1043,13 +1065,13 @@ function ConfirmDialog({
             </div>
             {schedule.cliffSeconds > 0 && (
               <div className="flex justify-between pt-2">
-                <span className="text-muted">Cliff</span>
+                <span className="text-muted">Wait</span>
                 <span className="text-foreground">{formatDuration(schedule.cliffSeconds)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-muted">
-                {schedule.isLumpSum ? "Unlock after" : "Vest duration"}
+                {schedule.isLumpSum ? "Unlock after" : "Reload window"}
               </span>
               <span className="text-foreground">{formatDuration(schedule.totalSeconds)}</span>
             </div>
