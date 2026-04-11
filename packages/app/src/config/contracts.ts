@@ -50,42 +50,42 @@ export const LOG_CHUNK_SIZE = IS_TESTNET ? BigInt(10_000) : BigInt(50_000);
 // Schedule presets — "build your own reloads"
 export const PRESETS = {
   hourly1d: {
-    label: "1 Day Hourly",
+    label: "Hourly Payouts (24h)",
     description: "Reload every hour for 24 hours",
     cliffSeconds: 0,
     totalSeconds: 24 * 60 * 60,
     isLumpSum: false,
   },
   hourly3d: {
-    label: "3 Days Hourly",
+    label: "Hourly Payouts (3d)",
     description: "Reload every hour for 3 days",
     cliffSeconds: 0,
     totalSeconds: 3 * 24 * 60 * 60,
     isLumpSum: false,
   },
   hourly1w: {
-    label: "1 Week Hourly",
+    label: "Hourly Payouts (1w)",
     description: "Reload every hour for 7 days",
     cliffSeconds: 0,
     totalSeconds: 7 * 24 * 60 * 60,
     isLumpSum: false,
   },
   daily1w: {
-    label: "1 Week Daily",
+    label: "Daily Payouts (1w)",
     description: "Reload once a day for 7 days",
     cliffSeconds: 0,
     totalSeconds: 7 * 24 * 60 * 60,
     isLumpSum: false,
   },
   panicLock1d: {
-    label: "1 Day Panic Lock",
+    label: "Panic Lock (24h)",
     description: "Lock everything for 24 hours",
     cliffSeconds: 24 * 60 * 60,
     totalSeconds: 24 * 60 * 60 + 1, // cliff < total required by Sablier
     isLumpSum: false,
   },
   panicThenDaily: {
-    label: "Panic Lock + Daily",
+    label: "Panic Lock + Daily Payouts",
     description: "1 day lock, then daily reloads for 7 days",
     cliffSeconds: 24 * 60 * 60,
     totalSeconds: 8 * 24 * 60 * 60, // 1d cliff + 7d vest

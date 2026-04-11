@@ -102,10 +102,10 @@ function drawCard(
     infoY + 22
   );
 
-  // Stream ID
+  // Lock ID
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = "11px system-ui, -apple-system, sans-serif";
-  ctx.fillText("STREAM", col1, infoY + 60);
+  ctx.fillText("LOCK", col1, infoY + 60);
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = "13px system-ui, -apple-system, sans-serif";
   ctx.fillText(`#${streamId.toString()}`, col1, infoY + 82);
