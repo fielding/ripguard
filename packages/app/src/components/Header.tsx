@@ -45,7 +45,7 @@ export function Header() {
             const className = `px-4 py-2 text-sm font-medium transition-colors ${
               isActive
                 ? "text-cyan"
-                : "text-foreground/70 hover:text-foreground"
+                : "text-muted hover:text-foreground"
             }`;
             return link.hash ? (
               <a key={link.href} href={link.href} className={className}>
@@ -65,7 +65,7 @@ export function Header() {
             {navLinks.slice(0, 2).map((link) => {
               const isActive = !link.hash && pathname === link.href;
               const className = `px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                isActive ? "text-cyan" : "text-foreground/60 hover:text-foreground"
+                isActive ? "text-cyan" : "text-muted hover:text-foreground"
               }`;
               return link.hash ? (
                 <a key={link.href} href={link.href} className={className}>
