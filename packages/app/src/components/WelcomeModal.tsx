@@ -9,12 +9,12 @@ const STEPS = [
   {
     num: "1",
     title: "Pick a schedule",
-    desc: "Choose a preset or build a custom lock. Panic Lock, 30-day hold, cliff + vest — whatever fits your vibe.",
+    desc: "Choose a preset or build a custom lock. Panic Lock, 30-day hold, cliff + vest, whatever fits your vibe.",
   },
   {
     num: "2",
     title: "Lock your USDC",
-    desc: "Approve and lock in one flow. Your funds go directly into the Sablier protocol — never through us.",
+    desc: "Approve and lock in one flow. Your funds go directly into the Sablier protocol. Never through us.",
   },
   {
     num: "3",

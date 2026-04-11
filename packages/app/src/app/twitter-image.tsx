@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
 import { IS_TESTNET } from "@/config/contracts";
+import { BRAND } from "@/content/brand";
 
 export const runtime = "edge";
-export const alt = "RipGuard — Self-custodial profit locker on Base";
+export const alt = BRAND.ogAlt;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -60,7 +61,7 @@ export default function TwitterImage() {
               display: "flex",
             }}
           >
-            RipGuard
+            {BRAND.name}
           </div>
 
           <div
@@ -73,7 +74,7 @@ export default function TwitterImage() {
               display: "flex",
             }}
           >
-            Lock your winnings before you give them back.
+            {BRAND.ogHeadline}
           </div>
 
           <div
@@ -85,7 +86,7 @@ export default function TwitterImage() {
               display: "flex",
             }}
           >
-            Self-custodial profit locking on Base. Powered by Sablier.
+            {BRAND.ogSubhead}
           </div>
         </div>
 
