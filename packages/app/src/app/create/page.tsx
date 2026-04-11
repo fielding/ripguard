@@ -129,15 +129,33 @@ function CreateLockInner() {
   const [amountInput, setAmountInput] = useState(amountParam);
   const [step, setStep] = useState<Step>("schedule");
   const [confirmed, setConfirmed] = useState(false);
+  // True during the brief pause after approve confirms, before we fire
+  // the lock tx. Lets the wallet's RPC catch up to the approve's state.
+  const [isPrimingLock, setIsPrimingLock] = useState(false);
 
-  const resetForm = useCallback(() => {
-    setSelectedPreset("hourly1d");
-    setCustomCliff(0);
-    setCustomTotal(3600);
-    setAmountInput("");
-    setStep("schedule");
-    setConfirmed(false);
+  // Guards against double-firing writeContract calls. `approveInFlightRef`
+  // blocks rapid double-clicks on the Approve USDC button. `lockInFlightRef`
+  // blocks rapid double-clicks on the Lock it in button. `autoLockFiredRef`
+  // ensures the approve->lock auto-progress effect only fires once per flow.
+  const approveInFlightRef = useRef(false);
+  const lockInFlightRef = useRef(false);
+  const autoLockFiredRef = useRef(false);
+  // Timeout ID for the approve->lock priming delay. Stored in a ref so it
+  // survives the re-render triggered by setStep("lock") inside the effect
+  // that owns it. If we returned cleanup from that effect, React would
+  // clear the timeout the moment deps change (including the setStep call
+  // we just made), and writeLock would never fire.
+  const primingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPrimingTimeout = useCallback(() => {
+    if (primingTimeoutRef.current !== null) {
+      clearTimeout(primingTimeoutRef.current);
+      primingTimeoutRef.current = null;
+    }
   }, []);
+
+  // Unmount-only cleanup for any pending priming timeout.
+  useEffect(() => clearPrimingTimeout, [clearPrimingTimeout]);
 
   // Derived schedule values
   const schedule = useMemo(() => {
@@ -212,6 +230,7 @@ function CreateLockInner() {
     isPending: isApproving,
     isError: isApproveError,
     error: approveError,
+    reset: resetApproveWrite,
   } = useWriteContract();
 
   const { isLoading: isApproveConfirming, isSuccess: isApproveConfirmed } =
@@ -224,10 +243,29 @@ function CreateLockInner() {
     isPending: isLocking,
     isError: isLockError,
     error: lockError,
+    reset: resetLockWrite,
   } = useWriteContract();
 
   const { data: lockReceipt, isLoading: isLockConfirming, isSuccess: isLockConfirmed } =
     useWaitForTransactionReceipt({ hash: lockTxHash });
+
+  const resetForm = useCallback(() => {
+    setSelectedPreset("hourly1d");
+    setCustomCliff(0);
+    setCustomTotal(3600);
+    setAmountInput("");
+    setStep("schedule");
+    setConfirmed(false);
+    setIsPrimingLock(false);
+    approveInFlightRef.current = false;
+    lockInFlightRef.current = false;
+    autoLockFiredRef.current = false;
+    clearPrimingTimeout();
+    // Clear wagmi mutation state so stale isSuccess/data from the previous
+    // flow can't trigger the success effect on the next flow's first render.
+    resetApproveWrite();
+    resetLockWrite();
+  }, [clearPrimingTimeout, resetApproveWrite, resetLockWrite]);
 
   // Testnet faucet
   const {
@@ -259,7 +297,12 @@ function CreateLockInner() {
   }, [isFaucetError, faucetError, toast]);
 
   const handleApprove = useCallback(() => {
-    if (!address) return;
+    if (!address || approveInFlightRef.current) return;
+    approveInFlightRef.current = true;
+    autoLockFiredRef.current = false; // fresh approve flow, allow auto-lock
+    // Clear stale success/error state from any previous approve so the
+    // post-confirm effect doesn't fire against leftover data.
+    resetApproveWrite();
     setStep("approve");
     writeApprove({
       address: USDC_ADDRESS,
@@ -267,10 +310,14 @@ function CreateLockInner() {
       functionName: "approve",
       args: [SABLIER_LOCKUP, totalAmount],
     });
-  }, [writeApprove, totalAmount, address]);
+  }, [writeApprove, totalAmount, address, resetApproveWrite]);
 
   const handleLock = useCallback(() => {
-    if (!address) return;
+    if (!address || lockInFlightRef.current) return;
+    lockInFlightRef.current = true;
+    // Clear stale success/error state from any previous lock so the
+    // post-confirm effect doesn't fire against leftover data.
+    resetLockWrite();
     setStep("lock");
     writeLock({
       address: SABLIER_LOCKUP,
@@ -291,21 +338,93 @@ function CreateLockInner() {
         { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
       ],
     });
-  }, [writeLock, totalAmount, schedule, unlockStart, unlockCliff, address]);
+  }, [writeLock, totalAmount, schedule, unlockStart, unlockCliff, address, resetLockWrite]);
 
-  // Auto-advance steps after tx confirmations
+  // Auto-advance from approve to lock after approval confirms. We skip
+  // re-opening the confirm dialog because (a) the user already consented
+  // when they clicked Approve USDC, and (b) bouncing through the dialog
+  // caused a timing race where hasEnoughAllowance could be stale against
+  // the just-refetched allowance state, triggering a second spurious
+  // approve popup in the wallet.
+  //
+  // Firing writeLock immediately after the approve confirms also hits a
+  // race: the wallet's own RPC node may not yet see the approve tx's
+  // allowance update, so viem's gas estimation simulates the lock call
+  // as reverting, returns a garbage gas estimate, and the wallet rejects
+  // with "exceeds max transaction gas limit". To avoid this we transition
+  // to the lock step immediately (so the spinner stays continuous) and
+  // delay the actual writeLock call by a beat, giving the RPC time to
+  // catch up to the approve tx's block.
   useEffect(() => {
-    if (isApproveConfirmed && step === "approve") {
-      refetchAllowance().then(() => {
-        setStep("confirm");
-        toast("USDC approved. Ready to lock.", "success");
-        trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
-      });
+    if (
+      !isApproveConfirmed ||
+      step !== "approve" ||
+      !address ||
+      autoLockFiredRef.current
+    ) {
+      return;
     }
-  }, [isApproveConfirmed, step, refetchAllowance, toast, totalAmount]);
+
+    autoLockFiredRef.current = true;
+    approveInFlightRef.current = false;
+    // Fire-and-forget refetch so allowance state stays accurate if the
+    // user ends up back at the dialog after a lock error.
+    refetchAllowance();
+    // Clear any stale lock mutation state before the auto-progress fires
+    // a new writeLock, so the post-confirm success effect doesn't trip on
+    // leftover isSuccess/lockTxHash from a previous lock flow.
+    resetLockWrite();
+    toast("USDC approved. Locking in…", "success");
+    trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
+    setStep("lock");
+    setIsPrimingLock(true);
+
+    // NOTE: intentionally no cleanup return from this effect. The setStep
+    // above changes `step`, which is in our deps, so React would re-run
+    // the effect and clear the timeout before it fires. The timeout lives
+    // in a ref and is cleaned up only on unmount (see clearPrimingTimeout
+    // effect above).
+    primingTimeoutRef.current = setTimeout(() => {
+      primingTimeoutRef.current = null;
+      setIsPrimingLock(false);
+      lockInFlightRef.current = true;
+      writeLock({
+        address: SABLIER_LOCKUP,
+        abi: sablierLockupAbi,
+        functionName: "createWithDurationsLL",
+        args: [
+          {
+            sender: address as Address,
+            recipient: address as Address,
+            totalAmount,
+            token: USDC_ADDRESS,
+            cancelable: false,
+            transferable: false,
+            shape: "RipGuard",
+            broker: { account: TREASURY, fee: BROKER_FEE },
+          },
+          { start: unlockStart, cliff: unlockCliff },
+          { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
+        ],
+      });
+    }, 1500);
+  }, [
+    isApproveConfirmed,
+    step,
+    address,
+    totalAmount,
+    schedule,
+    unlockStart,
+    unlockCliff,
+    writeLock,
+    refetchAllowance,
+    resetLockWrite,
+    toast,
+  ]);
 
   useEffect(() => {
     if (isLockConfirmed && step === "lock" && lockTxHash && lockReceipt) {
+      lockInFlightRef.current = false;
       setStep("success");
       toast("Lock created!", "success", {
         label: "View on BaseScan",
@@ -337,6 +456,8 @@ function CreateLockInner() {
   // Reset step if user rejects wallet prompt or tx fails
   useEffect(() => {
     if (isApproveError && step === "approve") {
+      approveInFlightRef.current = false;
+      autoLockFiredRef.current = false;
       setStep("confirm");
       refetchAllowance();
       refetchBalance();
@@ -351,6 +472,8 @@ function CreateLockInner() {
 
   useEffect(() => {
     if (isLockError && step === "lock") {
+      lockInFlightRef.current = false;
+      setIsPrimingLock(false);
       setStep("confirm");
       refetchBalance();
       refetchAllowance();
@@ -366,11 +489,18 @@ function CreateLockInner() {
   // Reset form if wallet disconnects mid-transaction
   useEffect(() => {
     if (!isConnected && step !== "schedule") {
+      approveInFlightRef.current = false;
+      lockInFlightRef.current = false;
+      autoLockFiredRef.current = false;
+      clearPrimingTimeout();
+      resetApproveWrite();
+      resetLockWrite();
+      setIsPrimingLock(false);
       setStep("schedule");
       setConfirmed(false);
       toast("Wallet disconnected. Please reconnect to continue.", "error");
     }
-  }, [isConnected, step, toast]);
+  }, [isConnected, step, toast, clearPrimingTimeout, resetApproveWrite, resetLockWrite]);
 
   const meetsMinimum = depositAmount >= MIN_DEPOSIT;
   const canProceed =
@@ -767,11 +897,13 @@ function CreateLockInner() {
                     <div className="flex flex-col items-center gap-3 py-4">
                       <Spinner />
                       <div className="text-sm text-muted">
-                        {isLocking
-                          ? "Confirm in wallet…"
-                          : isLockConfirming
-                            ? "Waiting for confirmation…"
-                            : "Writing the lock to Sablier…"}
+                        {isPrimingLock
+                          ? "Lining up the lock…"
+                          : isLocking
+                            ? "Confirm in wallet…"
+                            : isLockConfirming
+                              ? "Waiting for confirmation…"
+                              : "Writing the lock to Sablier…"}
                       </div>
                       <div className="text-xs text-faint max-w-[36ch] text-center leading-relaxed space-y-0.5">
                         <div>Routes directly into Sablier.</div>
