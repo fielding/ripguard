@@ -42,7 +42,7 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
           {navLinks.map((link) => {
             const isActive = !link.hash && pathname === link.href;
-            const className = `px-4 py-2 text-sm font-medium transition-colors ${
+            const className = `inline-flex items-center min-h-[2.75rem] px-4 text-sm font-medium transition-colors ${
               isActive
                 ? "text-cyan"
                 : "text-muted hover:text-foreground"
@@ -64,7 +64,7 @@ export function Header() {
           <nav className="flex md:hidden items-center gap-0">
             {navLinks.slice(0, 2).map((link) => {
               const isActive = !link.hash && pathname === link.href;
-              const className = `px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              const className = `inline-flex items-center min-h-[2.75rem] px-3 text-[0.8125rem] font-medium transition-colors ${
                 isActive ? "text-cyan" : "text-muted hover:text-foreground"
               }`;
               return link.hash ? (
@@ -81,7 +81,7 @@ export function Header() {
           {isHome ? (
             <Link
               href="/create"
-              className="btn-primary !min-h-0 !py-2.5 !px-5 !text-[0.8125rem] !font-semibold"
+              className="btn-primary !min-h-[2.75rem] !py-2.5 !px-5 !text-[0.8125rem] !font-semibold"
             >
               Create a Lock
             </Link>

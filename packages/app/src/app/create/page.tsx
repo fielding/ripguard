@@ -478,7 +478,7 @@ function CreateLockInner() {
                           setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
                           setStep("schedule");
                         }}
-                        className={`text-muted hover:text-cyan underline transition-colors ${isFormLocked || balance === BigInt(0) ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-muted hover:text-cyan underline transition-colors ${isFormLocked || balance === BigInt(0) ? "opacity-50 cursor-not-allowed" : ""}`}
                         title={`Max lock amount after ${BROKER_FEE_PCT} fee`}
                       >
                         Max{BROKER_FEE > BigInt(0) ? " (net of fee)" : ""}
@@ -507,7 +507,7 @@ function CreateLockInner() {
                         })
                       }
                       disabled={isFauceting || isFaucetConfirming}
-                      className="text-xs text-cyan/80 hover:text-cyan underline transition-colors disabled:opacity-50"
+                      className="inline-flex items-center min-h-[2.75rem] px-2 -mx-2 text-xs text-cyan/80 hover:text-cyan underline transition-colors disabled:opacity-50"
                     >
                       {isFauceting
                         ? "Confirm in wallet…"
@@ -528,7 +528,7 @@ function CreateLockInner() {
                         setSelectedPreset(selectedPreset === "custom" ? "hourly1d" : "custom");
                         setStep("schedule");
                       }}
-                      className={`text-xs text-muted hover:text-cyan transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                      className={`inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-xs text-muted hover:text-cyan transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       {selectedPreset === "custom" ? "← Back to presets" : "Build your own →"}
                     </button>
@@ -582,7 +582,7 @@ function CreateLockInner() {
                               type="button"
                               disabled={isFormLocked}
                               onClick={() => setCustomInterval(i.seconds)}
-                              className={`px-3.5 py-2 rounded-lg text-xs font-semibold tabular border transition-colors ${
+                              className={`inline-flex items-center min-h-[2.75rem] px-4 rounded-lg text-xs font-semibold tabular border transition-colors ${
                                 customInterval === i.seconds
                                   ? "border-cyan bg-cyan/10 text-cyan"
                                   : "border-line bg-background text-muted hover:border-line-strong hover:text-foreground"
@@ -757,7 +757,7 @@ function CreateLockInner() {
                           href={`${EXPLORER_URL}/tx/${approveTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-faint hover:text-cyan underline transition-colors"
+                          className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
                         >
                           View on BaseScan
                         </a>
@@ -783,7 +783,7 @@ function CreateLockInner() {
                           href={`${EXPLORER_URL}/tx/${lockTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-faint hover:text-cyan underline transition-colors"
+                          className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
                         >
                           View on BaseScan
                         </a>
