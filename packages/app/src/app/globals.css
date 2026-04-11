@@ -60,6 +60,8 @@
   --color-cyan-glow: var(--cyan-glow);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
 }
