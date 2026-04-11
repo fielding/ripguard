@@ -421,8 +421,12 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Verify in 60 seconds — editorial spec block */}
-            <div className="mt-24 pt-12 border-t border-line">
+            {/* Verify in 60 seconds — editorial spec block. Intentionally
+                NO border-t: the eyebrow + text-2xl headline already signal
+                "subsection inside Trust", and a border creates a mixed
+                full-section signal without the matching padding. Clean
+                spatial break via mt-24 sm:mt-32 instead. */}
+            <div className="mt-24 sm:mt-32">
               <div className="grid gap-8 sm:grid-cols-[1fr_2fr] sm:gap-16">
                 <div>
                   <div className="eyebrow mb-3">Verify</div>

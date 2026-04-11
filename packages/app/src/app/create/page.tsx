@@ -1321,7 +1321,7 @@ function SuccessView({
   })();
 
   return (
-    <div className="space-y-10 py-4 sm:py-8 w-full">
+    <div className="space-y-10 py-4 sm:py-8 w-full max-w-[600px] mx-auto">
       <div className="space-y-6">
         {/* Animated shield + check icon */}
         <div className="relative inline-flex items-center justify-center">
@@ -1335,7 +1335,7 @@ function SuccessView({
           />
           <svg
             className="relative w-20 h-20 text-cyan glow-cyan animate-success-pop"
-            viewBox="0 0 64 64"
+            viewBox="0 0 64 66"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
