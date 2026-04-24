@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RipGuard app
 
-## Getting Started
+This package is the Next.js frontend for [RipGuard](../../README.md): the "cash this out, don't let me play" Sablier lock UI.
 
-First, run the development server:
+The app runs the public `ripguard.xyz` interface and the Base Sepolia testnet deployment. It creates non-cancelable Sablier Lockup streams directly from the browser; RipGuard does not deploy custom custody contracts.
+
+## Local development
+
+Use Node 22 (see the repo-level `.node-version`). Node 24 has caused SSR hydration issues in this app.
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp packages/app/.env.example packages/app/.env.local
+pnpm --filter app dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`packages/app/.env.local` controls the deployed chain and wallet configuration:
 
-## Learn More
+- `NEXT_PUBLIC_CHAIN` — `base` for mainnet or `base-sepolia` for testnet.
+- `NEXT_PUBLIC_SABLIER_LOCKUP` — optional Sablier Lockup contract override.
+- `NEXT_PUBLIC_USDC_ADDRESS` — optional USDC/TestUSDC address override.
+- `NEXT_PUBLIC_TREASURY_ADDRESS` — Sablier broker-fee recipient; use the zero address to disable fees in local/testnet flows.
+- `NEXT_PUBLIC_WC_PROJECT_ID` — WalletConnect project ID for RainbowKit.
 
-To learn more about Next.js, take a look at the following resources:
+## Useful commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run these from the repository root:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm --filter app test
+pnpm --filter app exec tsc --noEmit
+pnpm --filter app build
+```
 
-## Deploy on Vercel
+## Main surfaces
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Landing and lock creation live under `app/`.
+- Wallet, chain, and Sablier transaction plumbing is in `lib/` and related hooks/components.
+- The app uses wagmi, viem, RainbowKit, Tailwind 4, and Next.js 16.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For product context, contracts, fee policy, and security notes, see the repo-level [README](../../README.md).
