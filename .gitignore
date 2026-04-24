@@ -36,3 +36,6 @@ ripguard-internal/
 
 .impeccable.md
 .handoff
+
+# Local agent/task-tracker state
+.tix/
