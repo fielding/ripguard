@@ -46,10 +46,12 @@ export function parsePositiveDurationParam(value: string | null): number | null 
   return parsed;
 }
 
-/** Parse a URL param into a valid USDC amount string */
-export function parseAmountParam(value: string | null): string {
+/** Parse a URL param into a valid USDC amount string. Decimal cap defaults to 6
+ * (USDC on every EVM chain except BNB, which uses 18). */
+export function parseAmountParam(value: string | null, decimals: number = 6): string {
   if (!value) return "";
-  return /^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(value) ? value : "";
+  const re = new RegExp(`^(\\d+\\.?\\d{0,${decimals}}|\\d*\\.\\d{1,${decimals}})$`);
+  return re.test(value) ? value : "";
 }
 
 /** Human-readable duration string */
