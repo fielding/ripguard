@@ -205,9 +205,9 @@ function CreateLockInner() {
     } catch {
       return BigInt(0);
     }
-  }, [amountInput]);
+  }, [amountInput, usdcDecimals]);
 
-  const fee = useMemo(() => computeFee(depositAmount, brokerFee), [depositAmount]);
+  const fee = useMemo(() => computeFee(depositAmount, brokerFee), [depositAmount, brokerFee]);
   const totalAmount = depositAmount + fee;
 
   // Unlock amounts for Sablier
@@ -330,7 +330,7 @@ function CreateLockInner() {
       // Users can still manually edit the cap down in MetaMask at sign time.
       args: [sablierLockup, MAX_UINT256],
     });
-  }, [writeApprove, address, resetApproveWrite]);
+  }, [writeApprove, address, resetApproveWrite, usdcAddress, sablierLockup]);
 
   const handleLock = useCallback(() => {
     if (!address || lockInFlightRef.current) return;
@@ -358,7 +358,19 @@ function CreateLockInner() {
         { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
       ],
     });
-  }, [writeLock, totalAmount, schedule, unlockStart, unlockCliff, address, resetLockWrite]);
+  }, [
+    writeLock,
+    totalAmount,
+    schedule,
+    unlockStart,
+    unlockCliff,
+    address,
+    resetLockWrite,
+    sablierLockup,
+    usdcAddress,
+    treasury,
+    brokerFee,
+  ]);
 
   // Auto-advance from approve to lock after approval confirms. We skip
   // re-opening the confirm dialog because (a) the user already consented
@@ -440,6 +452,11 @@ function CreateLockInner() {
     refetchAllowance,
     resetLockWrite,
     toast,
+    sablierLockup,
+    usdcAddress,
+    treasury,
+    brokerFee,
+    usdcDecimals,
   ]);
 
   useEffect(() => {
@@ -458,12 +475,14 @@ function CreateLockInner() {
       });
 
       // Remember the picked preset so /vaults can show the casino-voice label
-      // instead of the generic schedule-type fallback.
+      // instead of the generic schedule-type fallback. Key includes chainId
+      // because Sablier stream IDs reset per chain — without it, a stream #5
+      // on Arbitrum would steal the label of stream #5 on Base.
       try {
         const streamId = parseStreamIdFromReceipt(lockReceipt, sablierLockup);
         if (streamId > BigInt(0) && typeof window !== "undefined") {
           window.localStorage.setItem(
-            `ripguard:lock:${streamId.toString()}`,
+            `ripguard:lock:${chainId}:${streamId.toString()}`,
             schedule.label
           );
         }
@@ -471,7 +490,19 @@ function CreateLockInner() {
         // localStorage unavailable; /vaults falls back to schedule-type label
       }
     }
-  }, [isLockConfirmed, step, lockTxHash, lockReceipt, toast, schedule, depositAmount]);
+  }, [
+    isLockConfirmed,
+    step,
+    lockTxHash,
+    lockReceipt,
+    toast,
+    schedule,
+    depositAmount,
+    chainId,
+    sablierLockup,
+    explorerUrl,
+    usdcDecimals,
+  ]);
 
   // Reset step if user rejects wallet prompt or tx fails
   useEffect(() => {
@@ -521,6 +552,22 @@ function CreateLockInner() {
       toast("Wallet disconnected. Please reconnect to continue.", "error");
     }
   }, [isConnected, step, toast, clearPrimingTimeout, resetApproveWrite, resetLockWrite]);
+
+  // Reset form if the wallet's chain changes mid-flow. Locks the user into
+  // resigning the flow on the new chain so token addresses, treasury, fee,
+  // and decimals can't desync between the rendered totals and the queued tx.
+  // The riskiest path is the approve→lock priming timeout — without this
+  // guard a chain switch in that window would fire writeLock against the
+  // old chain's Sablier address while the wallet is on the new chain.
+  const lastChainIdRef = useRef(chainId);
+  useEffect(() => {
+    if (lastChainIdRef.current === chainId) return;
+    lastChainIdRef.current = chainId;
+    if (step !== "schedule" && step !== "success") {
+      resetForm();
+      toast("Network changed. Review the lock again on the new chain.", "error");
+    }
+  }, [chainId, step, resetForm, toast]);
 
   const meetsMinimum = depositAmount >= minDeposit;
   const canProceed =
