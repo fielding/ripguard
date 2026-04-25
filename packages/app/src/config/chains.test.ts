@@ -37,6 +37,7 @@ describe("chain registry", () => {
         /^0x[a-fA-F0-9]{40}$/
       );
       expect(chain.usdc, `${chain.name} usdc`).toMatch(/^0x[a-fA-F0-9]{40}$/);
+      expect(chain.treasury, `${chain.name} treasury`).toMatch(/^0x[a-fA-F0-9]{40}$/);
       expect(chain.usdcDecimals, `${chain.name} usdcDecimals`).toBeGreaterThan(0);
       expect(chain.streamStartBlock > BigInt(0), `${chain.name} streamStartBlock`).toBe(true);
       expect(chain.logChunkSize > BigInt(0), `${chain.name} logChunkSize`).toBe(true);
@@ -45,7 +46,9 @@ describe("chain registry", () => {
   });
 
   it("SUPPORTED_CHAIN_IDS matches CHAINS keys", () => {
-    expect(SUPPORTED_CHAIN_IDS.sort()).toEqual(Object.keys(CHAINS).map(Number).sort());
+    expect([...SUPPORTED_CHAIN_IDS].sort()).toEqual(
+      Object.keys(CHAINS).map(Number).sort()
+    );
   });
 
   it("isSupportedChain recognizes registered chains", () => {
