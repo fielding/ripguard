@@ -65,10 +65,19 @@ function getScheduleType(cliffSeconds: number, totalSeconds: number): string {
 
 // Prefer the preset label the user picked on /create (stored at lock time).
 // Falls back to the generic schedule-type label when no preset is remembered.
-function getLockLabel(streamId: bigint, cliffSeconds: number, totalSeconds: number): string {
+// chainId is part of the key because Sablier stream IDs reset per chain —
+// stream #5 on Arbitrum and stream #5 on Base are different vaults.
+function getLockLabel(
+  streamId: bigint,
+  chainId: number,
+  cliffSeconds: number,
+  totalSeconds: number,
+): string {
   if (typeof window !== "undefined") {
     try {
-      const stored = window.localStorage.getItem(`ripguard:lock:${streamId.toString()}`);
+      const stored = window.localStorage.getItem(
+        `ripguard:lock:${chainId}:${streamId.toString()}`,
+      );
       if (stored) return stored;
     } catch {
       // localStorage unavailable, fall through
@@ -90,6 +99,7 @@ function VaultCard({
   onClaim,
   claimingId,
   index,
+  chainId,
   usdcDecimals,
   sablierAddress,
   explorerUrl,
@@ -98,6 +108,7 @@ function VaultCard({
   onClaim: (streamId: bigint) => void;
   claimingId: bigint | null;
   index: number;
+  chainId: number;
   usdcDecimals: number;
   sablierAddress: Address;
   explorerUrl: string;
@@ -158,7 +169,7 @@ function VaultCard({
             Lock #{vault.streamId.toString()}
           </div>
           <div className="font-display text-xl tracking-tight">
-            {getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
+            {getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
           </div>
         </div>
         <div className="sm:text-right">
@@ -262,7 +273,7 @@ function VaultCard({
         <ShareCard
           streamId={vault.streamId}
           amountLocked={formatUnits(vault.deposited, usdcDecimals)}
-          scheduleType={getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
+          scheduleType={getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
           sablierAddress={sablierAddress}
@@ -559,7 +570,7 @@ function VaultDashboard() {
         args: [streamId, address],
       });
     },
-    [address, writeWithdraw, resetWithdrawWrite]
+    [address, writeWithdraw, resetWithdrawWrite, sablierLockup]
   );
 
   // Toast + refresh after successful claim. We guard on `claimingId !== null`
@@ -575,7 +586,7 @@ function VaultDashboard() {
         href: `${explorerUrl}/tx/${withdrawTxHash}`,
       });
     }
-  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast]);
+  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl]);
 
   // Toast + reset claiming state if tx rejected or failed
   useEffect(() => {
@@ -748,6 +759,7 @@ function VaultDashboard() {
               onClaim={handleClaim}
               claimingId={claimingId}
               index={i}
+              chainId={chainId}
               usdcDecimals={usdcDecimals}
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}
