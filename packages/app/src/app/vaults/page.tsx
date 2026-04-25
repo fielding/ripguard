@@ -709,6 +709,11 @@ function VaultDashboard() {
 
   return (
     <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
+      {chainConfig.usdcNote && (
+        <p className="text-[11px] text-faint leading-relaxed pt-1">
+          {chainConfig.usdcNote}
+        </p>
+      )}
       {totals && (
         <div className="border-y border-line py-7">
           <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-5">

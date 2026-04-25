@@ -122,6 +122,7 @@ function CreateLockInner() {
     usdcDecimals,
     treasury,
     explorerUrl,
+    usdcNote,
   } = useMemo(
     () =>
       getChainConfig(
@@ -706,6 +707,11 @@ function CreateLockInner() {
                       Not enough in the wallet. You have{" "}
                       {formatUnits(balance, usdcDecimals)} USDC, need{" "}
                       {formatUnits(totalAmount, usdcDecimals)} USDC (incl. {brokerFeePct} fee).
+                    </p>
+                  )}
+                  {usdcNote && (
+                    <p className="text-[11px] text-faint leading-relaxed">
+                      {usdcNote}
                     </p>
                   )}
                   {IS_TESTNET && isConnected && (

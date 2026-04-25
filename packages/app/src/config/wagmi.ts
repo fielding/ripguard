@@ -6,7 +6,13 @@ import { CHAINS } from "./chains";
 // Map a registry chainId to its wagmi chain definition. Add an entry here
 // when adding a chain to the registry so wagmi can pick it up.
 const chainIdToWagmiChain: Record<number, Chain> = {
+  [wagmiChains.mainnet.id]: wagmiChains.mainnet,
   [wagmiChains.base.id]: wagmiChains.base,
+  [wagmiChains.arbitrum.id]: wagmiChains.arbitrum,
+  [wagmiChains.optimism.id]: wagmiChains.optimism,
+  [wagmiChains.polygon.id]: wagmiChains.polygon,
+  [wagmiChains.avalanche.id]: wagmiChains.avalanche,
+  [wagmiChains.bsc.id]: wagmiChains.bsc,
   [wagmiChains.baseSepolia.id]: wagmiChains.baseSepolia,
 };
 
