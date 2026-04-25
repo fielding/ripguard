@@ -13,7 +13,8 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { getChainConfig, isSupportedChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
+import { getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
+import { IS_TESTNET } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
 import { WrongChainPanel } from "@/components/WrongChainPanel";
 import { ShareCard } from "@/components/ShareCard";
@@ -425,7 +426,7 @@ function VaultDashboard() {
   // default chain so the page renders. The wrong-chain panel below blocks
   // any tx on the unsupported chain.
   const chainConfig = getChainConfig(
-    isSupportedChain(chainId) ? chainId : DEFAULT_CHAIN_ID
+    isSupportedDeploymentChain(chainId, IS_TESTNET) ? chainId : DEFAULT_CHAIN_ID,
   );
   const { sablierLockup, usdcDecimals, explorerUrl } = chainConfig;
   const publicClient = usePublicClient();

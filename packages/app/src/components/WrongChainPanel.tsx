@@ -1,7 +1,7 @@
 "use client";
 
 import { useChainId, useSwitchChain } from "wagmi";
-import { CHAINS, isSupportedChain } from "@/config/chains";
+import { CHAINS, isSupportedDeploymentChain } from "@/config/chains";
 import { IS_TESTNET } from "@/config/contracts";
 
 /** Renders a "switch chain" prompt when the wallet is on a chain RipGuard
@@ -16,7 +16,10 @@ export function WrongChainPanel({ children }: { children: React.ReactNode }) {
   const chainId = useChainId();
   const { switchChain, isPending } = useSwitchChain();
 
-  if (isSupportedChain(chainId)) {
+  // Check against the active deployment specifically, not just registry
+  // membership — Base Sepolia is in the registry, but on the mainnet
+  // deployment it's still "wrong chain" for our purposes.
+  if (isSupportedDeploymentChain(chainId, IS_TESTNET)) {
     return <>{children}</>;
   }
 

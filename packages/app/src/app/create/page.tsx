@@ -18,7 +18,7 @@ import {
   brokerFeeForTreasury,
   brokerFeePctString,
 } from "@/config/contracts";
-import { getChainConfig, isSupportedChain, DEFAULT_CHAIN_ID } from "@/config/chains";
+import { getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { erc20Abi, sablierLockupAbi, testUsdcAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -123,8 +123,11 @@ function CreateLockInner() {
     treasury,
     explorerUrl,
   } = useMemo(
-    () => getChainConfig(isSupportedChain(chainId) ? chainId : DEFAULT_CHAIN_ID),
-    [chainId]
+    () =>
+      getChainConfig(
+        isSupportedDeploymentChain(chainId, IS_TESTNET) ? chainId : DEFAULT_CHAIN_ID,
+      ),
+    [chainId],
   );
   const brokerFee = brokerFeeForTreasury(treasury);
   const brokerFeePct = brokerFeePctString(brokerFee);

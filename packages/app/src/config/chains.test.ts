@@ -5,6 +5,7 @@ import {
   SUPPORTED_CHAIN_IDS,
   getChainConfig,
   isSupportedChain,
+  isSupportedDeploymentChain,
 } from "./chains";
 
 describe("chain registry", () => {
@@ -56,5 +57,18 @@ describe("chain registry", () => {
     expect(isSupportedChain(84532)).toBe(true);
     expect(isSupportedChain(1)).toBe(false);
     expect(isSupportedChain(undefined)).toBe(false);
+  });
+
+  it("isSupportedDeploymentChain filters by deployment's testnet flag", () => {
+    // Mainnet deployment: Base mainnet ✓, Base Sepolia ✗
+    expect(isSupportedDeploymentChain(8453, false)).toBe(true);
+    expect(isSupportedDeploymentChain(84532, false)).toBe(false);
+    // Testnet deployment: Base Sepolia ✓, Base mainnet ✗
+    expect(isSupportedDeploymentChain(84532, true)).toBe(true);
+    expect(isSupportedDeploymentChain(8453, true)).toBe(false);
+    // Unregistered chain: false either way
+    expect(isSupportedDeploymentChain(999_999, false)).toBe(false);
+    expect(isSupportedDeploymentChain(999_999, true)).toBe(false);
+    expect(isSupportedDeploymentChain(undefined, false)).toBe(false);
   });
 });
