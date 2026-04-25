@@ -78,7 +78,7 @@ const TRUST_POINTS = [
   {
     eyebrow: "04",
     title: "Site goes down. You're fine.",
-    body: "Your lock lives in Sablier, not on our servers. Interact directly via BaseScan anytime. RipGuard disappearing tomorrow doesn't touch your funds.",
+    body: "Your lock lives in Sablier, not on our servers. Interact directly via your chain's block explorer anytime. RipGuard disappearing tomorrow doesn't touch your funds.",
   },
 ];
 
@@ -122,7 +122,7 @@ export default function Home() {
   const chainId = useChainId();
   // Unconnected users + users on unsupported chains see the default chain's
   // contract link so the landing always has somewhere real to point at.
-  const { sablierLockup, explorerUrl } = getChainConfig(
+  const { sablierLockup, explorerUrl, explorerName } = getChainConfig(
     isSupportedDeploymentChain(chainId, IS_TESTNET) ? chainId : DEFAULT_CHAIN_ID,
   );
   const sablierExplorerUrl = `${explorerUrl}/address/${sablierLockup}`;
@@ -457,7 +457,7 @@ export default function Home() {
                       >
                         Sablier Lockup contract
                       </a>{" "}
-                      on BaseScan. Verified, immutable, no proxy.
+                      on the chain&apos;s block explorer. Verified, immutable, no proxy.
                     </span>
                   </li>
                   <li className="flex gap-4">
@@ -622,7 +622,7 @@ export default function Home() {
                 </p>
                 <p className="text-faint">
                   All smart contracts carry risk. Start with $5. Verify the
-                  Sablier contract yourself on BaseScan.
+                  Sablier contract yourself on the chain&apos;s block explorer.
                 </p>
               </FAQItem>
 
@@ -640,7 +640,7 @@ export default function Home() {
                 <p>
                   Your lock lives in Sablier, not on our servers. If this site
                   goes down tomorrow, your vault keeps counting down and you can
-                  claim directly through BaseScan or the Sablier app.
+                  claim directly through the chain&apos;s block explorer or the Sablier app.
                 </p>
                 <p className="text-foreground">
                   RipGuard is the UI. Sablier is the bank.
@@ -745,13 +745,13 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
               >
-                BaseScan
+                {explorerName}
               </a>
             </nav>
           </div>
           <p className="mt-10 text-xs text-faint max-w-2xl mx-auto text-center leading-relaxed">
             RipGuard does not custody funds. All locks are created directly in
-            Sablier&apos;s audited protocol on Base. Non-custodial. Immutable. Not
+            Sablier&apos;s audited protocol. Non-custodial. Immutable. Not
             financial advice. DYOR. 0.5% broker fee collected via Sablier&apos;s
             native mechanism.
           </p>

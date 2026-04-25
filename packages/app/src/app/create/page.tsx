@@ -122,6 +122,7 @@ function CreateLockInner() {
     usdcDecimals,
     treasury,
     explorerUrl,
+    explorerName,
     usdcNote,
   } = useMemo(
     () =>
@@ -475,7 +476,7 @@ function CreateLockInner() {
       lockInFlightRef.current = false;
       setStep("success");
       toast("Lock created!", "success", {
-        label: "View on BaseScan",
+        label: `View on ${explorerName}`,
         href: `${explorerUrl}/tx/${lockTxHash}`,
       });
       trackLockCreated({
@@ -512,6 +513,7 @@ function CreateLockInner() {
     chainId,
     sablierLockup,
     explorerUrl,
+    explorerName,
     usdcDecimals,
   ]);
 
@@ -617,6 +619,7 @@ function CreateLockInner() {
               usdcDecimals={usdcDecimals}
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}
+              explorerName={explorerName}
               onCreateAnother={resetForm}
             />
           ) : (
@@ -984,7 +987,7 @@ function CreateLockInner() {
                           rel="noopener noreferrer"
                           className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
                         >
-                          View on BaseScan
+                          View on {explorerName}
                         </a>
                       )}
                     </div>
@@ -1029,7 +1032,7 @@ function CreateLockInner() {
                           rel="noopener noreferrer"
                           className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
                         >
-                          View on BaseScan
+                          View on {explorerName}
                         </a>
                       )}
                     </div>
@@ -1395,6 +1398,7 @@ function SuccessView({
   usdcDecimals,
   sablierAddress,
   explorerUrl,
+  explorerName,
   onCreateAnother,
 }: {
   txHash: `0x${string}`;
@@ -1404,6 +1408,7 @@ function SuccessView({
   usdcDecimals: number;
   sablierAddress: Address;
   explorerUrl: string;
+  explorerName: string;
   onCreateAnother: () => void;
 }) {
   const now = Math.floor(Date.now() / 1000);
@@ -1498,7 +1503,7 @@ function SuccessView({
           rel="noopener noreferrer"
           className="block text-xs text-faint hover:text-cyan underline transition-colors text-center"
         >
-          View transaction on BaseScan
+          View transaction on {explorerName}
         </a>
       </div>
     </div>

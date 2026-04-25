@@ -9,6 +9,10 @@ export type ChainConfig = {
   usdcDecimals: number;
   treasury: Address;
   explorerUrl: string;
+  // Brand name of the explorer at explorerUrl, used as link/button copy.
+  // "View on BaseScan" reads stronger than a generic "View on the explorer"
+  // and is correct per chain (Etherscan, Arbiscan, etc.).
+  explorerName: string;
   streamStartBlock: bigint;
   logChunkSize: bigint;
   isTestnet: boolean;
@@ -34,6 +38,7 @@ const ETHEREUM_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://etherscan.io",
+  explorerName: "Etherscan",
   streamStartBlock: BigInt(21_717_452), // Sablier Lockup v2.0 deployment block
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -48,6 +53,7 @@ const BASE_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://basescan.org",
+  explorerName: "BaseScan",
   streamStartBlock: BigInt(22_000_000),
   logChunkSize: BigInt(50_000),
   isTestnet: false,
@@ -62,6 +68,7 @@ const ARBITRUM_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://arbiscan.io",
+  explorerName: "Arbiscan",
   streamStartBlock: BigInt(299_856_278),
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -76,6 +83,7 @@ const OPTIMISM_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://optimistic.etherscan.io",
+  explorerName: "Optimistic Etherscan",
   streamStartBlock: BigInt(131_196_856),
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -90,6 +98,7 @@ const POLYGON_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://polygonscan.com",
+  explorerName: "PolygonScan",
   streamStartBlock: BigInt(67_212_728),
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -104,6 +113,7 @@ const AVALANCHE_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: TREASURY_EOA,
   explorerUrl: "https://snowtrace.io",
+  explorerName: "Snowtrace",
   streamStartBlock: BigInt(56_433_739),
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -122,6 +132,7 @@ const BSC_DEFAULT: ChainConfig = {
   usdcDecimals: 18, // not 6 — sharp edge
   treasury: TREASURY_EOA,
   explorerUrl: "https://bscscan.com",
+  explorerName: "BscScan",
   streamStartBlock: BigInt(46_137_048),
   logChunkSize: BigInt(10_000),
   isTestnet: false,
@@ -137,6 +148,7 @@ const BASE_SEPOLIA_DEFAULT: ChainConfig = {
   usdcDecimals: 6,
   treasury: ZERO_ADDRESS,
   explorerUrl: "https://sepolia.basescan.org",
+  explorerName: "Base Sepolia BaseScan",
   streamStartBlock: BigInt(38_540_000),
   logChunkSize: BigInt(10_000),
   isTestnet: true,

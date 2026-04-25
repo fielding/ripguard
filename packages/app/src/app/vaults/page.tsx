@@ -428,7 +428,7 @@ function VaultDashboard() {
   const chainConfig = getChainConfig(
     isSupportedDeploymentChain(chainId, IS_TESTNET) ? chainId : DEFAULT_CHAIN_ID,
   );
-  const { sablierLockup, usdcDecimals, explorerUrl } = chainConfig;
+  const { sablierLockup, usdcDecimals, explorerUrl, explorerName } = chainConfig;
   const publicClient = usePublicClient();
   const { toast } = useToast();
 
@@ -589,11 +589,11 @@ function VaultDashboard() {
       setClaimingId(null);
       refetchStreams();
       toast("Claim successful!", "success", {
-        label: "View on BaseScan",
+        label: `View on ${explorerName}`,
         href: `${explorerUrl}/tx/${withdrawTxHash}`,
       });
     }
-  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl]);
+  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl, explorerName]);
 
   // Toast + reset claiming state if tx rejected or failed
   useEffect(() => {
