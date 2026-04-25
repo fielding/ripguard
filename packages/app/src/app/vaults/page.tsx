@@ -13,8 +13,9 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { getChainConfig, type ChainConfig } from "@/config/chains";
+import { getChainConfig, isSupportedChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
 import { sablierLockupAbi } from "@/config/abis";
+import { WrongChainPanel } from "@/components/WrongChainPanel";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
@@ -420,7 +421,12 @@ async function fetchFromChain(
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const chainConfig = getChainConfig(chainId);
+  // Defensive lookup: unsupported chains fall back to the deployment's
+  // default chain so the page renders. The wrong-chain panel below blocks
+  // any tx on the unsupported chain.
+  const chainConfig = getChainConfig(
+    isSupportedChain(chainId) ? chainId : DEFAULT_CHAIN_ID
+  );
   const { sablierLockup, usdcDecimals, explorerUrl } = chainConfig;
   const publicClient = usePublicClient();
   const { toast } = useToast();
@@ -813,7 +819,9 @@ export default function Vaults() {
 
         <div className="relative flex-1 flex flex-col">
           <ErrorBoundary fallbackTitle="Failed to load vaults">
-            <VaultDashboard />
+            <WrongChainPanel>
+              <VaultDashboard />
+            </WrongChainPanel>
           </ErrorBoundary>
         </div>
       </main>

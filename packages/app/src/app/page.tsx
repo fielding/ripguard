@@ -1,7 +1,7 @@
 "use client";
 
 import { PRESETS, IS_TESTNET } from "@/config/contracts";
-import { getChainConfig } from "@/config/chains";
+import { getChainConfig, isSupportedChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { useChainId } from "wagmi";
 import Link from "next/link";
 import { Header } from "@/components/Header";
@@ -120,7 +120,11 @@ function FAQItem({
 
 export default function Home() {
   const chainId = useChainId();
-  const { sablierLockup, explorerUrl } = getChainConfig(chainId);
+  // Unconnected users + users on unsupported chains see the default chain's
+  // contract link so the landing always has somewhere real to point at.
+  const { sablierLockup, explorerUrl } = getChainConfig(
+    isSupportedChain(chainId) ? chainId : DEFAULT_CHAIN_ID
+  );
   const sablierExplorerUrl = `${explorerUrl}/address/${sablierLockup}`;
   const githubUrl = "https://github.com/fielding/ripguard";
 

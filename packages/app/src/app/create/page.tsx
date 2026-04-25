@@ -18,10 +18,11 @@ import {
   brokerFeeForTreasury,
   brokerFeePctString,
 } from "@/config/contracts";
-import { getChainConfig } from "@/config/chains";
+import { getChainConfig, isSupportedChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { erc20Abi, sablierLockupAbi, testUsdcAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { WrongChainPanel } from "@/components/WrongChainPanel";
 import { useToast } from "@/components/Toast";
 import { trackLockCreated, trackLockApproved, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
@@ -112,13 +113,19 @@ function CreateLockInner() {
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  // Defensive lookup: if the wallet is on a chain we don't support, fall
+  // back to the deployment's default chain so the page can still render.
+  // The wrong-chain panel below blocks any tx attempt on the unsupported chain.
   const {
     sablierLockup,
     usdc: usdcAddress,
     usdcDecimals,
     treasury,
     explorerUrl,
-  } = useMemo(() => getChainConfig(chainId), [chainId]);
+  } = useMemo(
+    () => getChainConfig(isSupportedChain(chainId) ? chainId : DEFAULT_CHAIN_ID),
+    [chainId]
+  );
   const brokerFee = brokerFeeForTreasury(treasury);
   const brokerFeePct = brokerFeePctString(brokerFee);
   // 1 USDC minimum, scaled to the chain's decimals (6 on most, 18 on BNB).
@@ -596,6 +603,7 @@ function CreateLockInner() {
         </div>
 
         <div className="relative mx-auto max-w-2xl w-full">
+          <WrongChainPanel>
           {step === "success" ? (
             <SuccessView
               txHash={lockTxHash!}
@@ -1045,6 +1053,7 @@ function CreateLockInner() {
               )}
             </>
           )}
+          </WrongChainPanel>
         </div>
       </main>
     </div>
