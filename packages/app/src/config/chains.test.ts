@@ -25,7 +25,7 @@ describe("chain registry", () => {
   });
 
   it("throws on unsupported chainId", () => {
-    expect(() => getChainConfig(1)).toThrow(/Unsupported chainId: 1/);
+    expect(() => getChainConfig(999_999)).toThrow(/Unsupported chainId: 999999/);
   });
 
   it("DEFAULT_CHAIN_ID resolves to a registered chain", () => {
@@ -55,7 +55,8 @@ describe("chain registry", () => {
   it("isSupportedChain recognizes registered chains", () => {
     expect(isSupportedChain(8453)).toBe(true);
     expect(isSupportedChain(84532)).toBe(true);
-    expect(isSupportedChain(1)).toBe(false);
+    expect(isSupportedChain(1)).toBe(true);
+    expect(isSupportedChain(999_999)).toBe(false);
     expect(isSupportedChain(undefined)).toBe(false);
   });
 
@@ -70,5 +71,35 @@ describe("chain registry", () => {
     expect(isSupportedDeploymentChain(999_999, false)).toBe(false);
     expect(isSupportedDeploymentChain(999_999, true)).toBe(false);
     expect(isSupportedDeploymentChain(undefined, false)).toBe(false);
+  });
+
+  it("BNB Chain uses 18-decimal Binance-Peg USDC", () => {
+    const bsc = getChainConfig(56);
+    expect(bsc.usdcDecimals, "BNB Chain USDC is 18 decimals, not 6").toBe(18);
+    expect(bsc.usdc).toBe("0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
+    expect(bsc.usdcNote, "BNB Chain entry must disclose Binance-Peg variant").toMatch(
+      /Binance-Peg/i
+    );
+  });
+
+  it("every other registered chain uses 6-decimal USDC", () => {
+    for (const chain of Object.values(CHAINS)) {
+      if (chain.chainId === 56) continue; // BNB is the documented exception
+      expect(chain.usdcDecimals, `${chain.name} expected 6 decimals`).toBe(6);
+    }
+  });
+
+  it("all mainnet chains share the same treasury EOA", () => {
+    const mainnetChains = Object.values(CHAINS).filter((c) => !c.isTestnet);
+    const treasuries = new Set(mainnetChains.map((c) => c.treasury.toLowerCase()));
+    expect(treasuries.size, "treasury must be the same address on every mainnet chain").toBe(1);
+  });
+
+  it("all 7 target EVM mainnet chains are present", () => {
+    // Base, Ethereum, Arbitrum, Optimism, Polygon, Avalanche, BNB Chain
+    const expected = [1, 10, 56, 137, 8453, 42161, 43114];
+    for (const id of expected) {
+      expect(isSupportedChain(id), `chainId ${id} must be in the registry`).toBe(true);
+    }
   });
 });

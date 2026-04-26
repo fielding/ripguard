@@ -428,7 +428,7 @@ function VaultDashboard() {
   const chainConfig = getChainConfig(
     isSupportedDeploymentChain(chainId, IS_TESTNET) ? chainId : DEFAULT_CHAIN_ID,
   );
-  const { sablierLockup, usdcDecimals, explorerUrl } = chainConfig;
+  const { sablierLockup, usdcDecimals, explorerUrl, explorerName } = chainConfig;
   const publicClient = usePublicClient();
   const { toast } = useToast();
 
@@ -589,11 +589,11 @@ function VaultDashboard() {
       setClaimingId(null);
       refetchStreams();
       toast("Claim successful!", "success", {
-        label: "View on BaseScan",
+        label: `View on ${explorerName}`,
         href: `${explorerUrl}/tx/${withdrawTxHash}`,
       });
     }
-  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl]);
+  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl, explorerName]);
 
   // Toast + reset claiming state if tx rejected or failed
   useEffect(() => {
@@ -709,6 +709,11 @@ function VaultDashboard() {
 
   return (
     <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
+      {chainConfig.usdcNote && (
+        <p className="text-[11px] text-faint leading-relaxed pt-1">
+          {chainConfig.usdcNote}
+        </p>
+      )}
       {totals && (
         <div className="border-y border-line py-7">
           <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-5">
