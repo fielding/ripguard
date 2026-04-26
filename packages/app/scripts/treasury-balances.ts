@@ -15,6 +15,19 @@ import { createPublicClient, formatUnits, getAddress, http, isAddress, type Addr
 import * as wagmiChains from "viem/chains";
 import { CHAINS, type ChainConfig } from "../src/config/chains";
 
+// Per-chain RPC overrides. viem's default for Ethereum (eth.merkle.io) gets
+// rate-limited (HTTP 429) under back-to-back reads, so we keep a list of
+// well-known public RPCs and walk them in order. Other chains' viem defaults
+// have been fine in practice; add entries here only when one starts failing.
+const RPC_FALLBACKS: Record<number, string[]> = {
+  [wagmiChains.mainnet.id]: [
+    "https://ethereum-rpc.publicnode.com",
+    "https://eth.llamarpc.com",
+    "https://rpc.ankr.com/eth",
+    "https://cloudflare-eth.com",
+  ],
+};
+
 const ERC20_BALANCE_OF_ABI = [
   {
     type: "function",
@@ -38,43 +51,73 @@ const chainIdToWagmiChain: Record<number, (typeof wagmiChains)[keyof typeof wagm
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 const c = {
   cyan: useColor ? "\x1b[36m" : "",
+  yellow: useColor ? "\x1b[33m" : "",
   bold: useColor ? "\x1b[1m" : "",
   dim: useColor ? "\x1b[2m" : "",
   reset: useColor ? "\x1b[0m" : "",
 };
 
+type RpcAttempt = { url: string; ok: boolean; error?: string };
+
 type Result = {
   chain: ChainConfig;
   balance: bigint;
   error: string | null;
+  attempts: RpcAttempt[];
 };
+
+function shortMsg(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  // Collapse to single line — viem error messages carry URLs and multi-line
+  // stack traces that would wreck the table layout.
+  return msg.replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function rpcsFor(chainId: number): string[] {
+  if (RPC_FALLBACKS[chainId]) return RPC_FALLBACKS[chainId];
+  const wagmiChain = chainIdToWagmiChain[chainId];
+  return wagmiChain ? [wagmiChain.rpcUrls.default.http[0]] : [];
+}
+
+function shortHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
 
 async function fetchBalance(chain: ChainConfig, address: Address): Promise<Result> {
   const wagmiChain = chainIdToWagmiChain[chain.chainId];
   if (!wagmiChain) {
-    return { chain, balance: BigInt(0), error: "no RPC mapping" };
+    return { chain, balance: BigInt(0), error: "no RPC mapping", attempts: [] };
   }
-  try {
-    // Short timeout + no retries so a single slow public RPC (looking at you,
-    // Ethereum) doesn't block the whole script. The user can re-run if needed.
-    const client = createPublicClient({
-      chain: wagmiChain,
-      transport: http(undefined, { timeout: 8_000, retryCount: 0 }),
-    });
-    const balance = await client.readContract({
-      address: chain.usdc,
-      abi: ERC20_BALANCE_OF_ABI,
-      functionName: "balanceOf",
-      args: [address],
-    });
-    return { chain, balance, error: null };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Collapse to single line and trim — error messages can carry URLs and
-    // multi-line stack traces that wreck the table layout.
-    const oneLine = msg.replace(/\s+/g, " ").trim();
-    return { chain, balance: BigInt(0), error: oneLine.slice(0, 60) };
+  // Walk the candidate RPCs in order, recording each attempt so callers can
+  // see which one served (and which failed silently behind a fallback).
+  const urls = rpcsFor(chain.chainId);
+  const attempts: RpcAttempt[] = [];
+  for (const url of urls) {
+    try {
+      // Short timeout + no retries so a single slow public RPC (looking at you,
+      // Ethereum) doesn't block the whole script.
+      const client = createPublicClient({
+        chain: wagmiChain,
+        transport: http(url, { timeout: 8_000, retryCount: 0 }),
+      });
+      const balance = await client.readContract({
+        address: chain.usdc,
+        abi: ERC20_BALANCE_OF_ABI,
+        functionName: "balanceOf",
+        args: [address],
+      });
+      attempts.push({ url, ok: true });
+      return { chain, balance, error: null, attempts };
+    } catch (err) {
+      attempts.push({ url, ok: false, error: shortMsg(err) });
+    }
   }
+  const lastError = attempts[attempts.length - 1]?.error ?? "no RPCs available";
+  return { chain, balance: BigInt(0), error: lastError, attempts };
 }
 
 function resolveTargetAddress(): Address {
@@ -117,6 +160,17 @@ async function main() {
     console.log(
       `  ${color}${r.chain.name.padEnd(14)}${c.reset} ${color}${formatted.padStart(14)} USDC${c.reset}${note}`
     );
+
+    // Surface RPC failures even when a later fallback succeeded — these are
+    // the silent failures the user wanted visibility on.
+    const failed = r.attempts.filter((a) => !a.ok);
+    const succeeded = r.attempts.find((a) => a.ok);
+    for (const a of failed) {
+      console.log(`  ${c.yellow}    ↳ ${shortHost(a.url)} failed: ${a.error}${c.reset}`);
+    }
+    if (failed.length > 0 && succeeded) {
+      console.log(`  ${c.dim}    ↳ recovered via ${shortHost(succeeded.url)}${c.reset}`);
+    }
   }
 
   const totalColor = totalDisplay > 0 ? c.cyan + c.bold : c.dim;
