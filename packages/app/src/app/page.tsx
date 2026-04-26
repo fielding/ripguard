@@ -1,7 +1,7 @@
 "use client";
 
 import { PRESETS, IS_TESTNET } from "@/config/contracts";
-import { getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
+import { CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { useChainId } from "wagmi";
 import Link from "next/link";
 import { Header } from "@/components/Header";
@@ -90,6 +90,35 @@ const LIMITS = [
   "Bail you out when you beg",
   "Send funds anywhere except your wallet",
 ];
+
+function ChainChipRow() {
+  // Show only the chains live on this deployment (mainnet vs. testnet).
+  const chains = Object.values(CHAINS).filter((c) => c.isTestnet === IS_TESTNET);
+
+  return (
+    <div className="mt-12 sm:mt-14">
+      <div className="eyebrow mb-5 flex items-center gap-3">
+        <span className="h-px w-8 bg-cyan/40" />
+        Live across
+      </div>
+      <ul className="flex flex-wrap gap-2">
+        {chains.map((c) => (
+          <li key={c.chainId}>
+            <a
+              href={`${c.explorerUrl}/address/${c.sablierLockup}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Verify the Sablier Lockup contract on ${c.name}`}
+              className="inline-flex items-center px-3.5 py-2 text-[13px] tracking-wide rounded-full bg-surface border border-line text-muted hover:border-cyan/50 hover:text-cyan hover:bg-surface-strong transition-colors min-h-[2.5rem]"
+            >
+              {c.shortName}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function FAQItem({
   question,
@@ -257,6 +286,11 @@ export default function Home() {
                 </li>
               </ul>
             </div>
+
+            {/* Chain chip row — quietly tells users we're on every casino-relevant
+                chain. Each chip links to that chain's Sablier Lockup contract on
+                its native explorer so verification is one click away. */}
+            <ChainChipRow />
           </div>
         </section>
 
