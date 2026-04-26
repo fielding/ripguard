@@ -7,18 +7,13 @@ import { useState, useEffect, useCallback } from "react";
 import { formatUnits, parseAbiItem, type Address, type PublicClient } from "viem";
 import {
   useAccount,
+  useChainId,
   usePublicClient,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import {
-  SABLIER_LOCKUP,
-  EXPLORER_URL,
-  IS_TESTNET,
-  STREAM_START_BLOCK,
-  LOG_CHUNK_SIZE,
-} from "@/config/contracts";
+import { getChainConfig, type ChainConfig } from "@/config/chains";
 import { sablierLockupAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
@@ -26,11 +21,9 @@ import { useToast } from "@/components/Toast";
 import { trackClaim, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
 
-const USDC_DECIMALS = 6;
-
-// Sablier Envio indexer — single endpoint, no API key, supports all chains
+// Sablier Envio indexer — single endpoint, no API key, supports all chains.
+// Per-chain selection happens via the `chainId` filter in the GraphQL query.
 const SABLIER_SUBGRAPH = "https://indexer.hyperindex.xyz/53b7e25/v1/graphql";
-const CHAIN_ID = IS_TESTNET ? "84532" : "8453";
 
 type SubgraphStream = {
   tokenId: string;
@@ -72,10 +65,19 @@ function getScheduleType(cliffSeconds: number, totalSeconds: number): string {
 
 // Prefer the preset label the user picked on /create (stored at lock time).
 // Falls back to the generic schedule-type label when no preset is remembered.
-function getLockLabel(streamId: bigint, cliffSeconds: number, totalSeconds: number): string {
+// chainId is part of the key because Sablier stream IDs reset per chain —
+// stream #5 on Arbitrum and stream #5 on Base are different vaults.
+function getLockLabel(
+  streamId: bigint,
+  chainId: number,
+  cliffSeconds: number,
+  totalSeconds: number,
+): string {
   if (typeof window !== "undefined") {
     try {
-      const stored = window.localStorage.getItem(`ripguard:lock:${streamId.toString()}`);
+      const stored = window.localStorage.getItem(
+        `ripguard:lock:${chainId}:${streamId.toString()}`,
+      );
       if (stored) return stored;
     } catch {
       // localStorage unavailable, fall through
@@ -97,11 +99,19 @@ function VaultCard({
   onClaim,
   claimingId,
   index,
+  chainId,
+  usdcDecimals,
+  sablierAddress,
+  explorerUrl,
 }: {
   vault: VaultData;
   onClaim: (streamId: bigint) => void;
   claimingId: bigint | null;
   index: number;
+  chainId: number;
+  usdcDecimals: number;
+  sablierAddress: Address;
+  explorerUrl: string;
 }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -159,12 +169,12 @@ function VaultCard({
             Lock #{vault.streamId.toString()}
           </div>
           <div className="font-display text-xl tracking-tight">
-            {getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
+            {getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
           </div>
         </div>
         <div className="sm:text-right">
           <div className="font-display text-2xl tabular tracking-tight">
-            {formatUnits(vault.deposited, USDC_DECIMALS)}
+            {formatUnits(vault.deposited, usdcDecimals)}
             <span className="text-sm text-muted font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           <div className="eyebrow mt-1">Total locked</div>
@@ -198,10 +208,10 @@ function VaultCard({
         </div>
         <div className="flex justify-between text-xs tabular">
           <span className="text-muted">
-            {formatUnits(vested, USDC_DECIMALS)} unlocked
+            {formatUnits(vested, usdcDecimals)} unlocked
           </span>
           <span className="text-faint">
-            {formatUnits(remaining, USDC_DECIMALS)} remaining
+            {formatUnits(remaining, usdcDecimals)} remaining
           </span>
         </div>
       </div>
@@ -221,7 +231,7 @@ function VaultCard({
           <div
             className={`font-display text-3xl text-cyan tabular tracking-tight ${canClaim ? "animate-claim-pulse" : ""}`}
           >
-            {formatUnits(vault.claimable, USDC_DECIMALS)}
+            {formatUnits(vault.claimable, usdcDecimals)}
             <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           {!canClaim && !isClaimingThis && (
@@ -250,7 +260,7 @@ function VaultCard({
         </button>
         <span className="text-faint/50">·</span>
         <a
-          href={`${EXPLORER_URL}/nft/${SABLIER_LOCKUP}/${vault.streamId.toString()}`}
+          href={`${explorerUrl}/nft/${sablierAddress}/${vault.streamId.toString()}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted hover:text-cyan transition-colors"
@@ -262,11 +272,11 @@ function VaultCard({
       {showShare && (
         <ShareCard
           streamId={vault.streamId}
-          amountLocked={formatUnits(vault.deposited, USDC_DECIMALS)}
-          scheduleType={getLockLabel(vault.streamId, vault.cliffSeconds, vault.totalSeconds)}
+          amountLocked={formatUnits(vault.deposited, usdcDecimals)}
+          scheduleType={getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
-          sablierAddress={SABLIER_LOCKUP}
+          sablierAddress={sablierAddress}
         />
       )}
     </div>
@@ -313,13 +323,17 @@ const transferEvent = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 );
 
-async function fetchFromSubgraph(address: Address): Promise<SubgraphStream[]> {
+async function fetchFromSubgraph(
+  address: Address,
+  chainId: number,
+  sablierAddress: Address
+): Promise<SubgraphStream[]> {
   const query = `{
     LockupStream(
       where: {
         recipient: { _eq: "${address.toLowerCase()}" }
-        chainId: { _eq: "${CHAIN_ID}" }
-        contract: { _eq: "${SABLIER_LOCKUP.toLowerCase()}" }
+        chainId: { _eq: "${chainId.toString()}" }
+        contract: { _eq: "${sablierAddress.toLowerCase()}" }
       }
       order_by: { startTime: desc }
     ) {
@@ -347,15 +361,17 @@ async function fetchFromSubgraph(address: Address): Promise<SubgraphStream[]> {
 async function fetchFromChain(
   publicClient: PublicClient,
   address: Address,
+  chainConfig: ChainConfig,
 ): Promise<SubgraphStream[]> {
+  const { sablierLockup, streamStartBlock, logChunkSize } = chainConfig;
   const toBlock = await publicClient.getBlockNumber();
   const allTokenIds: bigint[] = [];
-  let from = STREAM_START_BLOCK;
+  let from = streamStartBlock;
 
   while (from <= toBlock) {
-    const to = from + LOG_CHUNK_SIZE > toBlock ? toBlock : from + LOG_CHUNK_SIZE;
+    const to = from + logChunkSize > toBlock ? toBlock : from + logChunkSize;
     const chunk = await publicClient.getLogs({
-      address: SABLIER_LOCKUP,
+      address: sablierLockup,
       event: transferEvent,
       args: { from: "0x0000000000000000000000000000000000000000", to: address },
       fromBlock: from,
@@ -373,11 +389,11 @@ async function fetchFromChain(
 
   // Multicall: 5 reads per stream (startTime, endTime, cliffTime, deposited, withdrawn)
   const calls = ids.flatMap((id) => [
-    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getStartTime" as const, args: [id] as const },
-    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getEndTime" as const, args: [id] as const },
-    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getCliffTime" as const, args: [id] as const },
-    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getDepositedAmount" as const, args: [id] as const },
-    { address: SABLIER_LOCKUP, abi: sablierLockupAbi, functionName: "getWithdrawnAmount" as const, args: [id] as const },
+    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getStartTime" as const, args: [id] as const },
+    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getEndTime" as const, args: [id] as const },
+    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getCliffTime" as const, args: [id] as const },
+    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getDepositedAmount" as const, args: [id] as const },
+    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getWithdrawnAmount" as const, args: [id] as const },
   ]);
 
   const results = await publicClient.multicall({ contracts: calls });
@@ -403,6 +419,9 @@ async function fetchFromChain(
 
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const chainConfig = getChainConfig(chainId);
+  const { sablierLockup, usdcDecimals, explorerUrl } = chainConfig;
   const publicClient = usePublicClient();
   const { toast } = useToast();
 
@@ -424,7 +443,7 @@ function VaultDashboard() {
 
     (async () => {
       try {
-        const streams = await fetchFromSubgraph(address);
+        const streams = await fetchFromSubgraph(address, chainId, sablierLockup);
         if (!cancelled) {
           setSubgraphStreams(streams);
           setFetchSource("subgraph");
@@ -439,7 +458,7 @@ function VaultDashboard() {
         }
 
         try {
-          const streams = await fetchFromChain(publicClient, address);
+          const streams = await fetchFromChain(publicClient, address, chainConfig);
           if (!cancelled) {
             setSubgraphStreams(streams);
             setFetchSource("onchain");
@@ -456,7 +475,7 @@ function VaultDashboard() {
     })();
 
     return () => { cancelled = true; };
-  }, [address, isConnected, publicClient, fetchKey]);
+  }, [address, isConnected, publicClient, fetchKey, chainId, sablierLockup, chainConfig]);
 
   const retryFetch = useCallback(() => setFetchKey((k) => k + 1), []);
 
@@ -472,7 +491,7 @@ function VaultDashboard() {
   // Only need on-chain call for live claimable amount (1 call per stream)
   const streamIds = subgraphStreams.map((s) => BigInt(s.tokenId));
   const claimableContracts = streamIds.map((id) => ({
-    address: SABLIER_LOCKUP,
+    address: sablierLockup,
     abi: sablierLockupAbi,
     functionName: "withdrawableAmountOf" as const,
     args: [id] as const,
@@ -545,13 +564,13 @@ function VaultDashboard() {
       resetWithdrawWrite();
       setClaimingId(streamId);
       writeWithdraw({
-        address: SABLIER_LOCKUP,
+        address: sablierLockup,
         abi: sablierLockupAbi,
         functionName: "withdrawMax",
         args: [streamId, address],
       });
     },
-    [address, writeWithdraw, resetWithdrawWrite]
+    [address, writeWithdraw, resetWithdrawWrite, sablierLockup]
   );
 
   // Toast + refresh after successful claim. We guard on `claimingId !== null`
@@ -564,10 +583,10 @@ function VaultDashboard() {
       refetchStreams();
       toast("Claim successful!", "success", {
         label: "View on BaseScan",
-        href: `${EXPLORER_URL}/tx/${withdrawTxHash}`,
+        href: `${explorerUrl}/tx/${withdrawTxHash}`,
       });
     }
-  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast]);
+  }, [isWithdrawConfirmed, withdrawTxHash, claimingId, refetchStreams, toast, explorerUrl]);
 
   // Toast + reset claiming state if tx rejected or failed
   useEffect(() => {
@@ -691,20 +710,20 @@ function VaultDashboard() {
               <span
                 className={`font-display text-cyan text-4xl tabular tracking-tight leading-none ${totals.claimable > BigInt(0) ? "animate-claim-pulse" : ""}`}
               >
-                {formatUnits(totals.claimable, USDC_DECIMALS)}
+                {formatUnits(totals.claimable, usdcDecimals)}
               </span>
               <span className="eyebrow">Claimable now</span>
             </li>
             {/* Context: what's behind it */}
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
-                {formatUnits(totals.locked, USDC_DECIMALS)}
+                {formatUnits(totals.locked, usdcDecimals)}
               </span>
               <span className="eyebrow text-faint">Total locked</span>
             </li>
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
-                {formatUnits(totals.claimed, USDC_DECIMALS)}
+                {formatUnits(totals.claimed, usdcDecimals)}
               </span>
               <span className="eyebrow text-faint">Claimed</span>
             </li>
@@ -740,6 +759,10 @@ function VaultDashboard() {
               onClaim={handleClaim}
               claimingId={claimingId}
               index={i}
+              chainId={chainId}
+              usdcDecimals={usdcDecimals}
+              sablierAddress={sablierLockup}
+              explorerUrl={explorerUrl}
             />
           </CardErrorBoundary>
         ))}

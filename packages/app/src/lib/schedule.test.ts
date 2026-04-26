@@ -93,6 +93,16 @@ describe("parseAmountParam", () => {
     expect(parseAmountParam(".5")).toBe(".5");
     expect(parseAmountParam("1000000")).toBe("1000000");
   });
+
+  it("accepts up to 18 decimals when decimals=18 (BNB USDC)", () => {
+    expect(parseAmountParam("1.123456789012345678", 18)).toBe("1.123456789012345678");
+    expect(parseAmountParam("1.1234567890123456789", 18)).toBe(""); // 19 decimals
+  });
+
+  it("respects custom decimal caps", () => {
+    expect(parseAmountParam("1.123", 2)).toBe(""); // 3 decimals exceeds cap of 2
+    expect(parseAmountParam("1.12", 2)).toBe("1.12");
+  });
 });
 
 // --- getIntervalOptions ---

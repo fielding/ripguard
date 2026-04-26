@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { PRESETS, BROKER_FEE, SABLIER_LOCKUP, USDC_ADDRESS } from "./contracts";
+import {
+  PRESETS,
+  BROKER_FEE_RATE,
+  brokerFeeForTreasury,
+  brokerFeePctString,
+} from "./contracts";
+import { ZERO_ADDRESS } from "./chains";
 
 describe("PRESETS", () => {
   it("all presets have required fields", () => {
@@ -56,23 +62,39 @@ describe("PRESETS", () => {
   });
 });
 
-describe("contract addresses", () => {
-  it("SABLIER_LOCKUP is a valid address", () => {
-    expect(SABLIER_LOCKUP).toMatch(/^0x[a-fA-F0-9]{40}$/);
-  });
-
-  it("USDC_ADDRESS is a valid address", () => {
-    expect(USDC_ADDRESS).toMatch(/^0x[a-fA-F0-9]{40}$/);
-  });
-});
-
-describe("BROKER_FEE", () => {
+describe("BROKER_FEE_RATE", () => {
   it("is a bigint", () => {
-    expect(typeof BROKER_FEE).toBe("bigint");
+    expect(typeof BROKER_FEE_RATE).toBe("bigint");
   });
 
   it("is <= 1% (1e16 in 1e18 scale)", () => {
     // Sanity check: fee should never be more than 1%
-    expect(BROKER_FEE).toBeLessThanOrEqual(BigInt("10000000000000000"));
+    expect(BROKER_FEE_RATE).toBeLessThanOrEqual(BigInt("10000000000000000"));
+  });
+
+  it("is exactly 0.5% (5e15)", () => {
+    expect(BROKER_FEE_RATE).toBe(BigInt("5000000000000000"));
+  });
+});
+
+describe("brokerFeeForTreasury", () => {
+  it("returns 0 for zero-address treasury (Sablier reverts otherwise)", () => {
+    expect(brokerFeeForTreasury(ZERO_ADDRESS)).toBe(BigInt(0));
+  });
+
+  it("returns BROKER_FEE_RATE for a real treasury", () => {
+    expect(brokerFeeForTreasury("0x847F640bE052b0700C31F72Dce622F4C6286934E")).toBe(
+      BROKER_FEE_RATE
+    );
+  });
+});
+
+describe("brokerFeePctString", () => {
+  it("returns 0% for zero fee", () => {
+    expect(brokerFeePctString(BigInt(0))).toBe("0%");
+  });
+
+  it("formats 5e15 as 0.5%", () => {
+    expect(brokerFeePctString(BROKER_FEE_RATE)).toBe("0.5%");
   });
 });

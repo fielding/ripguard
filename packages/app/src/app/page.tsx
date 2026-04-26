@@ -1,6 +1,8 @@
 "use client";
 
-import { PRESETS, SABLIER_LOCKUP, EXPLORER_URL, IS_TESTNET } from "@/config/contracts";
+import { PRESETS, IS_TESTNET } from "@/config/contracts";
+import { getChainConfig } from "@/config/chains";
+import { useChainId } from "wagmi";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { WelcomeModal } from "@/components/WelcomeModal";
@@ -117,7 +119,9 @@ function FAQItem({
 }
 
 export default function Home() {
-  const sablierExplorerUrl = `${EXPLORER_URL}/address/${SABLIER_LOCKUP}`;
+  const chainId = useChainId();
+  const { sablierLockup, explorerUrl } = getChainConfig(chainId);
+  const sablierExplorerUrl = `${explorerUrl}/address/${sablierLockup}`;
   const githubUrl = "https://github.com/fielding/ripguard";
 
   return (

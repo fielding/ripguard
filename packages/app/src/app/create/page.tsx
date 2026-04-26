@@ -7,20 +7,18 @@ import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "rea
 import { parseUnits, formatUnits, keccak256, toHex, type Address, type TransactionReceipt } from "viem";
 import {
   useAccount,
+  useChainId,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import {
   PRESETS,
-  USDC_ADDRESS,
-  BROKER_FEE,
-  SABLIER_LOCKUP,
-  TREASURY,
-  EXPLORER_URL,
   IS_TESTNET,
-  BROKER_FEE_PCT,
+  brokerFeeForTreasury,
+  brokerFeePctString,
 } from "@/config/contracts";
+import { getChainConfig } from "@/config/chains";
 import { erc20Abi, sablierLockupAbi, testUsdcAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -39,9 +37,6 @@ import {
 } from "@/lib/schedule";
 
 type PresetKey = keyof typeof PRESETS;
-
-const USDC_DECIMALS = 6;
-const MIN_DEPOSIT = BigInt(1_000_000); // 1 USDC minimum
 // Infinite allowance. Approving max uint256 once means future locks skip
 // the approve step entirely — one signature instead of two on every repeat
 // lock. Standard pattern for trusted, non-upgradeable DeFi protocols.
@@ -53,12 +48,15 @@ const MAX_UINT256 = BigInt(
 const TRANSFER_TOPIC = keccak256(toHex("Transfer(address,address,uint256)"));
 const ZERO_ADDR_TOPIC = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
-function parseStreamIdFromReceipt(receipt: TransactionReceipt | undefined): bigint {
+function parseStreamIdFromReceipt(
+  receipt: TransactionReceipt | undefined,
+  sablierAddress: Address
+): bigint {
   if (!receipt) return BigInt(0);
   // Find ERC-721 Transfer (mint) from Sablier: from=0x0, to=recipient, tokenId=streamId
   const mintLog = receipt.logs.find(
     (log) =>
-      log.address.toLowerCase() === SABLIER_LOCKUP.toLowerCase() &&
+      log.address.toLowerCase() === sablierAddress.toLowerCase() &&
       log.topics[0] === TRANSFER_TOPIC &&
       log.topics[1] === ZERO_ADDR_TOPIC &&
       log.topics[3]
@@ -111,9 +109,23 @@ function CreateLockInner() {
   const customCliffParam = parsePositiveDurationParam(searchParams.get("cliff"));
   const customTotalParam = parsePositiveDurationParam(searchParams.get("total"));
   const isCustomFromQuery = searchParams.get("mode") === "custom" && customTotalParam !== null;
-  const amountParam = parseAmountParam(searchParams.get("amount"));
 
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const {
+    sablierLockup,
+    usdc: usdcAddress,
+    usdcDecimals,
+    treasury,
+    explorerUrl,
+  } = useMemo(() => getChainConfig(chainId), [chainId]);
+  const brokerFee = brokerFeeForTreasury(treasury);
+  const brokerFeePct = brokerFeePctString(brokerFee);
+  // 1 USDC minimum, scaled to the chain's decimals (6 on most, 18 on BNB).
+  const minDeposit = BigInt(10) ** BigInt(usdcDecimals);
+
+  const amountParam = parseAmountParam(searchParams.get("amount"), usdcDecimals);
+
   const { toast } = useToast();
 
   // Schedule state
@@ -189,13 +201,13 @@ function CreateLockInner() {
     try {
       const trimmed = amountInput.trim();
       if (!trimmed || parseFloat(trimmed) <= 0) return BigInt(0);
-      return parseUnits(trimmed, USDC_DECIMALS);
+      return parseUnits(trimmed, usdcDecimals);
     } catch {
       return BigInt(0);
     }
-  }, [amountInput]);
+  }, [amountInput, usdcDecimals]);
 
-  const fee = useMemo(() => computeFee(depositAmount, BROKER_FEE), [depositAmount]);
+  const fee = useMemo(() => computeFee(depositAmount, brokerFee), [depositAmount, brokerFee]);
   const totalAmount = depositAmount + fee;
 
   // Unlock amounts for Sablier
@@ -204,10 +216,10 @@ function CreateLockInner() {
 
   // Read USDC allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: USDC_ADDRESS,
+    address: usdcAddress,
     abi: erc20Abi,
     functionName: "allowance",
-    args: [address as Address, SABLIER_LOCKUP],
+    args: [address as Address, sablierLockup],
     query: { enabled: isConnected && !!address },
   });
 
@@ -217,7 +229,7 @@ function CreateLockInner() {
     refetch: refetchBalance,
     isError: isBalanceError,
   } = useReadContract({
-    address: USDC_ADDRESS,
+    address: usdcAddress,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address as Address],
@@ -311,14 +323,14 @@ function CreateLockInner() {
     resetApproveWrite();
     setStep("approve");
     writeApprove({
-      address: USDC_ADDRESS,
+      address: usdcAddress,
       abi: erc20Abi,
       functionName: "approve",
       // Infinite allowance so future locks skip the approve step entirely.
       // Users can still manually edit the cap down in MetaMask at sign time.
-      args: [SABLIER_LOCKUP, MAX_UINT256],
+      args: [sablierLockup, MAX_UINT256],
     });
-  }, [writeApprove, address, resetApproveWrite]);
+  }, [writeApprove, address, resetApproveWrite, usdcAddress, sablierLockup]);
 
   const handleLock = useCallback(() => {
     if (!address || lockInFlightRef.current) return;
@@ -328,7 +340,7 @@ function CreateLockInner() {
     resetLockWrite();
     setStep("lock");
     writeLock({
-      address: SABLIER_LOCKUP,
+      address: sablierLockup,
       abi: sablierLockupAbi,
       functionName: "createWithDurationsLL",
       args: [
@@ -336,17 +348,29 @@ function CreateLockInner() {
           sender: address as Address,
           recipient: address as Address,
           totalAmount,
-          token: USDC_ADDRESS,
+          token: usdcAddress,
           cancelable: false,
           transferable: false,
           shape: "RipGuard",
-          broker: { account: TREASURY, fee: BROKER_FEE },
+          broker: { account: treasury, fee: brokerFee },
         },
         { start: unlockStart, cliff: unlockCliff },
         { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
       ],
     });
-  }, [writeLock, totalAmount, schedule, unlockStart, unlockCliff, address, resetLockWrite]);
+  }, [
+    writeLock,
+    totalAmount,
+    schedule,
+    unlockStart,
+    unlockCliff,
+    address,
+    resetLockWrite,
+    sablierLockup,
+    usdcAddress,
+    treasury,
+    brokerFee,
+  ]);
 
   // Auto-advance from approve to lock after approval confirms. We skip
   // re-opening the confirm dialog because (a) the user already consented
@@ -383,7 +407,7 @@ function CreateLockInner() {
     // leftover isSuccess/lockTxHash from a previous lock flow.
     resetLockWrite();
     toast("USDC approved. Locking in…", "success");
-    trackLockApproved(Number(formatUnits(totalAmount, USDC_DECIMALS)));
+    trackLockApproved(Number(formatUnits(totalAmount, usdcDecimals)));
     setStep("lock");
     setIsPrimingLock(true);
 
@@ -397,7 +421,7 @@ function CreateLockInner() {
       setIsPrimingLock(false);
       lockInFlightRef.current = true;
       writeLock({
-        address: SABLIER_LOCKUP,
+        address: sablierLockup,
         abi: sablierLockupAbi,
         functionName: "createWithDurationsLL",
         args: [
@@ -405,11 +429,11 @@ function CreateLockInner() {
             sender: address as Address,
             recipient: address as Address,
             totalAmount,
-            token: USDC_ADDRESS,
+            token: usdcAddress,
             cancelable: false,
             transferable: false,
             shape: "RipGuard",
-            broker: { account: TREASURY, fee: BROKER_FEE },
+            broker: { account: treasury, fee: brokerFee },
           },
           { start: unlockStart, cliff: unlockCliff },
           { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
@@ -428,6 +452,11 @@ function CreateLockInner() {
     refetchAllowance,
     resetLockWrite,
     toast,
+    sablierLockup,
+    usdcAddress,
+    treasury,
+    brokerFee,
+    usdcDecimals,
   ]);
 
   useEffect(() => {
@@ -436,22 +465,24 @@ function CreateLockInner() {
       setStep("success");
       toast("Lock created!", "success", {
         label: "View on BaseScan",
-        href: `${EXPLORER_URL}/tx/${lockTxHash}`,
+        href: `${explorerUrl}/tx/${lockTxHash}`,
       });
       trackLockCreated({
         schedule: schedule.label,
-        amountUsd: Number(formatUnits(depositAmount, USDC_DECIMALS)),
+        amountUsd: Number(formatUnits(depositAmount, usdcDecimals)),
         cliffSeconds: schedule.cliffSeconds,
         totalSeconds: schedule.totalSeconds,
       });
 
       // Remember the picked preset so /vaults can show the casino-voice label
-      // instead of the generic schedule-type fallback.
+      // instead of the generic schedule-type fallback. Key includes chainId
+      // because Sablier stream IDs reset per chain — without it, a stream #5
+      // on Arbitrum would steal the label of stream #5 on Base.
       try {
-        const streamId = parseStreamIdFromReceipt(lockReceipt);
+        const streamId = parseStreamIdFromReceipt(lockReceipt, sablierLockup);
         if (streamId > BigInt(0) && typeof window !== "undefined") {
           window.localStorage.setItem(
-            `ripguard:lock:${streamId.toString()}`,
+            `ripguard:lock:${chainId}:${streamId.toString()}`,
             schedule.label
           );
         }
@@ -459,7 +490,19 @@ function CreateLockInner() {
         // localStorage unavailable; /vaults falls back to schedule-type label
       }
     }
-  }, [isLockConfirmed, step, lockTxHash, lockReceipt, toast, schedule, depositAmount]);
+  }, [
+    isLockConfirmed,
+    step,
+    lockTxHash,
+    lockReceipt,
+    toast,
+    schedule,
+    depositAmount,
+    chainId,
+    sablierLockup,
+    explorerUrl,
+    usdcDecimals,
+  ]);
 
   // Reset step if user rejects wallet prompt or tx fails
   useEffect(() => {
@@ -510,7 +553,23 @@ function CreateLockInner() {
     }
   }, [isConnected, step, toast, clearPrimingTimeout, resetApproveWrite, resetLockWrite]);
 
-  const meetsMinimum = depositAmount >= MIN_DEPOSIT;
+  // Reset form if the wallet's chain changes mid-flow. Locks the user into
+  // resigning the flow on the new chain so token addresses, treasury, fee,
+  // and decimals can't desync between the rendered totals and the queued tx.
+  // The riskiest path is the approve→lock priming timeout — without this
+  // guard a chain switch in that window would fire writeLock against the
+  // old chain's Sablier address while the wallet is on the new chain.
+  const lastChainIdRef = useRef(chainId);
+  useEffect(() => {
+    if (lastChainIdRef.current === chainId) return;
+    lastChainIdRef.current = chainId;
+    if (step !== "schedule" && step !== "success") {
+      resetForm();
+      toast("Network changed. Review the lock again on the new chain.", "error");
+    }
+  }, [chainId, step, resetForm, toast]);
+
+  const meetsMinimum = depositAmount >= minDeposit;
   const canProceed =
     depositAmount > 0 && meetsMinimum && schedule.totalSeconds > 0 && isConnected;
 
@@ -540,9 +599,12 @@ function CreateLockInner() {
           {step === "success" ? (
             <SuccessView
               txHash={lockTxHash!}
-              streamId={parseStreamIdFromReceipt(lockReceipt)}
+              streamId={parseStreamIdFromReceipt(lockReceipt, sablierLockup)}
               depositAmount={depositAmount}
               schedule={schedule}
+              usdcDecimals={usdcDecimals}
+              sablierAddress={sablierLockup}
+              explorerUrl={explorerUrl}
               onCreateAnother={resetForm}
             />
           ) : (
@@ -577,7 +639,7 @@ function CreateLockInner() {
                       disabled={isFormLocked}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (/^(\d+\.?\d{0,6}|\d*\.\d{1,6})$/.test(v) || v === "") {
+                        if (parseAmountParam(v, usdcDecimals) || v === "") {
                           setAmountInput(v);
                           setStep("schedule");
                         }
@@ -607,19 +669,19 @@ function CreateLockInner() {
                   {isConnected && balance !== undefined && (
                     <div className="flex items-center justify-between text-xs text-faint tabular">
                       <span>
-                        Balance: {formatUnits(balance, USDC_DECIMALS)} USDC
+                        Balance: {formatUnits(balance, usdcDecimals)} USDC
                       </span>
                       <button
                         disabled={isFormLocked || balance === BigInt(0)}
                         onClick={() => {
-                          const maxDeposit = computeMaxDeposit(balance, BROKER_FEE);
-                          setAmountInput(formatUnits(maxDeposit, USDC_DECIMALS));
+                          const maxDeposit = computeMaxDeposit(balance, brokerFee);
+                          setAmountInput(formatUnits(maxDeposit, usdcDecimals));
                           setStep("schedule");
                         }}
                         className={`inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-muted hover:text-cyan underline transition-colors ${isFormLocked || balance === BigInt(0) ? "opacity-50 cursor-not-allowed" : ""}`}
-                        title={`Max lock amount after ${BROKER_FEE_PCT} fee`}
+                        title={`Max lock amount after ${brokerFeePct} fee`}
                       >
-                        Max{BROKER_FEE > BigInt(0) ? " (net of fee)" : ""}
+                        Max{brokerFee > BigInt(0) ? " (net of fee)" : ""}
                       </button>
                     </div>
                   )}
@@ -631,15 +693,15 @@ function CreateLockInner() {
                   {isConnected && balance !== undefined && !hasEnoughBalance && depositAmount > 0 && meetsMinimum && (
                     <p className="text-xs text-danger">
                       Not enough in the wallet. You have{" "}
-                      {formatUnits(balance, USDC_DECIMALS)} USDC, need{" "}
-                      {formatUnits(totalAmount, USDC_DECIMALS)} USDC (incl. {BROKER_FEE_PCT} fee).
+                      {formatUnits(balance, usdcDecimals)} USDC, need{" "}
+                      {formatUnits(totalAmount, usdcDecimals)} USDC (incl. {brokerFeePct} fee).
                     </p>
                   )}
                   {IS_TESTNET && isConnected && (
                     <button
                       onClick={() =>
                         writeFaucet({
-                          address: USDC_ADDRESS,
+                          address: usdcAddress,
                           abi: testUsdcAbi,
                           functionName: "faucet",
                         })
@@ -815,6 +877,7 @@ function CreateLockInner() {
                       totalSeconds={schedule.totalSeconds}
                       isLumpSum={schedule.isLumpSum}
                       depositAmount={depositAmount}
+                      usdcDecimals={usdcDecimals}
                     />
                     {!schedule.isLumpSum && (
                       <VestingCalculator
@@ -822,6 +885,7 @@ function CreateLockInner() {
                         totalSeconds={schedule.totalSeconds}
                         cliffSeconds={schedule.cliffSeconds}
                         intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
+                        usdcDecimals={usdcDecimals}
                       />
                     )}
                   </section>
@@ -832,17 +896,17 @@ function CreateLockInner() {
                   <section className="border border-line rounded-lg p-5 space-y-2.5 text-sm tabular">
                     <div className="flex justify-between">
                       <span className="text-muted">Lock amount</span>
-                      <span className="text-foreground">{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
+                      <span className="text-foreground">{formatUnits(depositAmount, usdcDecimals)} USDC</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">
-                        Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
+                        Lock fee {brokerFee > BigInt(0) ? `(${brokerFeePct})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}
                       </span>
-                      <span className="text-foreground">{formatUnits(fee, USDC_DECIMALS)} USDC</span>
+                      <span className="text-foreground">{formatUnits(fee, usdcDecimals)} USDC</span>
                     </div>
                     <div className="flex justify-between font-semibold border-t border-line pt-3 mt-1">
                       <span>Total from wallet</span>
-                      <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
+                      <span>{formatUnits(totalAmount, usdcDecimals)} USDC</span>
                     </div>
                   </section>
                 )}
@@ -898,7 +962,7 @@ function CreateLockInner() {
                       </div>
                       {isApproveConfirming && approveTxHash && (
                         <a
-                          href={`${EXPLORER_URL}/tx/${approveTxHash}`}
+                          href={`${explorerUrl}/tx/${approveTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
@@ -943,7 +1007,7 @@ function CreateLockInner() {
                       </div>
                       {isLockConfirming && lockTxHash && (
                         <a
-                          href={`${EXPLORER_URL}/tx/${lockTxHash}`}
+                          href={`${explorerUrl}/tx/${lockTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center min-h-[2.75rem] px-2 text-sm text-faint hover:text-cyan underline transition-colors"
@@ -967,6 +1031,9 @@ function CreateLockInner() {
                   totalAmount={totalAmount}
                   hasEnoughAllowance={hasEnoughAllowance}
                   confirmed={confirmed}
+                  usdcDecimals={usdcDecimals}
+                  brokerFee={brokerFee}
+                  brokerFeePct={brokerFeePct}
                   onConfirmedChange={setConfirmed}
                   onApprove={handleApprove}
                   onLock={handleLock}
@@ -989,16 +1056,18 @@ function VestingCalculator({
   totalSeconds,
   cliffSeconds,
   intervalSeconds,
+  usdcDecimals,
 }: {
   depositAmount: bigint;
   totalSeconds: number;
   cliffSeconds: number;
   intervalSeconds: number;
+  usdcDecimals: number;
 }) {
   const vestSeconds = totalSeconds - cliffSeconds;
   const totalIntervals = vestSeconds > 0 ? Math.floor(vestSeconds / intervalSeconds) : 0;
   const perInterval = totalIntervals > 0
-    ? Number(formatUnits(depositAmount, USDC_DECIMALS)) / totalIntervals
+    ? Number(formatUnits(depositAmount, usdcDecimals)) / totalIntervals
     : 0;
   const intervalLabel = ALL_INTERVALS.find((i) => i.seconds === intervalSeconds)?.label ?? formatDuration(intervalSeconds);
   const pctPerInterval = totalIntervals > 0 ? (100 / totalIntervals) : 0;
@@ -1058,11 +1127,13 @@ function TimelinePreview({
   totalSeconds,
   isLumpSum,
   depositAmount,
+  usdcDecimals,
 }: {
   cliffSeconds: number;
   totalSeconds: number;
   isLumpSum: boolean;
   depositAmount: bigint;
+  usdcDecimals: number;
 }) {
   const cliffPct = totalSeconds > 0 ? (cliffSeconds / totalSeconds) * 100 : 0;
 
@@ -1100,18 +1171,18 @@ function TimelinePreview({
       <p className="text-xs text-muted leading-relaxed">
         {isLumpSum ? (
           <>
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC unlocks in one drop
+            {formatUnits(depositAmount, usdcDecimals)} USDC unlocks in one drop
             after {formatDuration(totalSeconds)}.
           </>
         ) : cliffSeconds > 0 ? (
           <>
             Nothing for {formatDuration(cliffSeconds)}. Then{" "}
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC drips out over{" "}
+            {formatUnits(depositAmount, usdcDecimals)} USDC drips out over{" "}
             {formatDuration(totalSeconds - cliffSeconds)}.
           </>
         ) : (
           <>
-            {formatUnits(depositAmount, USDC_DECIMALS)} USDC drips out over{" "}
+            {formatUnits(depositAmount, usdcDecimals)} USDC drips out over{" "}
             {formatDuration(totalSeconds)}.
           </>
         )}
@@ -1127,6 +1198,9 @@ function ConfirmDialog({
   totalAmount,
   hasEnoughAllowance,
   confirmed,
+  usdcDecimals,
+  brokerFee,
+  brokerFeePct,
   onConfirmedChange,
   onApprove,
   onLock,
@@ -1138,6 +1212,9 @@ function ConfirmDialog({
   totalAmount: bigint;
   hasEnoughAllowance: boolean;
   confirmed: boolean;
+  usdcDecimals: number;
+  brokerFee: bigint;
+  brokerFeePct: string;
   onConfirmedChange: (v: boolean) => void;
   onApprove: () => void;
   onLock: () => void;
@@ -1218,15 +1295,15 @@ function ConfirmDialog({
             </div>
             <div className="flex justify-between">
               <span className="text-muted">Lock amount</span>
-              <span className="text-foreground">{formatUnits(depositAmount, USDC_DECIMALS)} USDC</span>
+              <span className="text-foreground">{formatUnits(depositAmount, usdcDecimals)} USDC</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Lock fee {BROKER_FEE > BigInt(0) ? `(${BROKER_FEE_PCT})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
-              <span className="text-foreground">{formatUnits(fee, USDC_DECIMALS)} USDC</span>
+              <span className="text-muted">Lock fee {brokerFee > BigInt(0) ? `(${brokerFeePct})` : IS_TESTNET ? "(disabled on testnet)" : "(waived)"}</span>
+              <span className="text-foreground">{formatUnits(fee, usdcDecimals)} USDC</span>
             </div>
             <div className="flex justify-between font-semibold border-t border-line pt-3 mt-1">
               <span>Total from wallet</span>
-              <span>{formatUnits(totalAmount, USDC_DECIMALS)} USDC</span>
+              <span>{formatUnits(totalAmount, usdcDecimals)} USDC</span>
             </div>
             {schedule.cliffSeconds > 0 && (
               <div className="flex justify-between pt-2">
@@ -1297,12 +1374,18 @@ function SuccessView({
   streamId,
   depositAmount,
   schedule,
+  usdcDecimals,
+  sablierAddress,
+  explorerUrl,
   onCreateAnother,
 }: {
   txHash: `0x${string}`;
   streamId: bigint;
   depositAmount: bigint;
   schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
+  usdcDecimals: number;
+  sablierAddress: Address;
+  explorerUrl: string;
   onCreateAnother: () => void;
 }) {
   const now = Math.floor(Date.now() / 1000);
@@ -1372,11 +1455,11 @@ function SuccessView({
 
       <ShareCard
         streamId={streamId}
-        amountLocked={formatUnits(depositAmount, USDC_DECIMALS)}
+        amountLocked={formatUnits(depositAmount, usdcDecimals)}
         scheduleType={schedule.label}
         endDate={endDate}
         nextUnlock={nextUnlock}
-        sablierAddress={SABLIER_LOCKUP}
+        sablierAddress={sablierAddress}
       />
 
       <div className="space-y-4">
@@ -1392,7 +1475,7 @@ function SuccessView({
           </button>
         </div>
         <a
-          href={`${EXPLORER_URL}/tx/${txHash}`}
+          href={`${explorerUrl}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
           className="block text-xs text-faint hover:text-cyan underline transition-colors text-center"
