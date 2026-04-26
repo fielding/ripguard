@@ -81,3 +81,20 @@ export function getChainConfig(chainId: number): ChainConfig {
 export function isSupportedChain(chainId: number | undefined): chainId is number {
   return chainId !== undefined && chainId in CHAINS;
 }
+
+// "Supported by THIS deployment" — registry membership AND testnet flag matches.
+// Use this (not isSupportedChain) for any logic that gates on whether the
+// current deployment can actually transact on a chain. The registry holds
+// both mainnets and testnets; isSupportedChain returns true for any of them,
+// which would let a mainnet wallet through the wrong-chain guard on the
+// testnet deployment (and vice-versa).
+export function isSupportedDeploymentChain(
+  chainId: number | undefined,
+  isTestnetDeployment: boolean,
+): chainId is number {
+  return (
+    chainId !== undefined &&
+    isSupportedChain(chainId) &&
+    getChainConfig(chainId).isTestnet === isTestnetDeployment
+  );
+}
