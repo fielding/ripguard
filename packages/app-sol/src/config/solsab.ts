@@ -56,22 +56,28 @@ export const MERKLE_INSTANT_PROGRAM_ID = new PublicKey(
 );
 
 // ----------------------------------------------------------------------------
-// USDC
+// Deposit token (Wrapped SOL)
 // ----------------------------------------------------------------------------
+//
+// RipGuard on Solana locks SOL — the native asset. Sablier streams SPL
+// tokens, not native SOL, so we wrap into wSOL transparently before the
+// lock. The wSOL mint is the same on every Solana cluster.
+//
+// Why SOL and not USDC: degens on Solana hold SOL. Locking USDC means
+// giving up the SOL exposure they came for. The "save me from myself"
+// thesis is about preventing panic-sells and chase-pumps, both of which
+// SOL-locking enforces while still preserving upside.
 
-const USDC_MINTS: Record<SolanaCluster, string> = {
-  // Circle's official USDC mint on Solana mainnet (6 decimals).
-  "mainnet-beta": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  // Devnet placeholder — Circle's devnet USDC mint. Override via env if a
-  // different mintable test token is preferred.
-  devnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-};
-
-export const USDC_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_USDC_MINT ?? USDC_MINTS[NETWORK],
+export const WSOL_MINT = new PublicKey(
+  "So11111111111111111111111111111111111111112",
 );
 
-export const USDC_DECIMALS = 6;
+// SOL has 9 decimals on chain (1 SOL = 1_000_000_000 lamports). All amount
+// math in this app uses base units (lamports) as bigint.
+export const SOL_DECIMALS = 9;
+
+// Display label — keeps copy in one place if we ever support other tokens.
+export const DEPOSIT_TOKEN_LABEL = "SOL";
 
 // ----------------------------------------------------------------------------
 // Treasury (broker fee recipient)

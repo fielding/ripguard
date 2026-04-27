@@ -5,7 +5,7 @@
  *
  *   pnpm --filter app-sol smoke:lock
  *   KEYPAIR=~/.config/solana/id.json pnpm --filter app-sol smoke:lock
- *   USDC_MINT=AnyDevnetMint... AMOUNT_USDC=10 pnpm --filter app-sol smoke:lock
+ *   AMOUNT_SOL=0.1 pnpm --filter app-sol smoke:lock
  *
  * What it does:
  *   1. Loads (or generates) a Solana keypair.
@@ -38,7 +38,8 @@ import { presetToSolanaArgs } from "../src/sol/preset";
 
 const RPC = process.env.SOLANA_RPC ?? "https://api.devnet.solana.com";
 const KEYPAIR_PATH = process.env.KEYPAIR ?? join(homedir(), ".config/solana/id.json");
-const AMOUNT_USDC = process.env.AMOUNT_USDC ?? "1";
+// Default to a tiny lock so the smoke run never blocks on faucet limits.
+const AMOUNT_SOL = process.env.AMOUNT_SOL ?? "0.01";
 
 async function loadKeypair(): Promise<Keypair> {
   try {
@@ -56,10 +57,10 @@ async function loadKeypair(): Promise<Keypair> {
   }
 }
 
-function dollarsToBaseUnits(amount: string): bigint {
+function solToLamports(amount: string): bigint {
   const [whole = "0", frac = ""] = amount.split(".");
-  const padded = (frac + "000000").slice(0, 6);
-  return BigInt(whole) * BigInt(1_000_000) + BigInt(padded || "0");
+  const padded = (frac + "000000000").slice(0, 9);
+  return BigInt(whole) * BigInt(1_000_000_000) + BigInt(padded || "0");
 }
 
 // Stub Anchor wallet used purely for instruction-builder typing.
@@ -112,16 +113,13 @@ async function main() {
     }
   }
 
-  const depositAmount = dollarsToBaseUnits(AMOUNT_USDC);
+  const depositAmount = solToLamports(AMOUNT_SOL);
   const presetArgs = presetToSolanaArgs("hourly1d");
   const salt = randomSalt();
-  const usdcMint = process.env.USDC_MINT
-    ? new PublicKey(process.env.USDC_MINT)
-    : undefined;
 
   console.log(`\nBuilding lock tx:`);
   console.log(`  preset: hourly1d`);
-  console.log(`  amount: ${AMOUNT_USDC} USDC (${depositAmount} base units)`);
+  console.log(`  amount: ${AMOUNT_SOL} SOL (${depositAmount} lamports)`);
   console.log(`  cliff/total seconds: ${presetArgs.cliffSeconds} / ${presetArgs.totalSeconds}`);
   console.log(`  salt: ${salt}`);
 
@@ -134,21 +132,20 @@ async function main() {
       cliffSeconds: presetArgs.cliffSeconds,
       totalSeconds: presetArgs.totalSeconds,
       salt,
-      depositTokenMint: usdcMint,
     });
 
   console.log(`\nDerived PDAs:`);
   console.log(`  stream NFT mint:        ${pdas.streamNftMint.toBase58()}`);
   console.log(`  stream data:            ${pdas.streamData.toBase58()}`);
   console.log(`  stream data ATA:        ${pdas.streamDataAta.toBase58()}`);
-  console.log(`  creator ATA:            ${pdas.creatorAta.toBase58()}`);
+  console.log(`  creator ATA (wSOL):     ${pdas.creatorAta.toBase58()}`);
   console.log(`  recipient stream NFT:   ${pdas.recipientStreamNftAta.toBase58()}`);
   console.log(`  nft collection mint:    ${pdas.nftCollectionMint.toBase58()}`);
 
   console.log(`\nInstructions in tx: ${instructions.length}`);
   console.log(`  fee active: ${feeActive}`);
-  console.log(`  fee amount: ${feeAmount} base units`);
-  console.log(`  net deposit: ${netDepositAmount} base units`);
+  console.log(`  fee amount: ${feeAmount} lamports`);
+  console.log(`  net deposit: ${netDepositAmount} lamports`);
 
   const tx = new Transaction();
   for (const ix of instructions) tx.add(ix);

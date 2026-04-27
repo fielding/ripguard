@@ -27,14 +27,17 @@ import {
   ComputeBudgetProgram,
 } from "@solana/web3.js";
 import {
+  NATIVE_MINT,
   TOKEN_PROGRAM_ID,
   createTransferInstruction,
   createAssociatedTokenAccountIdempotentInstruction,
+  createSyncNativeInstruction,
 } from "@solana/spl-token";
+import { SystemProgram } from "@solana/web3.js";
 import {
   SABLIER_LOCKUP_PROGRAM_ID,
   TREASURY_PUBKEY,
-  USDC_MINT,
+  WSOL_MINT,
   ZERO_PUBKEY,
   computeBrokerFee,
 } from "@/config/solsab";
@@ -109,9 +112,13 @@ export async function buildLockTx(
     cliffSeconds,
     totalSeconds,
     salt,
-    depositTokenMint = USDC_MINT,
+    depositTokenMint = WSOL_MINT,
     treasury = TREASURY_PUBKEY,
   } = args;
+
+  // Wrapping native SOL means we transfer lamports into the user's wSOL
+  // ATA and then call syncNative to recognize them as token balance.
+  const isWrappedSol = depositTokenMint.equals(NATIVE_MINT);
 
   if (depositAmount <= 0n) {
     throw new RangeError(
@@ -154,9 +161,9 @@ export async function buildLockTx(
     ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
   );
 
-  // Idempotently ensure the user's USDC ATA exists before the create ix
-  // tries to read from it. This is a no-op if it already exists, so we can
-  // include it unconditionally without an RPC pre-flight.
+  // Idempotently ensure the user's deposit-token ATA exists before the
+  // create ix tries to read from it. No-op if it already exists, so we
+  // can include it unconditionally without an RPC pre-flight.
   instructions.push(
     createAssociatedTokenAccountIdempotentInstruction(
       signer,
@@ -166,8 +173,24 @@ export async function buildLockTx(
     ),
   );
 
-  // 1. Pre-transfer the broker fee out of the user's USDC ATA to the
-  //    treasury ATA. Skip entirely if no treasury is configured.
+  // For native-SOL locks we wrap the user's SOL into wSOL: system-transfer
+  // depositAmount lamports into the wSOL ATA, then syncNative tells the
+  // SPL token program to update the ATA's token balance. The result is
+  // depositAmount wSOL sitting in the creator ATA, ready for the Sablier
+  // create ix to spend exactly like any other SPL token.
+  if (isWrappedSol) {
+    instructions.push(
+      SystemProgram.transfer({
+        fromPubkey: signer,
+        toPubkey: pdas.creatorAta,
+        lamports: depositAmount,
+      }),
+    );
+    instructions.push(createSyncNativeInstruction(pdas.creatorAta));
+  }
+
+  // 1. Pre-transfer the broker fee out of the user's deposit-token ATA to
+  //    the treasury ATA. Skip entirely if no treasury is configured.
   if (feeActive && feeAmount > 0n) {
     const [treasuryAta] = deriveAta(treasury, depositTokenMint);
     // Same idempotent dance for the treasury — first-ever lock per token

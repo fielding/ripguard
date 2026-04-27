@@ -14,7 +14,7 @@ import {
   deriveNftCollectionMint,
   randomSalt,
 } from "./pdas";
-import { SABLIER_LOCKUP_PROGRAM_ID, USDC_MINT } from "@/config/solsab";
+import { SABLIER_LOCKUP_PROGRAM_ID, WSOL_MINT } from "@/config/solsab";
 
 // Deterministic fixture wallet — never funded, never used. Existence on
 // chain is irrelevant; PDA derivation is pure math.
@@ -103,17 +103,17 @@ describe("PDA derivations are deterministic", () => {
 
 describe("deriveAta", () => {
   it("matches the SPL ATA seed convention: [owner, tokenProgram, mint]", () => {
-    const [ata] = deriveAta(SENDER, USDC_MINT);
+    const [ata] = deriveAta(SENDER, WSOL_MINT);
     const [expected] = PublicKey.findProgramAddressSync(
-      [SENDER.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), USDC_MINT.toBuffer()],
+      [SENDER.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), WSOL_MINT.toBuffer()],
       ASSOCIATED_TOKEN_PROGRAM_ID,
     );
     expect(ata.toBase58()).toBe(expected.toBase58());
   });
 
   it("is stable across calls", () => {
-    const [a] = deriveAta(SENDER, USDC_MINT);
-    const [b] = deriveAta(SENDER, USDC_MINT);
+    const [a] = deriveAta(SENDER, WSOL_MINT);
+    const [b] = deriveAta(SENDER, WSOL_MINT);
     expect(a.toBase58()).toBe(b.toBase58());
   });
 });
@@ -125,7 +125,7 @@ describe("deriveStreamPdas", () => {
       sender: SENDER,
       recipient: RECIPIENT,
       salt: FIXED_SALT,
-      depositTokenMint: USDC_MINT,
+      depositTokenMint: WSOL_MINT,
     });
 
     // All required keys present
@@ -148,7 +148,7 @@ describe("deriveStreamPdas", () => {
       sender: SENDER,
       recipient: RECIPIENT,
       salt: FIXED_SALT,
-      depositTokenMint: USDC_MINT,
+      depositTokenMint: WSOL_MINT,
     });
     const [mint] = deriveStreamNftMint(SENDER, FIXED_SALT);
     expect(bundle.streamNftMint.toBase58()).toBe(mint.toBase58());
@@ -156,7 +156,7 @@ describe("deriveStreamPdas", () => {
     const [data] = deriveStreamData(mint);
     expect(bundle.streamData.toBase58()).toBe(data.toBase58());
 
-    const [creatorAta] = deriveAta(SENDER, USDC_MINT);
+    const [creatorAta] = deriveAta(SENDER, WSOL_MINT);
     expect(bundle.creatorAta.toBase58()).toBe(creatorAta.toBase58());
   });
 
@@ -169,14 +169,14 @@ describe("deriveStreamPdas", () => {
       sender: SENDER,
       recipient: RECIPIENT,
       salt: FIXED_SALT,
-      depositTokenMint: USDC_MINT,
+      depositTokenMint: WSOL_MINT,
     });
     const b = deriveStreamPdas({
       creator: SENDER,
       sender: SENDER,
       recipient: RECIPIENT,
       salt: FIXED_SALT,
-      depositTokenMint: USDC_MINT,
+      depositTokenMint: WSOL_MINT,
       programId: fakeProgramId,
     });
     expect(a.streamNftMint.toBase58()).not.toBe(b.streamNftMint.toBase58());

@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { BROKER_FEE_BPS, PRESETS, computeBrokerFee, ZERO_PUBKEY, TREASURY_PUBKEY } from "./solsab";
 
-// USDC has 6 decimals on Solana. Same denomination shape as Base mainnet.
-const usdc = (n: number | bigint) => BigInt(n) * BigInt(1_000_000);
+// SOL has 9 decimals (1 SOL = 1_000_000_000 lamports). Math is bigint
+// end-to-end so the higher denominator doesn't change anything except
+// the scale of fixture amounts.
+const sol = (n: number | bigint) => BigInt(n) * BigInt(1_000_000_000);
 
 describe("BROKER_FEE_BPS", () => {
   it("is 50 bps (0.5% — parity with EVM BROKER_FEE_RATE)", () => {
@@ -20,7 +22,7 @@ describe("computeBrokerFee", () => {
   // function returns 0 in that case (sentinel for "fee disabled").
   it("returns 0 when treasury is the zero pubkey (default test env)", () => {
     expect(TREASURY_PUBKEY.equals(ZERO_PUBKEY)).toBe(true);
-    expect(computeBrokerFee(usdc(1000))).toBe(BigInt(0));
+    expect(computeBrokerFee(sol(1000))).toBe(BigInt(0));
   });
 
   // The math itself — bypassing the treasury sentinel by passing through
@@ -30,16 +32,18 @@ describe("computeBrokerFee", () => {
       return (amount * bps) / BigInt(10_000);
     }
 
-    it("0.5% of 1000 USDC = 5 USDC", () => {
-      expect(pureSkim(usdc(1000), BROKER_FEE_BPS)).toBe(usdc(5));
+    it("0.5% of 1000 SOL = 5 SOL", () => {
+      expect(pureSkim(sol(1000), BROKER_FEE_BPS)).toBe(sol(5));
     });
 
-    it("0.5% of 100 USDC = 0.5 USDC", () => {
-      expect(pureSkim(usdc(100), BROKER_FEE_BPS)).toBe(BigInt(500_000));
+    it("0.5% of 100 SOL = 0.5 SOL", () => {
+      // 100 SOL = 100e9 lamports; 0.5% = 0.5e9 = 500_000_000
+      expect(pureSkim(sol(100), BROKER_FEE_BPS)).toBe(BigInt(500_000_000));
     });
 
-    it("0.5% of 1 USDC = 0.005 USDC", () => {
-      expect(pureSkim(usdc(1), BROKER_FEE_BPS)).toBe(BigInt(5_000));
+    it("0.5% of 1 SOL = 0.005 SOL", () => {
+      // 1 SOL = 1e9 lamports; 0.5% = 5e6 = 5_000_000
+      expect(pureSkim(sol(1), BROKER_FEE_BPS)).toBe(BigInt(5_000_000));
     });
 
     it("rounds toward zero on non-divisible amounts", () => {

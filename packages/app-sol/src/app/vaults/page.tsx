@@ -9,7 +9,12 @@ import { Transaction, type PublicKey } from "@solana/web3.js";
 import { Header } from "@/components/Header";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
-import { USDC_DECIMALS, explorerAccount, explorerTx } from "@/config/solsab";
+import {
+  SOL_DECIMALS,
+  DEPOSIT_TOKEN_LABEL,
+  explorerAccount,
+  explorerTx,
+} from "@/config/solsab";
 import {
   getStreamsForSender,
   type DiscoveredStream,
@@ -24,11 +29,17 @@ import {
 import { trackClaim, trackContractError } from "@/lib/analytics";
 import { isUserRejection } from "@/lib/errors";
 
-function formatUsdc(units: bigint): string {
-  const whole = units / BigInt(1_000_000);
-  const frac = units % BigInt(1_000_000);
+// Same display strategy as /create: 9 decimals on chain, render up to 4
+// fractional digits, trim trailing zeros.
+const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
+
+function formatSol(units: bigint): string {
+  const whole = units / LAMPORTS_PER_SOL;
+  const frac = units % LAMPORTS_PER_SOL;
   if (frac === 0n) return whole.toString();
-  return `${whole.toString()}.${frac.toString().padStart(6, "0").replace(/0+$/, "")}`;
+  const padded = frac.toString().padStart(SOL_DECIMALS, "0");
+  const trimmed = padded.slice(0, 4).replace(/0+$/, "");
+  return trimmed ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
 function formatCountdown(seconds: bigint | null): string {
@@ -86,7 +97,7 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
             </span>
           </div>
           <h2 className="mt-2 font-display text-2xl tracking-tight tabular">
-            {formatUsdc(snapshot.deposited)} USDC
+            {formatSol(snapshot.deposited)} {DEPOSIT_TOKEN_LABEL}
           </h2>
           <p className="mt-1 text-xs text-faint font-mono">
             <a
@@ -103,7 +114,7 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
         <div className="text-right">
           <div className="eyebrow text-faint">Claimable</div>
           <div className="font-display text-xl tabular text-cyan">
-            {formatUsdc(claimable)}
+            {formatSol(claimable)}
           </div>
         </div>
       </div>
@@ -136,7 +147,7 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
           {claiming ? "Claiming…" : canClaim ? "Claim" : "Nothing to claim"}
         </button>
         <span className="text-xs text-faint tabular">
-          Withdrawn: {formatUsdc(snapshot.withdrawn)} USDC
+          Withdrawn: {formatSol(snapshot.withdrawn)} {DEPOSIT_TOKEN_LABEL}
         </span>
       </div>
     </article>

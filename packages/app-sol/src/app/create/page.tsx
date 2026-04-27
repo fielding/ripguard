@@ -12,7 +12,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import {
   PRESETS,
-  USDC_DECIMALS,
+  SOL_DECIMALS,
+  DEPOSIT_TOKEN_LABEL,
   IS_DEVNET,
   computeBrokerFee,
   explorerTx,
@@ -29,24 +30,32 @@ import {
 } from "@/lib/analytics";
 import { isUserRejection } from "@/lib/errors";
 
-function parseUsdcAmount(input: string): bigint | null {
+// SOL has 9 decimals (1 SOL = 1e9 lamports). Display 4 decimals max so
+// the form stays readable; trim trailing zeros for a clean look.
+const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
+const AMOUNT_RE = new RegExp(`^\\d+(\\.\\d{1,${SOL_DECIMALS}})?$`);
+
+function parseSolAmount(input: string): bigint | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  if (!/^\d+(\.\d{1,6})?$/.test(trimmed)) return null;
+  if (!AMOUNT_RE.test(trimmed)) return null;
   const [whole, frac = ""] = trimmed.split(".");
-  const padded = (frac + "000000").slice(0, USDC_DECIMALS);
+  const padded = (frac + "000000000").slice(0, SOL_DECIMALS);
   try {
-    return BigInt(whole) * BigInt(1_000_000) + BigInt(padded);
+    return BigInt(whole) * LAMPORTS_PER_SOL + BigInt(padded);
   } catch {
     return null;
   }
 }
 
-function formatUsdc(units: bigint): string {
-  const whole = units / BigInt(1_000_000);
-  const frac = units % BigInt(1_000_000);
+function formatSol(units: bigint): string {
+  const whole = units / LAMPORTS_PER_SOL;
+  const frac = units % LAMPORTS_PER_SOL;
   if (frac === 0n) return whole.toString();
-  return `${whole.toString()}.${frac.toString().padStart(6, "0").replace(/0+$/, "")}`;
+  // Keep up to 4 fractional digits visible — past that is dust.
+  const padded = frac.toString().padStart(SOL_DECIMALS, "0");
+  const trimmed = padded.slice(0, 4).replace(/0+$/, "");
+  return trimmed ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
 type Status =
@@ -71,7 +80,7 @@ function CreateForm() {
   const [amountStr, setAmountStr] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
-  const amount = useMemo(() => parseUsdcAmount(amountStr), [amountStr]);
+  const amount = useMemo(() => parseSolAmount(amountStr), [amountStr]);
   const fee = amount !== null ? computeBrokerFee(amount) : 0n;
   const net = amount !== null ? amount - fee : 0n;
 
@@ -86,13 +95,13 @@ function CreateForm() {
       return;
     }
     if (amount === null || amount <= 0n) {
-      toast.toast("Enter a valid USDC amount.", "error");
+      toast.toast(`Enter a valid ${DEPOSIT_TOKEN_LABEL} amount.`, "error");
       return;
     }
 
     try {
       setStatus({ kind: "building" });
-      trackLockApproved(Number(formatUsdc(amount)));
+      trackLockApproved(Number(formatSol(amount)));
 
       // Anchor needs a wallet-shaped object; the adapter exposes the right
       // fields but not the exact `Wallet` type, so we adapt.
@@ -153,7 +162,7 @@ function CreateForm() {
 
       trackLockCreated({
         schedule: presetKey,
-        amountUsd: Number(formatUsdc(amount)),
+        amountUsd: Number(formatSol(amount)),
         cliffSeconds: presetArgs.cliffSeconds,
         totalSeconds: presetArgs.totalSeconds,
       });
@@ -205,8 +214,9 @@ function CreateForm() {
             Past you just paid future you<span className="text-cyan">.</span>
           </h1>
           <p className="mt-4 text-muted leading-relaxed">
-            Your USDC is in the Sablier Lockup program on Solana. Non-cancelable.
-            Counting down on-chain regardless of whether RipGuard exists.
+            Your SOL is wrapped and locked in the Sablier Lockup program on
+            Solana. Non-cancelable. Counting down on-chain regardless of
+            whether RipGuard exists.
           </p>
           <dl className="mt-10 space-y-4 text-sm">
             <div>
@@ -297,11 +307,11 @@ function CreateForm() {
         </fieldset>
 
         <fieldset className="mt-8" disabled={isPending}>
-          <legend className="eyebrow mb-3">Amount (USDC)</legend>
+          <legend className="eyebrow mb-3">Amount ({DEPOSIT_TOKEN_LABEL})</legend>
           <input
             type="text"
             inputMode="decimal"
-            placeholder="100"
+            placeholder="1"
             value={amountStr}
             onChange={(e) => setAmountStr(e.target.value)}
             className="w-full rounded-md border border-line bg-background px-4 py-3 text-2xl font-display tabular focus:outline-2 focus:outline-cyan focus:outline-offset-2"
@@ -309,18 +319,18 @@ function CreateForm() {
           />
           {amountStr.length > 0 && amount === null && (
             <p className="mt-2 text-sm text-warning">
-              Enter a positive number with up to 6 decimal places.
+              Enter a positive number with up to 9 decimal places.
             </p>
           )}
           {amount !== null && (
             <dl className="mt-4 space-y-1 text-sm tabular">
               <div className="flex justify-between text-muted">
                 <dt>Fee (0.5%)</dt>
-                <dd>{formatUsdc(fee)} USDC</dd>
+                <dd>{formatSol(fee)} {DEPOSIT_TOKEN_LABEL}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted">Locked</dt>
-                <dd className="text-foreground">{formatUsdc(net)} USDC</dd>
+                <dd className="text-foreground">{formatSol(net)} {DEPOSIT_TOKEN_LABEL}</dd>
               </div>
             </dl>
           )}
@@ -359,8 +369,8 @@ function CreateForm() {
               className="underline decoration-line hover:decoration-cyan"
             >
               the Solana faucet
-            </a>{" "}
-            and devnet USDC from Circle&apos;s faucet to test.
+            </a>
+            .
           </p>
         )}
       </section>
