@@ -54,6 +54,18 @@ export function deriveNftCollectionData(
   );
 }
 
+/**
+ * Treasury PDA — single program account holding the configured fee
+ * collector, chainlink program ID, and chainlink SOL/USD feed pubkey.
+ * Read it via `program.account.treasury.fetch(treasuryPda)` to wire the
+ * chainlink accounts the `withdraw` / `withdraw_max` instructions need.
+ */
+export function deriveTreasury(
+  programId: PublicKey = SABLIER_LOCKUP_PROGRAM_ID,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([TEXT("treasury")], programId);
+}
+
 export function deriveNftCollectionMint(
   programId: PublicKey = SABLIER_LOCKUP_PROGRAM_ID,
 ): [PublicKey, number] {
