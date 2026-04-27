@@ -29,6 +29,7 @@ import {
 import {
   TOKEN_PROGRAM_ID,
   createTransferInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
 import {
   SABLIER_LOCKUP_PROGRAM_ID,
@@ -153,10 +154,32 @@ export async function buildLockTx(
     ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
   );
 
+  // Idempotently ensure the user's USDC ATA exists before the create ix
+  // tries to read from it. This is a no-op if it already exists, so we can
+  // include it unconditionally without an RPC pre-flight.
+  instructions.push(
+    createAssociatedTokenAccountIdempotentInstruction(
+      signer,
+      pdas.creatorAta,
+      signer,
+      depositTokenMint,
+    ),
+  );
+
   // 1. Pre-transfer the broker fee out of the user's USDC ATA to the
   //    treasury ATA. Skip entirely if no treasury is configured.
   if (feeActive && feeAmount > 0n) {
     const [treasuryAta] = deriveAta(treasury, depositTokenMint);
+    // Same idempotent dance for the treasury — first-ever lock per token
+    // creates the treasury ATA without needing manual setup.
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        signer,
+        treasuryAta,
+        treasury,
+        depositTokenMint,
+      ),
+    );
     instructions.push(
       createTransferInstruction(
         pdas.creatorAta,
