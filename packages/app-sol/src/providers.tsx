@@ -13,6 +13,7 @@ import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
+import { createSolanaClient } from "@metamask/connect-solana";
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { ToastProvider } from "@/components/Toast";
 import { trackWalletConnect, trackAppError } from "@/lib/analytics";
@@ -63,6 +64,26 @@ function GlobalErrorHandler() {
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
+
+  // Register MetaMask with the Solana wallet-standard registry so it shows
+  // up in the modal next to Phantom/Solflare for users who already have
+  // MetaMask installed (and have enabled a Solana account in MetaMask).
+  // Phantom remains the primary recommendation in copy — this is just an
+  // additional connector for users who don't want a second extension.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      createSolanaClient({
+        dapp: {
+          name: "RipGuard",
+          url: window.location.origin,
+        },
+      });
+    } catch {
+      // Best-effort registration. If it fails (older MetaMask, network
+      // hiccup), the wallet modal still works with the other adapters.
+    }
+  }, []);
 
   // Explicit adapters for Phantom + Solflare; Backpack and other modern
   // Solana wallets auto-register via the @wallet-standard interface, so they

@@ -9,10 +9,12 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fetch:idl": "tsx scripts/fetch-idl.ts"
+    "fetch:idl": "tsx scripts/fetch-idl.ts",
+    "smoke:lock": "tsx scripts/smoke-lock.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
+    "@metamask/connect-solana": "^1.0.0",
     "@solana/spl-token": "^0.4.13",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
