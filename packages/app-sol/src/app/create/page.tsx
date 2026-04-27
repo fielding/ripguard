@@ -134,11 +134,14 @@ function CreateForm() {
       tx.recentBlockhash = blockhash;
       tx.feePayer = wallet.publicKey;
 
+      // Use the wallet adapter's sendTransaction rather than manual
+      // signTransaction + connection.sendRawTransaction. Phantom (and some
+      // other wallets) auto-submit on signTransaction, which causes a
+      // "transaction has already been processed" error on the second send.
+      // sendTransaction delegates to the wallet's preferred submission path
+      // and returns the signature.
       setStatus({ kind: "signing" });
-      const signed = await wallet.signTransaction(tx);
-
-      const signature = await connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
+      const signature = await wallet.sendTransaction(tx, connection, {
         preflightCommitment: "confirmed",
       });
       setStatus({ kind: "confirming", signature });
@@ -166,6 +169,19 @@ function CreateForm() {
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       if (isUserRejection(e)) {
+        setStatus({ kind: "idle" });
+        return;
+      }
+      // "Transaction has already been processed" means the wallet adapter
+      // and our code both submitted, OR the user double-clicked. Either
+      // way, the lock probably landed — surface it as a soft message
+      // pointing at /vaults instead of a hard failure.
+      if (e.message.toLowerCase().includes("already been processed")) {
+        toast.toast(
+          "Looks like the lock landed already. Check Vaults.",
+          "info",
+          { label: "Vaults", href: "/vaults" },
+        );
         setStatus({ kind: "idle" });
         return;
       }
