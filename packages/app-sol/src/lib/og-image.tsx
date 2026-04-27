@@ -69,7 +69,7 @@ async function loadPublicImageAsDataUrl(
  * asymmetric layout (copy left, 3D padlock right), Archivo Black headline.
  */
 export async function renderSiteOGImage() {
-  const siteHost = IS_TESTNET ? "sol-testnet.ripguard.xyz" : "sol.ripguard.xyz";
+  const siteHost = IS_TESTNET ? "testnet.sol.ripguard.xyz" : "sol.ripguard.xyz";
 
   // Load fonts and the 3D padlock in parallel. Each is best-effort: if
   // any fails, we fall back to Satori's default font and/or drop the

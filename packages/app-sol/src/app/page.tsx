@@ -233,7 +233,7 @@ export default function Home() {
 
                 {!IS_TESTNET && (
                   <a
-                    href="https://sol-testnet.ripguard.xyz"
+                    href="https://testnet.sol.ripguard.xyz"
                     className="mt-6 inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors animate-hero-enter"
                     style={{ animationDelay: "620ms" }}
                   >

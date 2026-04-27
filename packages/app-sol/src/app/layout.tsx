@@ -26,7 +26,7 @@ const archivoBlack = Archivo_Black({
 });
 
 const siteUrl = IS_TESTNET
-  ? "https://sol-testnet.ripguard.xyz"
+  ? "https://testnet.sol.ripguard.xyz"
   : "https://sol.ripguard.xyz";
 const siteTitle = getSiteTitle({ testnet: IS_TESTNET });
 

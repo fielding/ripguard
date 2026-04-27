@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { IS_TESTNET } from "@/config/solsab";
 
 const siteUrl = IS_TESTNET
-  ? "https://sol-testnet.ripguard.xyz"
+  ? "https://testnet.sol.ripguard.xyz"
   : "https://sol.ripguard.xyz";
 
 export default function robots(): MetadataRoute.Robots {
