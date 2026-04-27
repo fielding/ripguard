@@ -22,6 +22,15 @@ export function brokerFeePctString(fee: bigint): string {
     : "0%";
 }
 
+// Absolute broker fee amount, in the deposit token's decimals.
+// Mirrors Sablier's UD60x18 math: amount * rate / 1e18, floor.
+//
+// On EVM the protocol does this for us. We expose the helper here so the
+// Solana app can TS-skim the same amount client-side and pin parity in tests.
+export function computeBrokerFee(amount: bigint, rate: bigint): bigint {
+  return (amount * rate) / BigInt("1000000000000000000");
+}
+
 // Schedule presets — "build your own reloads". Global: schedules aren't chain-scoped.
 export const PRESETS = {
   hourly1d: {

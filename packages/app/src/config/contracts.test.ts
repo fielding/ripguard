@@ -4,6 +4,7 @@ import {
   BROKER_FEE_RATE,
   brokerFeeForTreasury,
   brokerFeePctString,
+  computeBrokerFee,
 } from "./contracts";
 import { ZERO_ADDRESS } from "./chains";
 
@@ -96,5 +97,69 @@ describe("brokerFeePctString", () => {
 
   it("formats 5e15 as 0.5%", () => {
     expect(brokerFeePctString(BROKER_FEE_RATE)).toBe("0.5%");
+  });
+});
+
+describe("computeBrokerFee", () => {
+  // USDC is 6 decimals on every chain we care about (Base, Solana mainnet).
+  const usdc = (n: number | bigint) => BigInt(n) * BigInt(1_000_000);
+
+  it("returns 0 for zero amount", () => {
+    expect(computeBrokerFee(BigInt(0), BROKER_FEE_RATE)).toBe(BigInt(0));
+  });
+
+  it("returns 0 for zero rate (fee disabled, e.g. testnet)", () => {
+    expect(computeBrokerFee(usdc(1000), BigInt(0))).toBe(BigInt(0));
+  });
+
+  it("0.5% of 1000 USDC = 5 USDC", () => {
+    expect(computeBrokerFee(usdc(1000), BROKER_FEE_RATE)).toBe(usdc(5));
+  });
+
+  it("0.5% of 100 USDC = 0.5 USDC (500_000 in 6dp)", () => {
+    expect(computeBrokerFee(usdc(100), BROKER_FEE_RATE)).toBe(BigInt(500_000));
+  });
+
+  it("0.5% of 1 USDC = 0.005 USDC (5000 in 6dp)", () => {
+    expect(computeBrokerFee(usdc(1), BROKER_FEE_RATE)).toBe(BigInt(5_000));
+  });
+
+  it("rounds toward zero (floor) on non-divisible amounts", () => {
+    // 0.5% of 333_333 (= 0.333333 USDC) = 1666.665 → 1666
+    expect(computeBrokerFee(BigInt(333_333), BROKER_FEE_RATE)).toBe(
+      BigInt(1_666),
+    );
+  });
+
+  it("rounds 0.5% of 1 base unit down to 0 (deposit too small)", () => {
+    // 0.5% of 1 = 0.005 → 0. Caller's responsibility to handle.
+    expect(computeBrokerFee(BigInt(1), BROKER_FEE_RATE)).toBe(BigInt(0));
+  });
+
+  it("rounds 0.5% of 199 base units down to 0", () => {
+    // 199 * 5e15 / 1e18 = 0.995 → 0
+    expect(computeBrokerFee(BigInt(199), BROKER_FEE_RATE)).toBe(BigInt(0));
+  });
+
+  it("rounds 0.5% of 200 base units to exactly 1", () => {
+    // 200 * 5e15 / 1e18 = 1.0 → 1
+    expect(computeBrokerFee(BigInt(200), BROKER_FEE_RATE)).toBe(BigInt(1));
+  });
+
+  it("handles amounts up to u64 max without overflow", () => {
+    // u64 max = 2^64-1; tokens on Solana are u64. (amount * rate) is bigint
+    // in JS so no native overflow, but verify the math doesn't pathologize.
+    const u64Max = BigInt("18446744073709551615");
+    const fee = computeBrokerFee(u64Max, BROKER_FEE_RATE);
+    expect(fee).toBeGreaterThan(BigInt(0));
+    expect(fee).toBeLessThan(u64Max);
+    // 0.5% of u64 max should be < 1% so should comfortably fit in u64.
+    expect(fee).toBeLessThan(u64Max / BigInt(100));
+  });
+
+  it("brokerFeeForTreasury * computeBrokerFee parity (zero treasury → zero fee)", () => {
+    expect(computeBrokerFee(usdc(1000), brokerFeeForTreasury(ZERO_ADDRESS))).toBe(
+      BigInt(0),
+    );
   });
 });
