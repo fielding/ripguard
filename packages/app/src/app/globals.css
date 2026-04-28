@@ -99,13 +99,22 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* Hero headline — the showpiece */
+/* Hero headline — the showpiece. Default tracking is calibrated for
+   mixed-case sentence text where lowercase ascenders/descenders need
+   the negative spacing to feel composed. */
 .text-hero {
   font-family: var(--font-display), var(--font-sans), sans-serif;
   font-weight: 400;
   font-size: var(--text-hero);
   line-height: 0.88;
   letter-spacing: -0.045em;
+}
+
+/* Override for uppercase hero — caps don't have ascenders/descenders so
+   they need less negative tracking to avoid crashing. Apply via
+   `<h1 class="text-hero uppercase">`. */
+.text-hero.uppercase {
+  letter-spacing: -0.02em;
 }
 
 /* Display heading for sections */
@@ -220,7 +229,9 @@ body {
   border: 0;
 }
 
-/* Brand wordmark — massive display type */
+/* Brand wordmark — massive display type. Tracking is -0.02em (not
+   -0.03em): caps in Archivo Black are already dense, and tighter
+   spacing makes the R and I crash into each other at hero scale. */
 .brand-wordmark {
   display: inline-flex;
   align-items: baseline;
@@ -228,8 +239,14 @@ body {
   font-weight: 400;
   font-size: clamp(2.5rem, 7vw, 5.5rem);
   line-height: 0.88;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
+}
+
+/* Hair gap between adjacent spans inside the wordmark — stops P and G
+   from kissing where the accent split lives (RIP|GUARD). */
+.brand-wordmark > span + span {
+  margin-left: 0.02em;
 }
 
 .brand-wordmark-dim {
@@ -239,6 +256,17 @@ body {
 
 .brand-wordmark-accent {
   color: var(--cyan);
+}
+
+/* Header nav links — ALL CAPS at 13px. Small caps need *positive*
+   tracking to read; tight spacing makes them mush. 0.08em is the
+   floor for UI caps at this size (eyebrows at 11px take 0.18em — the
+   smaller the type, the more tracking). */
+.nav-link {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 /* Tagline beneath wordmark */

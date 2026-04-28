@@ -40,7 +40,7 @@ function drawCard(
   // Branding
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 22px system-ui, -apple-system, sans-serif";
-  ctx.fillText("RipGuard", 32, 44);
+  ctx.fillText("RIPGUARD", 32, 44);
 
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.font = "12px system-ui, -apple-system, sans-serif";
