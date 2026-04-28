@@ -65,8 +65,9 @@ export function RipGuardMark({ className }: { className?: string }) {
 
 /**
  * 3D raster padlock mark — used at large sizes where the detail can breathe.
- * Wraps a cyan glow halo behind it since the transparent PNG lost its baked-in
- * ambient glow. The halo is animated with a gentle pulse at hero scale.
+ * The halo classes use bg-cyan utilities, which on this surface resolve to
+ * the violet accent via the --cyan → --violet alias in globals.css. The
+ * drop-shadow is hardcoded to violet rgba so it visually matches.
  */
 export function RipGuardMark3D({
   className,
@@ -89,7 +90,7 @@ export function RipGuardMark3D({
         alt=""
         width={1024}
         height={1024}
-        className="relative w-full h-full drop-shadow-[0_0_32px_rgba(71,180,204,0.5)]"
+        className="relative w-full h-full drop-shadow-[0_0_32px_rgba(155,107,255,0.5)]"
         aria-hidden="true"
         priority
       />
@@ -111,7 +112,7 @@ export function RipGuardWordmark({
         <span className="brand-wordmark-accent">GUARD</span>
       </span>
       {showTagline ? (
-        <span className="brand-tagline">Time-Locked Vaults On Base</span>
+        <span className="brand-tagline">Time-Locked Vaults On Solana</span>
       ) : null}
     </div>
   );

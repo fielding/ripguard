@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { RipGuardMark } from "@/components/Brand";
 
 // WalletMultiButton has its own client-only render path. Loading dynamically
 // with ssr:false keeps it from blowing up Next's static prerender pass.
@@ -28,6 +27,9 @@ const HOME_NAV_LINKS: NavLink[] = [
   { href: "/vaults", label: "Vaults" },
 ];
 
+// Where to send users who want the EVM surface from this Solana surface.
+const EVM_SITE_URL = "https://ripguard.xyz";
+
 export function Header() {
   const pathname = usePathname();
   const isHome = pathname === "/";
@@ -36,21 +38,25 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+        {/* TODO(logo): when the proper RipGuard lock mark exists, render it
+            here at 32px, left of the wordmark, with --violet as the
+            rim-light color on this surface. Wordmark stands alone until
+            then — see design handoff §2c. */}
         <Link
           href="/"
-          className="flex items-center gap-3 shrink-0 focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-4 focus-visible:rounded"
+          className="flex items-baseline gap-0 shrink-0 focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-4 focus-visible:rounded"
           aria-label="RipGuard home"
         >
-          <RipGuardMark className="h-9 w-9 shrink-0" />
           <span className="font-display text-xl tracking-tight leading-none">
             Rip<span className="text-cyan">Guard</span>
           </span>
+          <span className="brand-chain-chip">· SOL</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
           {navLinks.map((link) => {
             const isActive = !link.hash && pathname === link.href;
-            const className = `inline-flex items-center min-h-[2.75rem] px-4 text-sm font-medium transition-colors ${
+            const className = `nav-link inline-flex items-center min-h-[2.75rem] px-4 transition-colors ${
               isActive
                 ? "text-cyan"
                 : "text-muted hover:text-foreground"
@@ -67,11 +73,11 @@ export function Header() {
           })}
         </nav>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           <nav className="flex md:hidden items-center gap-0">
             {navLinks.slice(0, 2).map((link) => {
               const isActive = !link.hash && pathname === link.href;
-              const className = `inline-flex items-center min-h-[2.75rem] px-3 text-[0.8125rem] font-medium transition-colors ${
+              const className = `nav-link inline-flex items-center min-h-[2.75rem] px-3 transition-colors ${
                 isActive ? "text-cyan" : "text-muted hover:text-foreground"
               }`;
               return link.hash ? (
@@ -85,6 +91,13 @@ export function Header() {
               );
             })}
           </nav>
+          <a
+            href={EVM_SITE_URL}
+            className="chain-switch-link hidden sm:inline-flex"
+            aria-label="Switch to the EVM surface"
+          >
+            EVM →
+          </a>
           {isHome ? (
             <Link
               href="/create"

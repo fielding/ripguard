@@ -128,7 +128,7 @@ export async function renderSiteOGImage() {
             height: "920px",
             borderRadius: "50%",
             background:
-              "radial-gradient(circle, rgba(71,180,204,0.22) 0%, rgba(71,180,204,0.06) 45%, transparent 70%)",
+              "radial-gradient(circle, rgba(155,107,255,0.22) 0%, rgba(155,107,255,0.06) 45%, transparent 70%)",
             display: "flex",
           }}
         />
@@ -142,7 +142,7 @@ export async function renderSiteOGImage() {
             height: "460px",
             borderRadius: "50%",
             background:
-              "radial-gradient(circle, rgba(71,180,204,0.22) 0%, rgba(71,180,204,0.08) 40%, transparent 70%)",
+              "radial-gradient(circle, rgba(155,107,255,0.22) 0%, rgba(155,107,255,0.08) 40%, transparent 70%)",
             display: "flex",
           }}
         />
@@ -179,7 +179,7 @@ export async function renderSiteOGImage() {
                 style={{
                   width: "54px",
                   height: "2px",
-                  background: "#47b4cc",
+                  background: "#9b6bff",
                   opacity: 0.7,
                   display: "flex",
                 }}
@@ -212,7 +212,7 @@ export async function renderSiteOGImage() {
               }}
             >
               <span style={{ display: "flex" }}>Lock your winnings</span>
-              <span style={{ display: "flex", color: "#47b4cc" }}>
+              <span style={{ display: "flex", color: "#9b6bff" }}>
                 before you give them back.
               </span>
             </div>
@@ -279,7 +279,7 @@ export async function renderSiteOGImage() {
             }}
           >
             <span style={{ display: "flex", color: "#a6b2b8" }}>{siteHost}</span>
-            <span style={{ display: "flex", color: "#47b4cc" }}>·</span>
+            <span style={{ display: "flex", color: "#9b6bff" }}>·</span>
             <span style={{ display: "flex" }}>Powered by Sablier v2.0</span>
           </div>
           <span

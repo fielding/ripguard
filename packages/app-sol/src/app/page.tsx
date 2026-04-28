@@ -164,7 +164,7 @@ export default function Home() {
         <section className="relative overflow-hidden">
           {/* Ambient backdrop */}
           <div aria-hidden className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_20%,oklch(0.30_0.060_200/0.55),transparent_60%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_20%,oklch(0.30_0.060_290/0.55),transparent_60%)]" />
             <div className="absolute inset-0 grid-overlay" />
           </div>
 
