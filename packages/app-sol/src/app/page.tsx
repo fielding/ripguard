@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { WelcomeModal } from "@/components/WelcomeModal";
-import { RipGuardMark, RipGuardMark3D } from "@/components/Brand";
+import { RipGuardMark3D } from "@/components/Brand";
 import { BRAND } from "@/content/brand";
 
 function PresetIcon({ variant }: { variant: "clock" | "shield" | "lock" }) {
@@ -753,9 +753,16 @@ export default function Home() {
         {/* FOOTER */}
         <footer className="px-5 sm:px-8 py-16 border-t border-line">
           <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-3">
-              <RipGuardMark className="h-6 w-6" />
-              <span className="font-display text-lg tracking-tight">RipGuard</span>
+            {/* Wordmark stands alone — same treatment as the header.
+                18px caps fall between the header's 20px (0.01em) and
+                UI caps (0.06em+), so 0.02em gives a hair more
+                breathing room without losing the bunker feel.
+                TODO(logo): slot a real lock mark left of the wordmark
+                when one exists. */}
+            <div className="flex items-center">
+              <span className="font-display text-lg uppercase tracking-[0.02em] leading-none">
+                RIP<span className="text-cyan ml-[0.02em]">GUARD</span>
+              </span>
             </div>
             <nav className="flex items-center gap-2 sm:gap-4 text-sm text-muted">
               <Link

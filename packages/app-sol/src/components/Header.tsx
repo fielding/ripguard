@@ -44,8 +44,13 @@ export function Header() {
           className="flex items-baseline gap-0 shrink-0 focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-4 focus-visible:rounded"
           aria-label="RipGuard home"
         >
-          <span className="font-display text-xl tracking-tight leading-none">
-            Rip<span className="text-cyan">Guard</span>
+          {/* Header wordmark renders ALL CAPS at 20px (text-xl). That
+              size sits in the "mid caps" tracking band — 0 to 0.02em.
+              tracking-[0.01em] keeps the bunker tightness without
+              crashing R/I or P/G. The .brand-wordmark utility is
+              reserved for the larger display contexts (hero, etc.). */}
+          <span className="font-display text-xl uppercase tracking-[0.01em] leading-none">
+            RIP<span className="text-cyan ml-[0.02em]">GUARD</span>
           </span>
           <span className="brand-chain-chip">· SOL</span>
         </Link>

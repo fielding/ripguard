@@ -32,15 +32,15 @@ function drawCard(
 
   // Accent line at top
   const gradient = ctx.createLinearGradient(0, 0, CARD_W, 0);
-  gradient.addColorStop(0, "#47B4CC");
-  gradient.addColorStop(1, "#3A99AB");
+  gradient.addColorStop(0, "#9B6BFF");
+  gradient.addColorStop(1, "#7A4EE0");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CARD_W, 3);
 
   // Branding
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 22px system-ui, -apple-system, sans-serif";
-  ctx.fillText("RipGuard", 32, 44);
+  ctx.fillText("RIPGUARD", 32, 44);
 
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.font = "12px system-ui, -apple-system, sans-serif";
@@ -52,7 +52,7 @@ function drawCard(
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.font = "12px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Base", CARD_W - 78, 42);
+  ctx.fillText("Solana", CARD_W - 80, 42);
 
   // Amount
   ctx.fillStyle = "#ffffff";
