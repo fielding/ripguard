@@ -4,6 +4,8 @@
   "packageManager": "pnpm@10.29.3",
   "workspaces": ["packages/*"],
   "scripts": {
-    "balances": "pnpm --filter app balances"
+    "balances": "pnpm --filter app balances && pnpm --filter app-sol balances",
+    "balances:evm": "pnpm --filter app balances",
+    "balances:sol": "pnpm --filter app-sol balances"
   }
 }
