@@ -27,9 +27,6 @@ const HOME_NAV_LINKS: NavLink[] = [
   { href: "/vaults", label: "Vaults" },
 ];
 
-// Where to send users who want the EVM surface from this Solana surface.
-const EVM_SITE_URL = "https://ripguard.xyz";
-
 export function Header() {
   const pathname = usePathname();
   const isHome = pathname === "/";
@@ -91,13 +88,6 @@ export function Header() {
               );
             })}
           </nav>
-          <a
-            href={EVM_SITE_URL}
-            className="chain-switch-link hidden sm:inline-flex"
-            aria-label="Switch to the EVM surface"
-          >
-            EVM →
-          </a>
           {isHome ? (
             <Link
               href="/create"

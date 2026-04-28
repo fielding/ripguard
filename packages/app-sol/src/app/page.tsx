@@ -231,16 +231,26 @@ export default function Home() {
                   </a>
                 </div>
 
-                {!IS_TESTNET && (
+                <div className="mt-6 flex flex-col gap-2 items-start">
+                  {!IS_TESTNET && (
+                    <a
+                      href="https://testnet.sol.ripguard.xyz"
+                      className="inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors animate-hero-enter"
+                      style={{ animationDelay: "620ms" }}
+                    >
+                      Test the flow on Solana devnet
+                      <span aria-hidden>→</span>
+                    </a>
+                  )}
                   <a
-                    href="https://testnet.sol.ripguard.xyz"
-                    className="mt-6 inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors animate-hero-enter"
-                    style={{ animationDelay: "620ms" }}
+                    href="https://ripguard.xyz"
+                    className="inline-flex items-center gap-2 text-sm text-faint hover:text-cyan transition-colors animate-hero-enter"
+                    style={{ animationDelay: IS_TESTNET ? "620ms" : "720ms" }}
                   >
-                    Test the flow on Solana devnet
+                    Use RipGuard on EVM
                     <span aria-hidden>→</span>
                   </a>
-                )}
+                </div>
               </div>
 
               {/* 3D mark — floats free, no card frame. Outer wrapper handles
