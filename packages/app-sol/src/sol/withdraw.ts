@@ -16,6 +16,7 @@ import {
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import idlJson from "@/idl/sablier_lockup.json";
 import type { Idl } from "@coral-xyz/anchor";
+import { PRIORITY_FEE_MICRO_LAMPORTS } from "@/config/solsab";
 
 const SABLIER_LOCKUP_IDL = idlJson as unknown as Idl;
 
@@ -58,6 +59,12 @@ export async function buildWithdrawMaxTx(
     // Withdraw touches the same Metaplex / Sablier account web as create —
     // bump CU just like we do on the create path.
     ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
+    // Pay a per-CU priority fee so leaders actually include the tx during
+    // contention — without this, mainnet routinely drops our tx until the
+    // blockhash expires.
+    ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: PRIORITY_FEE_MICRO_LAMPORTS,
+    }),
   ];
 
   const ix = await program.methods

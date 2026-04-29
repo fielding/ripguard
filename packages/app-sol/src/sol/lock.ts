@@ -35,6 +35,7 @@ import {
 } from "@solana/spl-token";
 import { SystemProgram } from "@solana/web3.js";
 import {
+  PRIORITY_FEE_MICRO_LAMPORTS,
   SABLIER_LOCKUP_PROGRAM_ID,
   TREASURY_PUBKEY,
   WSOL_MINT,
@@ -159,6 +160,14 @@ export async function buildLockTx(
   // we proactively bump. This is cheap insurance.
   instructions.push(
     ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }),
+  );
+  // Pay a per-CU priority fee so leaders actually include the tx during
+  // contention — without this, mainnet routinely drops our tx until the
+  // blockhash expires.
+  instructions.push(
+    ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: PRIORITY_FEE_MICRO_LAMPORTS,
+    }),
   );
 
   // Idempotently ensure the user's deposit-token ATA exists before the

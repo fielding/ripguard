@@ -119,6 +119,27 @@ export function computeBrokerFee(amount: bigint, bps: bigint = BROKER_FEE_BPS): 
 }
 
 // ----------------------------------------------------------------------------
+// Priority fee
+// ----------------------------------------------------------------------------
+//
+// Mainnet leaders deprioritize txs with no compute-unit price during any
+// contention — our 600k-CU txs would routinely miss the ~60s blockhash
+// validity window, surfacing as "Signature has expired: block height
+// exceeded." Setting a small price per CU is the standard fix.
+//
+// 50k microLamports/CU × 600k CU = 30k lamports (~$0.007 at $230 SOL).
+// Cheap insurance; tune via env if mainnet congestion spikes.
+
+const DEFAULT_PRIORITY_FEE_MICRO_LAMPORTS = 50_000;
+
+export const PRIORITY_FEE_MICRO_LAMPORTS: number = (() => {
+  const raw = process.env.NEXT_PUBLIC_PRIORITY_FEE_MICRO_LAMPORTS;
+  if (!raw) return DEFAULT_PRIORITY_FEE_MICRO_LAMPORTS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_PRIORITY_FEE_MICRO_LAMPORTS;
+})();
+
+// ----------------------------------------------------------------------------
 // Explorer
 // ----------------------------------------------------------------------------
 
