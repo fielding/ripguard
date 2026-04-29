@@ -136,6 +136,9 @@ function CreateForm() {
       // Assemble a legacy Transaction. Solana v0 transactions add lookup
       // tables we don't need yet — keep it simple until we hit the account
       // limit.
+      if (!wallet.signTransaction) {
+        throw new Error("Wallet does not support signTransaction.");
+      }
       const tx = new Transaction();
       for (const ix of instructions) tx.add(ix);
       // Use `processed` for the blockhash so we get the freshest possible
@@ -146,17 +149,21 @@ function CreateForm() {
       tx.recentBlockhash = blockhash;
       tx.feePayer = wallet.publicKey;
 
-      // Use the wallet adapter's sendTransaction rather than manual
-      // signTransaction + connection.sendRawTransaction. Phantom (and some
-      // other wallets) auto-submit on signTransaction, which causes a
-      // "transaction has already been processed" error on the second send.
-      // sendTransaction delegates to the wallet's preferred submission path
-      // and returns the signature.
+      // Have Phantom sign only — DON'T let Phantom broadcast. Phantom's
+      // RPC isn't stake-weighted; under any contention, leaders silently
+      // drop our tx and we hit "block height exceeded" without it ever
+      // reaching the chain. Broadcasting through our own Helius endpoint
+      // (which has stake-weighted forwarding) gets us reliable landing.
       setStatus({ kind: "signing" });
-      const signature = await wallet.sendTransaction(tx, connection, {
-        preflightCommitment: "confirmed",
-        maxRetries: 5,
-      });
+      const signed = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        {
+          maxRetries: 5,
+          skipPreflight: false,
+          preflightCommitment: "confirmed",
+        },
+      );
       setStatus({ kind: "confirming", signature });
 
       await connection.confirmTransaction(

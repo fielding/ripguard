@@ -232,6 +232,9 @@ function VaultsBody() {
           depositedTokenMint: stream.depositedTokenMint,
         });
 
+        if (!wallet.signTransaction) {
+          throw new Error("Wallet does not support signTransaction.");
+        }
         const tx = new Transaction();
         for (const ix of instructions) tx.add(ix);
         // Use `processed` for the blockhash so we get the freshest possible
@@ -242,10 +245,20 @@ function VaultsBody() {
         tx.recentBlockhash = blockhash;
         tx.feePayer = wallet.publicKey;
 
-        const signature = await wallet.sendTransaction(tx, connection, {
-          preflightCommitment: "confirmed",
-          maxRetries: 5,
-        });
+        // Have Phantom sign only — DON'T let Phantom broadcast. Phantom's
+        // RPC isn't stake-weighted; under any contention, leaders silently
+        // drop our tx and we hit "block height exceeded" without it ever
+        // reaching the chain. Broadcasting through our own Helius endpoint
+        // (which has stake-weighted forwarding) gets us reliable landing.
+        const signed = await wallet.signTransaction(tx);
+        const signature = await connection.sendRawTransaction(
+          signed.serialize(),
+          {
+            maxRetries: 5,
+            skipPreflight: false,
+            preflightCommitment: "confirmed",
+          },
+        );
         await connection.confirmTransaction(
           { signature, blockhash, lastValidBlockHeight },
           "confirmed",
