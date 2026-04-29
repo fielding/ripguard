@@ -127,10 +127,11 @@ export function computeBrokerFee(amount: bigint, bps: bigint = BROKER_FEE_BPS): 
 // validity window, surfacing as "Signature has expired: block height
 // exceeded." Setting a small price per CU is the standard fix.
 //
-// 50k microLamports/CU × 600k CU = 30k lamports (~$0.007 at $230 SOL).
-// Cheap insurance; tune via env if mainnet congestion spikes.
+// 500k microLamports/CU × 600k CU = 300k lamports (~$0.07 at $230 SOL).
+// Mainnet medians during contention are 100k–1M µLamports/CU; sized to
+// land in the next block even on busy days. Tune via env for spikes.
 
-const DEFAULT_PRIORITY_FEE_MICRO_LAMPORTS = 50_000;
+const DEFAULT_PRIORITY_FEE_MICRO_LAMPORTS = 500_000;
 
 export const PRIORITY_FEE_MICRO_LAMPORTS: number = (() => {
   const raw = process.env.NEXT_PUBLIC_PRIORITY_FEE_MICRO_LAMPORTS;

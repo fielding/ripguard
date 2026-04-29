@@ -138,8 +138,11 @@ function CreateForm() {
       // limit.
       const tx = new Transaction();
       for (const ix of instructions) tx.add(ix);
+      // Use `processed` for the blockhash so we get the freshest possible
+      // tip — buys ~30 extra slots of validity vs `confirmed`, which the
+      // Phantom warning popup eats up while the user reads it.
       const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
+        await connection.getLatestBlockhash("processed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = wallet.publicKey;
 
@@ -152,6 +155,7 @@ function CreateForm() {
       setStatus({ kind: "signing" });
       const signature = await wallet.sendTransaction(tx, connection, {
         preflightCommitment: "confirmed",
+        maxRetries: 5,
       });
       setStatus({ kind: "confirming", signature });
 
