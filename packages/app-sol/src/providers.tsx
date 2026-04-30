@@ -13,17 +13,11 @@ import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import {
-  SolanaMobileWalletAdapter,
-  createDefaultAddressSelector,
-  createDefaultAuthorizationResultCache,
-  createDefaultWalletNotFoundHandler,
-} from "@solana-mobile/wallet-adapter-mobile";
 import { createSolanaClient } from "@metamask/connect-solana";
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { ToastProvider } from "@/components/Toast";
 import { trackWalletConnect, trackAppError } from "@/lib/analytics";
-import { NETWORK, RPC_URL } from "@/config/solsab";
+import { RPC_URL } from "@/config/solsab";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -95,31 +89,13 @@ export function Providers({ children }: { children: ReactNode }) {
   // Solana wallets auto-register via the @wallet-standard interface, so they
   // show up in the modal without needing a dedicated adapter dependency.
   //
-  // SolanaMobileWalletAdapter (MWA) handles the Android — and increasingly
-  // iOS — deep-link handshake to wallet apps so mobile-browser users without
-  // an extension can connect. It quietly self-disables on platforms where
-  // MWA isn't supported, so it's safe to include unconditionally. Mobile
-  // users on platforms MWA doesn't reach get the deep-link affordance from
+  // The Solana Mobile Wallet Adapter (MWA) is auto-injected by
+  // <WalletProvider> when getEnvironment() returns MOBILE_WEB — we don't
+  // need to register it manually. Mobile users on platforms MWA can't
+  // reach (iOS Chrome, etc.) get the deep-link affordance from
   // <MobileWalletFallback /> on the connect-required pages.
   const wallets = useMemo(
-    () => [
-      new SolanaMobileWalletAdapter({
-        addressSelector: createDefaultAddressSelector(),
-        appIdentity: {
-          name: "RipGuard",
-          uri:
-            typeof window !== "undefined"
-              ? window.location.origin
-              : "https://sol.ripguard.xyz",
-          icon: "/favicon.ico",
-        },
-        authorizationResultCache: createDefaultAuthorizationResultCache(),
-        cluster: NETWORK,
-        onWalletNotFound: createDefaultWalletNotFoundHandler(),
-      }),
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-    ],
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
     [],
   );
 
