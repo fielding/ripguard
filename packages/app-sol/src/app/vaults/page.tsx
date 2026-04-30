@@ -8,6 +8,7 @@ import { Transaction, type PublicKey } from "@solana/web3.js";
 
 import { Header } from "@/components/Header";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
+import { MobileWalletFallback } from "@/components/MobileWalletFallback";
 import { useToast } from "@/components/Toast";
 import {
   SOL_DECIMALS,
@@ -311,9 +312,12 @@ function VaultsBody() {
         </div>
 
         {!wallet.connected && (
-          <div className="mt-10 rounded-md border border-line p-6 text-muted">
-            Connect a Solana wallet from the header to see your locks.
-          </div>
+          <>
+            <div className="mt-10 rounded-md border border-line p-6 text-muted">
+              Connect a Solana wallet from the header to see your locks.
+            </div>
+            <MobileWalletFallback />
+          </>
         )}
 
         {wallet.connected && loading && streams === null && (

@@ -9,6 +9,7 @@ import { Transaction } from "@solana/web3.js";
 
 import { Header } from "@/components/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MobileWalletFallback } from "@/components/MobileWalletFallback";
 import { useToast } from "@/components/Toast";
 import {
   PRESETS,
@@ -284,10 +285,13 @@ function CreateForm() {
         </p>
 
         {!wallet.connected && (
-          <div className="mt-8 rounded-md border border-line p-5 text-sm text-muted">
-            Connect a Solana wallet from the header to start. Phantom, Solflare,
-            and Backpack all work.
-          </div>
+          <>
+            <div className="mt-8 rounded-md border border-line p-5 text-sm text-muted">
+              Connect a Solana wallet from the header to start. Phantom, Solflare,
+              and Backpack all work.
+            </div>
+            <MobileWalletFallback />
+          </>
         )}
 
         <fieldset className="mt-10" disabled={isPending}>

@@ -16,6 +16,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
     "@metamask/connect-solana": "^1.0.0",
+    "@solana-mobile/wallet-adapter-mobile": "^2.2.8",
     "@solana/spl-token": "^0.4.13",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
