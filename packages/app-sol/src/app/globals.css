@@ -569,6 +569,33 @@ option {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Wallet adapter trigger button — vendor styles set 48px height, 24px
+   horizontal padding, 16px font, and decorate the connected button
+   with a 24px wallet icon (left) and 24px caret (right). At <640px
+   viewports that ~170-180px button collides with the wordmark.
+   Mobile: hide both icons, tighten padding/font, let the truncated
+   address (e.g. "AbCd…1234") be the whole story. */
+@media (max-width: 639px) {
+  .wallet-adapter-button-trigger {
+    height: 40px;
+    line-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  .wallet-adapter-button-trigger .wallet-adapter-button-start-icon,
+  .wallet-adapter-button-trigger .wallet-adapter-button-end-icon {
+    display: none;
+  }
+  /* Compact dropdown placement — vendor's 100% top + 10px translate is
+     fine; just align it to the trigger's right edge so it doesn't
+     spill off-screen. */
+  .wallet-adapter-dropdown-list {
+    right: 0;
+    left: auto;
+  }
+}
+
 .skeleton {
   background: linear-gradient(
     90deg,

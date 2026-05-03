@@ -168,7 +168,7 @@ export default function Home() {
             <div className="absolute inset-0 grid-overlay" />
           </div>
 
-          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 pt-20 pb-24 sm:pt-28 sm:pb-32">
+          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 pt-14 pb-20 sm:pt-28 sm:pb-32">
             {/* Eyebrow */}
             <div
               className="eyebrow mb-10 flex items-center gap-3 animate-hero-enter"
@@ -273,8 +273,8 @@ export default function Home() {
             </div>
 
             {/* Proof line — not metric cards, just a row of claims */}
-            <div className="mt-20 sm:mt-24 border-t border-line pt-8">
-              <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-4 text-sm">
+            <div className="mt-16 sm:mt-24 border-t border-line pt-8">
+              <ul className="flex flex-wrap items-baseline gap-x-6 gap-y-3 sm:gap-x-10 sm:gap-y-4 text-sm">
                 <li className="flex items-baseline gap-2">
                   <span className="font-display text-cyan text-2xl tabular">100%</span>
                   <span className="text-muted">Non-custodial</span>
@@ -301,7 +301,7 @@ export default function Home() {
         </section>
 
         {/* PROBLEM — single column, editorial pullquote style */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40">
+        <section className="px-5 sm:px-8 py-20 sm:py-40">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">The problem</div>
             <h2 className="text-display max-w-4xl">
@@ -326,7 +326,7 @@ export default function Home() {
         </section>
 
         {/* HOW IT WORKS — numbered editorial, no identical cards */}
-        <section id="how-it-works" className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section id="how-it-works" className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">How it works</div>
             <h2 className="text-display max-w-3xl">
@@ -396,7 +396,7 @@ export default function Home() {
         </section>
 
         {/* PRESETS — card grid is earned here because these are actually selections */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">Reloads</div>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-8 mb-16">
@@ -445,7 +445,7 @@ export default function Home() {
         </section>
 
         {/* TRUST — four claims as an editorial spec sheet */}
-        <section id="trust" className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section id="trust" className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">Trust model</div>
             <h2 className="text-display max-w-3xl">
@@ -533,7 +533,7 @@ export default function Home() {
         </section>
 
         {/* LIMITS — bold statement of what RipGuard explicitly cannot do */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">Limitations</div>
             <h2 className="text-display max-w-3xl">
@@ -571,7 +571,7 @@ export default function Home() {
         </section>
 
         {/* FOUNDER — editorial, widened */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">Why this exists</div>
             <h2 className="text-display">
@@ -618,7 +618,7 @@ export default function Home() {
         </section>
 
         {/* FEES — tight, quoted */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">Fees</div>
             <h2 className="text-display max-w-4xl">
@@ -643,7 +643,7 @@ export default function Home() {
         </section>
 
         {/* FAQ */}
-        <section className="px-5 sm:px-8 py-28 sm:py-40 border-t border-line">
+        <section className="px-5 sm:px-8 py-20 sm:py-40 border-t border-line">
           <div className="mx-auto max-w-6xl">
             <div className="eyebrow mb-8">FAQ</div>
             <h2 className="text-display mb-16">Questions people ask.</h2>
@@ -718,7 +718,7 @@ export default function Home() {
         </section>
 
         {/* BOTTOM CTA — quiet command */}
-        <section className="relative px-5 sm:px-8 py-32 sm:py-44 border-t border-line overflow-hidden">
+        <section className="relative px-5 sm:px-8 py-24 sm:py-44 border-t border-line overflow-hidden">
           <div aria-hidden className="absolute inset-0 pointer-events-none">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-cyan/[0.05] blur-[160px]" />
             <div className="absolute inset-0 grid-overlay" />
@@ -751,8 +751,8 @@ export default function Home() {
         </section>
 
         {/* FOOTER */}
-        <footer className="px-5 sm:px-8 py-16 border-t border-line">
-          <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-8">
+        <footer className="px-5 sm:px-8 py-12 sm:py-16 border-t border-line">
+          <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-8">
             {/* Wordmark stands alone — same treatment as the header.
                 18px caps fall between the header's 20px (0.01em) and
                 UI caps (0.06em+), so 0.02em gives a hair more
@@ -764,7 +764,7 @@ export default function Home() {
                 RIP<span className="text-cyan ml-[0.02em]">GUARD</span>
               </span>
             </div>
-            <nav className="flex items-center gap-2 sm:gap-4 text-sm text-muted">
+            <nav className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 sm:gap-x-4 text-sm text-muted">
               <Link
                 href="/vaults"
                 className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"

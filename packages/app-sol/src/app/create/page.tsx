@@ -220,9 +220,9 @@ function CreateForm() {
     return (
       <main className="min-h-screen bg-background text-foreground">
         <Header />
-        <section className="mx-auto max-w-3xl px-5 sm:px-8 py-16">
+        <section className="mx-auto max-w-3xl px-5 sm:px-8 py-12 sm:py-16">
           <div className="eyebrow mb-6">Locked</div>
-          <h1 className="font-display text-4xl tracking-tight">
+          <h1 className="font-display text-3xl sm:text-4xl tracking-tight">
             Past you just paid future you<span className="text-cyan">.</span>
           </h1>
           <p className="mt-4 text-muted leading-relaxed">
@@ -258,11 +258,11 @@ function CreateForm() {
               </dd>
             </div>
           </dl>
-          <div className="mt-10 flex gap-3">
-            <Link href="/vaults" className="btn-primary">
+          <div className="mt-10 flex flex-col sm:flex-row gap-3">
+            <Link href="/vaults" className="btn-primary w-full sm:w-auto">
               See vaults
             </Link>
-            <Link href="/create" className="btn-secondary">
+            <Link href="/create" className="btn-secondary w-full sm:w-auto">
               Lock more
             </Link>
           </div>
@@ -274,9 +274,9 @@ function CreateForm() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Header />
-      <section className="mx-auto max-w-3xl px-5 sm:px-8 py-16">
+      <section className="mx-auto max-w-3xl px-5 sm:px-8 py-12 sm:py-16">
         <div className="eyebrow mb-6">Create a lock</div>
-        <h1 className="font-display text-4xl tracking-tight">
+        <h1 className="font-display text-3xl sm:text-4xl tracking-tight">
           Past you<span className="text-cyan">.</span>
         </h1>
         <p className="mt-4 text-muted">
@@ -355,7 +355,7 @@ function CreateForm() {
           type="button"
           onClick={onSubmit}
           disabled={!wallet.connected || isPending || amount === null}
-          className="btn-primary mt-10 w-full sm:w-auto"
+          className="btn-primary mt-8 sm:mt-10 w-full sm:w-auto"
         >
           {!wallet.connected
             ? "Connect a wallet"

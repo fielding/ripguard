@@ -79,9 +79,9 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
   const canClaim = claimable > 0n && !snapshot.isDepleted;
 
   return (
-    <article className="rounded-md border border-line p-6 bg-background hover:border-cyan/40 transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <article className="rounded-md border border-line p-5 sm:p-6 bg-background hover:border-cyan/40 transition-colors">
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
           <div className="eyebrow">
             <span
               className={
@@ -97,7 +97,7 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
               {status}
             </span>
           </div>
-          <h2 className="mt-2 font-display text-2xl tracking-tight tabular">
+          <h2 className="mt-2 font-display text-xl sm:text-2xl tracking-tight tabular break-all">
             {formatSol(snapshot.deposited)} {DEPOSIT_TOKEN_LABEL}
           </h2>
           <p className="mt-1 text-xs text-faint font-mono">
@@ -112,9 +112,9 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
             </a>
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <div className="eyebrow text-faint">Claimable</div>
-          <div className="font-display text-xl tabular text-cyan">
+          <div className="font-display text-lg sm:text-xl tabular text-cyan">
             {formatSol(claimable)}
           </div>
         </div>
@@ -291,11 +291,11 @@ function VaultsBody() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Header />
-      <section className="mx-auto max-w-4xl px-5 sm:px-8 py-16">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+      <section className="mx-auto max-w-4xl px-5 sm:px-8 py-12 sm:py-16">
+        <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <div className="eyebrow">Your vaults</div>
-            <h1 className="mt-2 font-display text-4xl tracking-tight">
+            <h1 className="mt-2 font-display text-3xl sm:text-4xl tracking-tight">
               Claim what&apos;s unlocked<span className="text-cyan">.</span>
             </h1>
           </div>
@@ -304,7 +304,7 @@ function VaultsBody() {
               type="button"
               onClick={loadStreams}
               disabled={loading}
-              className="btn-secondary !min-h-[2.5rem] !py-2 !px-4 !text-sm shrink-0"
+              className="btn-secondary !min-h-[2.5rem] !py-2 !px-4 !text-sm shrink-0 mt-1"
             >
               {loading ? "Loading…" : "Refresh"}
             </button>
