@@ -28,7 +28,7 @@ import {
   secondsUntilNext,
 } from "@/sol/vault-math";
 import { trackClaim, trackContractError } from "@/lib/analytics";
-import { isUserRejection } from "@/lib/errors";
+import { isUserRejection, extractErrorReason } from "@/lib/errors";
 
 // Same display strategy as /create: 9 decimals on chain, render up to 4
 // fractional digits, trim trailing zeros.
@@ -275,12 +275,13 @@ function VaultsBody() {
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         if (isUserRejection(e)) return;
+        const friendly = extractErrorReason(e);
         trackContractError({
           action: "withdraw_max",
-          error: e.message,
+          error: friendly,
           contract: "sablier_lockup",
         });
-        toast.toast(`Claim failed: ${e.message}`, "error");
+        toast.toast(friendly, "error");
       } finally {
         setClaimingMint(null);
       }
