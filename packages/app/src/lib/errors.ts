@@ -15,6 +15,19 @@ export function extractErrorReason(error: Error | null): string {
   if (!error) return "Transaction failed.";
   const msg = error.message ?? "";
 
+  // Wallet is on a chain we don't support / mismatch between requested
+  // chain and active chain. Surfaces as "ChainMismatchError" or the
+  // less-specific "does not match the target chain" string.
+  if (
+    msg.includes("ChainMismatchError") ||
+    msg.includes("does not match the target chain") ||
+    msg.includes("chain mismatch") ||
+    msg.includes("ChainNotConfiguredError") ||
+    msg.includes("UnknownRpcError") && msg.toLowerCase().includes("chain")
+  ) {
+    return "Your wallet is on a different network than this page. Switch networks in your wallet (or use the network switcher in the header).";
+  }
+
   // Viem contract revert reasons: "reverted with reason string 'Foo'"
   const revertMatch = msg.match(
     /reverted with reason string ['"]([^'"]+)['"]/
@@ -49,5 +62,11 @@ export function extractErrorReason(error: Error | null): string {
   if (msg.includes("ERC20: insufficient allowance"))
     return "USDC approval insufficient.";
 
+  // Generic fallback — keep first sentence so we don't dump a stack
+  // trace into a toast.
+  const trimmed = msg.split(/\.\s|\n/)[0].slice(0, 140).trim();
+  if (trimmed && trimmed.length > 8 && !trimmed.includes("0x")) {
+    return `${trimmed}.`;
+  }
   return "Transaction failed. Please try again.";
 }

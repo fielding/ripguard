@@ -6,7 +6,7 @@ describe("isUserRejection", () => {
     expect(isUserRejection(null)).toBe(false);
   });
 
-  it("detects MetaMask-style rejection", () => {
+  it("detects Phantom-style rejection", () => {
     expect(isUserRejection(new Error("User rejected the request."))).toBe(true);
   });
 
@@ -14,14 +14,13 @@ describe("isUserRejection", () => {
     expect(isUserRejection(new Error("User denied transaction signature"))).toBe(true);
   });
 
-  it("detects generic rejection", () => {
-    expect(isUserRejection(new Error("user rejected"))).toBe(true);
+  it("detects Solflare-style cancellation", () => {
+    expect(isUserRejection(new Error("Transaction was not signed by the user"))).toBe(true);
   });
 
   it("returns false for unrelated errors", () => {
-    expect(isUserRejection(new Error("out of gas"))).toBe(false);
-    expect(isUserRejection(new Error("insufficient funds"))).toBe(false);
-    expect(isUserRejection(new Error("network error"))).toBe(false);
+    expect(isUserRejection(new Error("Blockhash not found"))).toBe(false);
+    expect(isUserRejection(new Error("Insufficient lamports"))).toBe(false);
   });
 });
 
@@ -30,44 +29,47 @@ describe("extractErrorReason", () => {
     expect(extractErrorReason(null)).toBe("Transaction failed.");
   });
 
-  it("extracts Solidity revert reason", () => {
-    const err = new Error("reverted with reason string 'ERC20: transfer amount exceeds balance'");
-    expect(extractErrorReason(err)).toBe("ERC20: transfer amount exceeds balance");
+  it("translates the empty-wallet preflight error", () => {
+    const err = new Error(
+      "Transaction simulation failed: Attempt to debit an account but found no record of a prior credit. Logs: [].",
+    );
+    expect(extractErrorReason(err)).toContain("no SOL on this network");
   });
 
-  it("extracts custom error name", () => {
-    const err = new Error("reverted with custom error 'SablierLockup_ZeroAmount()'");
-    expect(extractErrorReason(err)).toBe("Contract error: SablierLockup_ZeroAmount");
+  it("translates insufficient lamports", () => {
+    expect(extractErrorReason(new Error("insufficient lamports for rent")))
+      .toContain("Not enough SOL");
   });
 
-  it("detects panic codes", () => {
-    const err = new Error("reverted with panic code 0x11");
-    expect(extractErrorReason(err)).toBe("Contract panic (arithmetic error).");
+  it("translates expired blockhash", () => {
+    expect(extractErrorReason(new Error("Signature has expired: block height exceeded")))
+      .toContain("transaction expired");
   });
 
-  it("detects gas errors", () => {
-    expect(extractErrorReason(new Error("gas required exceeds allowance")))
-      .toBe("Transaction would fail on-chain (out of gas or revert).");
-    expect(extractErrorReason(new Error("out of gas")))
-      .toBe("Transaction would fail on-chain (out of gas or revert).");
-    expect(extractErrorReason(new Error("intrinsic gas too low")))
-      .toBe("Transaction would fail on-chain (out of gas or revert).");
+  it("translates a missing on-chain account as a cluster hint", () => {
+    expect(extractErrorReason(new Error("AccountNotFound: ...")))
+      .toContain("same network as this site");
   });
 
-  it("detects insufficient funds", () => {
-    expect(extractErrorReason(new Error("insufficient funds for gas * price + value")))
-      .toBe("Insufficient ETH for gas fees.");
+  it("extracts Anchor error message", () => {
+    const err = new Error(
+      "AnchorError caused by account: stream. Error Code: SomeError. Error Number: 6000. Error Message: The stream has already been claimed.",
+    );
+    expect(extractErrorReason(err)).toBe("The stream has already been claimed");
   });
 
-  it("detects ERC-20 specific errors", () => {
-    expect(extractErrorReason(new Error("ERC20: transfer amount exceeds balance")))
-      .toBe("Insufficient USDC balance.");
-    expect(extractErrorReason(new Error("ERC20: insufficient allowance")))
-      .toBe("USDC approval insufficient.");
+  it("formats raw custom program error codes", () => {
+    expect(extractErrorReason(new Error("Custom program error: 0x1771")))
+      .toContain("0x1771");
   });
 
-  it("returns generic fallback for unknown errors", () => {
-    expect(extractErrorReason(new Error("something unexpected")))
-      .toBe("Transaction failed. Please try again.");
+  it("strips Lock failed: wrapper", () => {
+    const err = new Error("Lock failed: Blockhash not found");
+    expect(extractErrorReason(err)).toContain("transaction expired");
+  });
+
+  it("falls back to a clean first sentence", () => {
+    expect(extractErrorReason(new Error("Something weird happened. With extra detail.")))
+      .toBe("Something weird happened.");
   });
 });

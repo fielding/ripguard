@@ -66,8 +66,18 @@ describe("extractErrorReason", () => {
       .toBe("USDC approval insufficient.");
   });
 
-  it("returns generic fallback for unknown errors", () => {
-    expect(extractErrorReason(new Error("something unexpected")))
+  it("preserves a clean first sentence for unknown errors", () => {
+    expect(extractErrorReason(new Error("something unexpected. with details")))
+      .toBe("something unexpected.");
+  });
+
+  it("falls back to generic for hex-blob errors", () => {
+    expect(extractErrorReason(new Error("0xdeadbeef internal error")))
       .toBe("Transaction failed. Please try again.");
+  });
+
+  it("translates ChainMismatchError", () => {
+    expect(extractErrorReason(new Error("ChainMismatchError: chain ID does not match")))
+      .toContain("different network");
   });
 });
