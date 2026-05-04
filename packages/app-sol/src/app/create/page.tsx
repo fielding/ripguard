@@ -168,9 +168,21 @@ function CreateForm() {
     }
     setBalanceLoading(true);
     try {
-      const lamports = await connection.getBalance(wallet.publicKey);
+      const lamports = await connection.getBalance(wallet.publicKey, "confirmed");
+      // One-line debug breadcrumb so a real user (or the dev) can
+      // open DevTools and verify we're hitting the cluster they
+      // expect. RPC URL is the smoking gun if balances don't match.
+      // eslint-disable-next-line no-console
+      console.info("[ripguard] balance check", {
+        rpc: connection.rpcEndpoint,
+        cluster: IS_DEVNET ? "devnet" : "mainnet-beta",
+        pubkey: wallet.publicKey.toBase58(),
+        lamports,
+      });
       setSolBalance(BigInt(lamports));
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[ripguard] balance check failed", err);
       setSolBalance(null);
     } finally {
       setBalanceLoading(false);
@@ -442,38 +454,74 @@ function CreateForm() {
           </>
         )}
 
-        {/* Network mismatch nudge — fires when the wallet is connected but
-            reports zero balance on the cluster the dApp is talking to.
-            Phantom doesn't expose the wallet's selected cluster to the
-            dApp, so this heuristic is the best signal we have. */}
-        {networkHint && (
+        {/* Empty-balance diagnostic. Fires when the wallet is connected
+            but our RPC reports zero balance for the connected pubkey on
+            the active cluster. The user's wallet might really be empty,
+            but more often it's one of three things they can fix:
+            wrong account selected in the wallet, wallet set to a
+            different cluster, or a transient RPC blip. We surface the
+            connected pubkey + an explorer link so they can verify
+            against ground truth themselves. */}
+        {networkHint && wallet.publicKey && (
           <div className="mt-6 rounded-md border border-warning/40 bg-warning/[0.04] p-4 text-sm">
-            <div className="eyebrow text-warning/90 mb-1.5">Heads up</div>
+            <div className="eyebrow text-warning/90 mb-1.5">
+              Wallet looks empty
+            </div>
             <p className="text-foreground/90 leading-relaxed">
-              Your wallet shows <span className="tabular">0 SOL</span> on{" "}
-              {IS_DEVNET ? "Solana devnet" : "Solana mainnet-beta"}.{" "}
-              {IS_DEVNET ? (
-                <>
-                  Make sure your wallet is set to <strong>Devnet</strong>, then
-                  fund it from{" "}
-                  <a
-                    href="https://faucet.solana.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline decoration-warning/50 hover:decoration-warning"
-                  >
-                    the Solana faucet
-                  </a>
-                  .
-                </>
-              ) : (
-                <>
-                  If your wallet is set to a different network (devnet,
-                  testnet), switch it to <strong>Mainnet</strong> in the
-                  wallet settings before trying to lock.
-                </>
-              )}
+              We see{" "}
+              <span className="tabular text-foreground">
+                {solBalance !== null ? formatSol(solBalance) : "—"} SOL
+              </span>{" "}
+              on this account on{" "}
+              <strong>
+                {IS_DEVNET ? "Solana devnet" : "Solana mainnet-beta"}
+              </strong>
+              . If your wallet says otherwise, check:
             </p>
+            <ul className="mt-2 space-y-1 text-foreground/80 list-disc list-outside pl-5">
+              <li>
+                That this is the account you expected — Phantom can hold
+                several. Connected:{" "}
+                <a
+                  href={explorerAccount(wallet.publicKey.toBase58())}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono underline decoration-warning/50 hover:decoration-warning"
+                >
+                  {wallet.publicKey.toBase58().slice(0, 4)}…
+                  {wallet.publicKey.toBase58().slice(-4)}
+                </a>
+              </li>
+              <li>
+                That your wallet is set to{" "}
+                <strong>{IS_DEVNET ? "Devnet" : "Mainnet"}</strong>
+                {IS_DEVNET ? (
+                  <>
+                    {" "}
+                    (and fund it from{" "}
+                    <a
+                      href="https://faucet.solana.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-warning/50 hover:decoration-warning"
+                    >
+                      the faucet
+                    </a>
+                    )
+                  </>
+                ) : (
+                  <> — not Devnet or another network</>
+                )}
+              </li>
+            </ul>
+            <button
+              type="button"
+              onClick={() => refreshBalance()}
+              disabled={balanceLoading}
+              className="mt-3 inline-flex items-center min-h-[2.25rem] px-2 -my-2 text-xs text-muted hover:text-cyan underline transition-colors disabled:opacity-50"
+            >
+              {balanceLoading ? "Refreshing…" : "Refresh balance ↻"}
+            </button>
           </div>
         )}
 
@@ -500,13 +548,23 @@ function CreateForm() {
           )}
           {wallet.connected && (
             <div className="mt-2 flex items-center justify-between text-xs text-faint tabular">
-              <span>
+              <span className="flex items-center gap-2">
                 Balance:{" "}
                 {balanceLoading
                   ? "loading…"
                   : solBalance === null
                     ? "—"
                     : `${formatSol(solBalance)} SOL`}
+                <button
+                  type="button"
+                  onClick={() => refreshBalance()}
+                  disabled={balanceLoading}
+                  className="text-muted hover:text-cyan transition-colors disabled:opacity-50"
+                  title="Refresh balance"
+                  aria-label="Refresh balance"
+                >
+                  ↻
+                </button>
               </span>
               {solBalance !== null && solBalance > LOCK_HEADROOM_LAMPORTS && (
                 <button
