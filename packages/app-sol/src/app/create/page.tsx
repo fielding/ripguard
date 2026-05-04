@@ -267,7 +267,7 @@ function CreateForm() {
     // from the "Attempt to debit an account..." mystery message.
     if (balanceShortfall) {
       toast.toast(
-        `Your wallet has ${balanceShortfall.haveSol} SOL — need ${balanceShortfall.needSol} for the lock plus ~0.005 SOL for fees and rent.`,
+        `Your wallet has ${balanceShortfall.haveSol} SOL. You need ${balanceShortfall.needSol} for the lock plus ~0.005 SOL for fees and rent.`,
         "error",
       );
       return;
@@ -488,38 +488,62 @@ function CreateForm() {
           </>
         )}
 
-        {/* Wrapped-SOL hint — fires before the generic empty-balance
+        {/* Wrapped-SOL hint. Fires before the generic empty-balance
             panel. Our lock builder wraps native SOL during the tx, so
             users who already hold wSOL (e.g. from a swap) need to
-            unwrap first. */}
+            unwrap first. Styled with a heavier border + warning chip
+            so it can't be missed. */}
         {wsolOnlyHint && wsolBalance !== null && (
-          <div className="mt-6 rounded-md border border-cyan/40 bg-cyan/[0.04] p-4 text-sm">
-            <div className="eyebrow text-cyan/90 mb-1.5">
-              You have wrapped SOL
+          <div className="mt-6 rounded-md border-2 border-warning/60 bg-warning/[0.06] p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-warning/20 text-warning text-sm font-bold">
+                !
+              </span>
+              <h3 className="font-display text-lg tracking-tight text-foreground">
+                You have wrapped SOL, not native SOL
+              </h3>
             </div>
-            <p className="text-foreground/90 leading-relaxed">
+            <p className="text-sm text-foreground/90 leading-relaxed">
               Your wallet holds{" "}
-              <span className="tabular text-foreground">
+              <span className="tabular text-foreground font-semibold">
                 {formatSol(wsolBalance)} wSOL
               </span>{" "}
               but{" "}
-              <span className="tabular text-foreground">0 SOL</span> in
-              native form. RipGuard wraps native SOL during the lock tx,
-              so it can&apos;t use your wSOL directly — and a Solana tx
-              still needs a tiny bit of native SOL to pay the fee.
+              <span className="tabular text-foreground font-semibold">
+                0 SOL
+              </span>{" "}
+              in native form. RipGuard wraps native SOL during the lock
+              transaction, so it can&apos;t use your existing wSOL
+              directly. You&apos;ll need to unwrap it first.
             </p>
-            <p className="mt-2 text-foreground/80 leading-relaxed">
-              In Phantom: tap your wSOL token → <strong>Unwrap</strong>{" "}
-              (or use Phantom&apos;s in-app Swap, wSOL → SOL). Then come
-              back here and refresh.
+            <div className="mt-4 rounded-md border border-warning/40 bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-warning/90 mb-1.5">
+                Heads up
+              </p>
+              <p className="text-sm text-foreground/85 leading-relaxed">
+                Unwrapping is itself a Solana transaction, so it needs a
+                tiny bit of native SOL (~0.001) to pay the fee. If your
+                wallet is literally{" "}
+                <span className="tabular">0 SOL native</span>, send a
+                small amount in first or use Phantom&apos;s in-app Swap
+                (which can route around the fee).
+              </p>
+            </div>
+            <p className="mt-4 text-sm text-foreground/85 leading-relaxed">
+              <span className="font-semibold">In Phantom:</span> tap
+              your wSOL token, then choose{" "}
+              <span className="font-semibold">Unwrap</span>. Or use{" "}
+              <span className="font-semibold">Swap</span> (wSOL → SOL).
             </p>
             <button
               type="button"
               onClick={() => refreshBalance()}
               disabled={balanceLoading}
-              className="mt-3 inline-flex items-center min-h-[2.25rem] px-2 -my-2 text-xs text-muted hover:text-cyan underline transition-colors disabled:opacity-50"
+              className="mt-4 inline-flex items-center min-h-[2.5rem] px-3 -my-1 -ml-1 text-sm text-cyan hover:text-foreground underline transition-colors disabled:opacity-50"
             >
-              {balanceLoading ? "Refreshing…" : "Refresh balance ↻"}
+              {balanceLoading
+                ? "Refreshing…"
+                : "I unwrapped it. Refresh balance ↻"}
             </button>
           </div>
         )}
@@ -551,7 +575,7 @@ function CreateForm() {
             </p>
             <ul className="mt-2 space-y-1 text-foreground/80 list-disc list-outside pl-5">
               <li>
-                That this is the account you expected — Phantom can hold
+                That this is the account you expected. Phantom can hold
                 several. Connected:{" "}
                 <a
                   href={explorerAccount(wallet.publicKey.toBase58())}
@@ -581,7 +605,7 @@ function CreateForm() {
                     )
                   </>
                 ) : (
-                  <> — not Devnet or another network</>
+                  <>, not Devnet or another network</>
                 )}
               </li>
             </ul>
@@ -689,20 +713,43 @@ function CreateForm() {
         </fieldset>
 
         <fieldset className="mt-10" disabled={isPending}>
-          <div className="flex items-end justify-between gap-4 mb-3">
-            <legend className="eyebrow">Reload</legend>
+          <legend className="eyebrow mb-3">Reload</legend>
+          {/* Segmented mode tabs. The "Build your own" affordance was
+              previously a small text link in the corner that nobody
+              found. Promoting it to an equal-weight tab makes the
+              custom-schedule path discoverable. */}
+          <div
+            role="tablist"
+            aria-label="Reload mode"
+            className="grid grid-cols-2 gap-px bg-line border border-line rounded-md overflow-hidden mb-4"
+          >
             <button
               type="button"
-              onClick={() =>
-                setSelectedPreset(
-                  selectedPreset === "custom" ? "hourly1d" : "custom",
-                )
-              }
-              className="inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-xs text-muted hover:text-cyan transition-colors"
+              role="tab"
+              aria-selected={selectedPreset !== "custom"}
+              onClick={() => {
+                if (selectedPreset === "custom") setSelectedPreset("hourly1d");
+              }}
+              className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                selectedPreset !== "custom"
+                  ? "bg-cyan/[0.10] text-cyan"
+                  : "bg-background text-muted hover:bg-surface hover:text-foreground"
+              }`}
             >
-              {selectedPreset === "custom"
-                ? "← Back to presets"
-                : "Build your own →"}
+              Presets
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedPreset === "custom"}
+              onClick={() => setSelectedPreset("custom")}
+              className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                selectedPreset === "custom"
+                  ? "bg-cyan/[0.10] text-cyan"
+                  : "bg-background text-muted hover:bg-surface hover:text-foreground"
+              }`}
+            >
+              Build your own
             </button>
           </div>
 

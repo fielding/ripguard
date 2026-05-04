@@ -42,10 +42,10 @@ export function extractErrorReason(error: Error | null): string {
     msg.includes("block height exceeded") ||
     msg.includes("BlockhashNotFound")
   ) {
-    return "The transaction expired before it landed. Try again — the network is busy.";
+    return "The transaction expired before it landed. Try again, the network is busy.";
   }
   if (msg.toLowerCase().includes("transaction was not confirmed")) {
-    return "Couldn't confirm the transaction. Check your wallet history before retrying — it may have landed.";
+    return "Couldn't confirm the transaction. Check your wallet history before retrying. It may have landed.";
   }
 
   // ── Wrong cluster heuristics ────────────────────────────────────────
