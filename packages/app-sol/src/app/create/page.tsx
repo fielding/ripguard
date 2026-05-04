@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { Transaction } from "@solana/web3.js";
+import {
+  NATIVE_MINT,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 
 import { Header } from "@/components/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -120,6 +124,12 @@ function CreateForm() {
   const [amountStr, setAmountStr] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [solBalance, setSolBalance] = useState<bigint | null>(null);
+  // Pre-existing wrapped SOL in the user's wSOL ATA. Our lock flow
+  // wraps native SOL during the tx, so wSOL doesn't get used unless
+  // the user unwraps first. Surface it separately so users with wSOL
+  // (e.g. swapped from another token) aren't confused by a 0 native
+  // balance.
+  const [wsolBalance, setWsolBalance] = useState<bigint | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   const amount = useMemo(() => parseSolAmount(amountStr), [amountStr]);
@@ -164,26 +174,39 @@ function CreateForm() {
   const refreshBalance = useCallback(async () => {
     if (!wallet.publicKey) {
       setSolBalance(null);
+      setWsolBalance(null);
       return;
     }
     setBalanceLoading(true);
     try {
-      const lamports = await connection.getBalance(wallet.publicKey, "confirmed");
-      // One-line debug breadcrumb so a real user (or the dev) can
-      // open DevTools and verify we're hitting the cluster they
-      // expect. RPC URL is the smoking gun if balances don't match.
+      // Run native + wSOL balance reads in parallel. The wSOL read can
+      // throw if the ATA doesn't exist — that just means 0 wSOL.
+      const wsolAta = getAssociatedTokenAddressSync(
+        NATIVE_MINT,
+        wallet.publicKey,
+      );
+      const [lamports, wsolAmount] = await Promise.all([
+        connection.getBalance(wallet.publicKey, "confirmed"),
+        connection
+          .getTokenAccountBalance(wsolAta, "confirmed")
+          .then((r) => BigInt(r.value.amount))
+          .catch(() => 0n),
+      ]);
       // eslint-disable-next-line no-console
       console.info("[ripguard] balance check", {
         rpc: connection.rpcEndpoint,
         cluster: IS_DEVNET ? "devnet" : "mainnet-beta",
         pubkey: wallet.publicKey.toBase58(),
         lamports,
+        wsolLamports: wsolAmount.toString(),
       });
       setSolBalance(BigInt(lamports));
+      setWsolBalance(wsolAmount);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn("[ripguard] balance check failed", err);
       setSolBalance(null);
+      setWsolBalance(null);
     } finally {
       setBalanceLoading(false);
     }
@@ -219,6 +242,17 @@ function CreateForm() {
   // with a helpful nudge.
   const networkHint =
     wallet.connected && solBalance !== null && solBalance === 0n;
+  // Special case: native SOL is empty but the user has wSOL sitting in
+  // their ATA. Our lock flow wraps native SOL during the tx, so it
+  // can't use pre-existing wSOL — they need to unwrap first. This
+  // catches users who swapped into wSOL from another token and
+  // assumed it'd be picked up automatically.
+  const wsolOnlyHint =
+    wallet.connected &&
+    solBalance !== null &&
+    solBalance === 0n &&
+    wsolBalance !== null &&
+    wsolBalance > 0n;
 
   const onSubmit = useCallback(async () => {
     if (!wallet.publicKey || !wallet.signTransaction) {
@@ -454,6 +488,42 @@ function CreateForm() {
           </>
         )}
 
+        {/* Wrapped-SOL hint — fires before the generic empty-balance
+            panel. Our lock builder wraps native SOL during the tx, so
+            users who already hold wSOL (e.g. from a swap) need to
+            unwrap first. */}
+        {wsolOnlyHint && wsolBalance !== null && (
+          <div className="mt-6 rounded-md border border-cyan/40 bg-cyan/[0.04] p-4 text-sm">
+            <div className="eyebrow text-cyan/90 mb-1.5">
+              You have wrapped SOL
+            </div>
+            <p className="text-foreground/90 leading-relaxed">
+              Your wallet holds{" "}
+              <span className="tabular text-foreground">
+                {formatSol(wsolBalance)} wSOL
+              </span>{" "}
+              but{" "}
+              <span className="tabular text-foreground">0 SOL</span> in
+              native form. RipGuard wraps native SOL during the lock tx,
+              so it can&apos;t use your wSOL directly — and a Solana tx
+              still needs a tiny bit of native SOL to pay the fee.
+            </p>
+            <p className="mt-2 text-foreground/80 leading-relaxed">
+              In Phantom: tap your wSOL token → <strong>Unwrap</strong>{" "}
+              (or use Phantom&apos;s in-app Swap, wSOL → SOL). Then come
+              back here and refresh.
+            </p>
+            <button
+              type="button"
+              onClick={() => refreshBalance()}
+              disabled={balanceLoading}
+              className="mt-3 inline-flex items-center min-h-[2.25rem] px-2 -my-2 text-xs text-muted hover:text-cyan underline transition-colors disabled:opacity-50"
+            >
+              {balanceLoading ? "Refreshing…" : "Refresh balance ↻"}
+            </button>
+          </div>
+        )}
+
         {/* Empty-balance diagnostic. Fires when the wallet is connected
             but our RPC reports zero balance for the connected pubkey on
             the active cluster. The user's wallet might really be empty,
@@ -461,8 +531,9 @@ function CreateForm() {
             wrong account selected in the wallet, wallet set to a
             different cluster, or a transient RPC blip. We surface the
             connected pubkey + an explorer link so they can verify
-            against ground truth themselves. */}
-        {networkHint && wallet.publicKey && (
+            against ground truth themselves. Suppressed when the
+            wsolOnlyHint above already explains the situation. */}
+        {networkHint && !wsolOnlyHint && wallet.publicKey && (
           <div className="mt-6 rounded-md border border-warning/40 bg-warning/[0.04] p-4 text-sm">
             <div className="eyebrow text-warning/90 mb-1.5">
               Wallet looks empty
@@ -548,13 +619,21 @@ function CreateForm() {
           )}
           {wallet.connected && (
             <div className="mt-2 flex items-center justify-between text-xs text-faint tabular">
-              <span className="flex items-center gap-2">
-                Balance:{" "}
-                {balanceLoading
-                  ? "loading…"
-                  : solBalance === null
-                    ? "—"
-                    : `${formatSol(solBalance)} SOL`}
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>
+                  Balance:{" "}
+                  {balanceLoading
+                    ? "loading…"
+                    : solBalance === null
+                      ? "—"
+                      : `${formatSol(solBalance)} SOL`}
+                  {wsolBalance !== null && wsolBalance > 0n && (
+                    <span className="text-muted">
+                      {" "}
+                      · {formatSol(wsolBalance)} wSOL
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
                   onClick={() => refreshBalance()}
