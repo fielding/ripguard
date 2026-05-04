@@ -10,10 +10,11 @@ import {
   useChainId,
   usePublicClient,
   useReadContracts,
+  useSwitchChain,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
+import { CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
 import { IS_TESTNET } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
 import { WrongChainPanel } from "@/components/WrongChainPanel";
@@ -422,6 +423,7 @@ async function fetchFromChain(
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   // Defensive lookup: unsupported chains fall back to the deployment's
   // default chain so the page renders. The wrong-chain panel below blocks
   // any tx on the unsupported chain.
@@ -438,6 +440,13 @@ function VaultDashboard() {
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
   const [fetchSource, setFetchSource] = useState<"subgraph" | "onchain" | null>(null);
+  // Other-chain probe — when the current chain returns 0 streams, fan
+  // out to the rest of the deployment's chains so we can tell users
+  // exactly where their vaults actually live. The "vault vanished"
+  // support hits we've seen are almost all wallet-on-wrong-chain.
+  const [otherChainStreams, setOtherChainStreams] = useState<
+    Array<{ chainId: number; chainName: string; count: number }>
+  >([]);
 
   // Fetch streams: subgraph first, on-chain fallback
   useEffect(() => {
@@ -486,12 +495,63 @@ function VaultDashboard() {
 
   const retryFetch = useCallback(() => setFetchKey((k) => k + 1), []);
 
+  // Cross-chain probe: when the current chain comes back empty, hit
+  // every other deployment chain's subgraph in parallel and surface
+  // the counts. Cheap (one subgraph query per chain), and tells users
+  // exactly where their vaults live when the wallet is on the wrong
+  // chain. Subgraph-only by design — chain-scan fallback would be
+  // catastrophic to fan out across 6 chains on mobile.
+  useEffect(() => {
+    if (
+      !isConnected ||
+      !address ||
+      isLoadingEvents ||
+      fetchError ||
+      subgraphStreams.length > 0
+    ) {
+      setOtherChainStreams([]);
+      return;
+    }
+    let cancelled = false;
+    const otherChains = Object.values(CHAINS).filter(
+      (c) => c.isTestnet === IS_TESTNET && c.chainId !== chainId,
+    );
+    Promise.all(
+      otherChains.map(async (c) => {
+        try {
+          const streams = await fetchFromSubgraph(
+            address,
+            c.chainId,
+            c.sablierLockup,
+          );
+          return { chainId: c.chainId, chainName: c.name, count: streams.length };
+        } catch {
+          return { chainId: c.chainId, chainName: c.name, count: 0 };
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setOtherChainStreams(results.filter((r) => r.count > 0));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    address,
+    chainId,
+    fetchError,
+    isConnected,
+    isLoadingEvents,
+    subgraphStreams.length,
+  ]);
+
   // Clear vault state when wallet disconnects
   useEffect(() => {
     if (!isConnected) {
       setSubgraphStreams([]);
       setFetchError(null);
       setClaimingId(null);
+      setOtherChainStreams([]);
     }
   }, [isConnected]);
 
@@ -665,8 +725,63 @@ function VaultDashboard() {
     );
   }
 
-  // Empty state
+  // Empty state. Two flavors:
+  //   (1) no vaults anywhere on this account (welcome / first-time user)
+  //   (2) no vaults on the *current* chain but the wallet has vaults on
+  //       a different supported chain — by far the most common cause of
+  //       "vault vanished" support hits, so we surface a one-click
+  //       switch instead of a generic empty state.
   if (streamIds.length === 0) {
+    const truncated = address
+      ? `${address.slice(0, 6)}…${address.slice(-4)}`
+      : "your wallet";
+    if (otherChainStreams.length > 0) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 py-20 px-6">
+          <div className="text-center space-y-3 max-w-lg">
+            <div className="eyebrow text-warning/90">Wrong chain?</div>
+            <h3 className="font-display text-3xl tracking-tight">
+              No vaults on{" "}
+              <span className="text-cyan">{chainConfig.name}</span> for
+              this wallet.
+            </h3>
+            <p className="text-muted text-sm leading-relaxed mx-auto max-w-md">
+              {truncated} has locks on another chain. Switch your wallet
+              to one of these to see them.
+            </p>
+          </div>
+          <ul className="w-full max-w-md space-y-2">
+            {otherChainStreams.map((c) => (
+              <li
+                key={c.chainId}
+                className="flex items-center justify-between gap-3 rounded-lg border border-line bg-background px-4 py-3"
+              >
+                <div className="flex items-baseline gap-3">
+                  <span className="font-display text-cyan tabular text-2xl leading-none">
+                    {c.count}
+                  </span>
+                  <span className="text-sm text-foreground">
+                    on {c.chainName}
+                  </span>
+                </div>
+                <button
+                  onClick={() => switchChain({ chainId: c.chainId })}
+                  className="btn-secondary !min-h-[2.5rem] !py-2 !px-4 !text-sm"
+                >
+                  Switch
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={retryFetch}
+            className="text-xs text-muted hover:text-cyan underline transition-colors"
+          >
+            Or refresh this chain
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-8 py-20 px-6">
         <div className="relative">
@@ -686,6 +801,9 @@ function VaultDashboard() {
           </h3>
           <p className="text-muted text-sm leading-relaxed">
             Cash out. Lock it. Thank yourself later.
+          </p>
+          <p className="text-xs text-faint pt-2 tabular">
+            Connected: {truncated} on {chainConfig.name}
           </p>
         </div>
         <Link href="/create" className="btn-primary btn-lg">

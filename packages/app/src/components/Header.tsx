@@ -96,12 +96,16 @@ export function Header() {
             </Link>
           ) : (
             // RainbowKit accepts breakpoint-shaped props that toggle at
-            // its internal 768px breakpoint. On smallScreen we drop the
-            // chain icon and shorten the account display to just the
-            // truncated address — without this the connected state's
-            // chain icon + ENS + balance + caret blow past the gutter.
+            // its internal 768px breakpoint. We keep the chain icon on
+            // smallScreen too — it's tiny and load-bearing: a user
+            // whose wallet auto-switched to a chain other than the one
+            // they meant to be on will see zero vaults with no other
+            // signal that the chain changed. (Earlier we hid it for
+            // gutter space; that caused a real "vault vanished"
+            // support hit.) Account label shortens on smallScreen, no
+            // balance.
             <ConnectButton
-              chainStatus={{ smallScreen: "none", largeScreen: "icon" }}
+              chainStatus={{ smallScreen: "icon", largeScreen: "icon" }}
               accountStatus={{ smallScreen: "address", largeScreen: "full" }}
               showBalance={false}
               label="Connect"
