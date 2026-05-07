@@ -94,6 +94,13 @@ const LIMITS = [
 function ChainChipRow() {
   // Show only the chains live on this deployment (mainnet vs. testnet).
   const chains = Object.values(CHAINS).filter((c) => c.isTestnet === IS_TESTNET);
+  // Solana is on a sister deployment (sol.ripguard.xyz). Surface it in
+  // the same row so users discovering RipGuard via the EVM site know
+  // there's a Solana surface too. Dashed border + ↗ glyph mark it as
+  // "leaves this site" so users don't expect a wallet chain switch.
+  const solHref = IS_TESTNET
+    ? "https://testnet.sol.ripguard.xyz"
+    : "https://sol.ripguard.xyz";
 
   return (
     <div className="mt-12 sm:mt-14">
@@ -115,6 +122,16 @@ function ChainChipRow() {
             </a>
           </li>
         ))}
+        <li>
+          <a
+            href={solHref}
+            title="RipGuard on Solana — opens sol.ripguard.xyz"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
+          >
+            Solana
+            <span aria-hidden="true" className="text-[11px] -mt-0.5">↗</span>
+          </a>
+        </li>
       </ul>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import {
   PRESETS,
+  IS_DEVNET,
   IS_TESTNET,
   SABLIER_LOCKUP_PROGRAM_ID,
   explorerAccount,
@@ -94,14 +95,33 @@ const LIMITS = [
   "Send funds anywhere except your wallet",
 ];
 
+// EVM chains live on the sister deployment (ripguard.xyz). Listed here
+// for cross-surface discovery — clicking takes the user to the EVM site
+// where they can connect a wallet on that network. Order mirrors the
+// EVM app's chain registry so the two pages read the same.
+const EVM_CHAIN_NAMES = [
+  "Base",
+  "Ethereum",
+  "Arbitrum",
+  "Optimism",
+  "Polygon",
+  "Avalanche",
+  "BNB",
+];
+
 function ChainChipRow({ programUrl }: { programUrl: string }) {
-  // Solana is the only chain this deployment talks to. Single chip pointing
-  // at the SolSab Lockup program on Solscan so users have a one-click verify.
+  // Solana chip links to its on-chain program (Solscan). EVM chips
+  // link to the sister site at ripguard.xyz with a dashed border + ↗
+  // glyph so users don't expect a wallet chain switch.
+  const evmHref = IS_DEVNET
+    ? "https://testnet.ripguard.xyz"
+    : "https://ripguard.xyz";
+
   return (
     <div className="mt-12 sm:mt-14">
       <div className="eyebrow mb-5 flex items-center gap-3">
         <span className="h-px w-8 bg-cyan/40" />
-        Live on
+        Live across
       </div>
       <ul className="flex flex-wrap gap-2">
         <li>
@@ -115,6 +135,20 @@ function ChainChipRow({ programUrl }: { programUrl: string }) {
             Solana
           </a>
         </li>
+        {EVM_CHAIN_NAMES.map((name) => (
+          <li key={name}>
+            <a
+              href={evmHref}
+              title={`RipGuard on ${name} — opens ripguard.xyz`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
+            >
+              {name}
+              <span aria-hidden="true" className="text-[11px] -mt-0.5">
+                ↗
+              </span>
+            </a>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -294,8 +328,9 @@ export default function Home() {
               </ul>
             </div>
 
-            {/* Single-chain chip linking to the SolSab Lockup program on Solscan
-                so users can verify with one click. */}
+            {/* Solana program chip + cross-surface EVM chips for
+                discovery. Solana links to the SolSab Lockup program on
+                Solscan; EVM chips link to ripguard.xyz. */}
             <ChainChipRow programUrl={sablierExplorerUrl} />
           </div>
         </section>
