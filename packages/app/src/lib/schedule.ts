@@ -80,6 +80,48 @@ export function computeMaxDeposit(walletBalance: bigint, brokerFee: bigint): big
   return (walletBalance * (SCALE - brokerFee)) / SCALE;
 }
 
+/** Sablier requires cliff < total strictly. Smallest legal window is 1 hour. */
+export const MIN_LOCK_SECONDS = 3600;
+
+/**
+ * Parse a value from an `<input type="datetime-local">` (format
+ * "YYYY-MM-DDTHH:MM" in the browser's local timezone) into the unix ms
+ * target and the seconds-from-now duration. Returns null when the input
+ * is empty, malformed, or in the past / too soon.
+ */
+export function parseLockUntilInput(
+  value: string,
+  nowMs: number,
+): { durationSeconds: number; targetMs: number } | null {
+  if (!value) return null;
+  const targetMs = new Date(value).getTime();
+  if (!Number.isFinite(targetMs)) return null;
+  const durationSeconds = Math.floor((targetMs - nowMs) / 1000);
+  if (durationSeconds < MIN_LOCK_SECONDS) return null;
+  return { durationSeconds, targetMs };
+}
+
+/** Pretty-print a unix ms timestamp as "Mon, Jun 1, 3:00 PM". */
+export function formatTargetDate(ms: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(ms));
+}
+
+/**
+ * Format a `Date` as a `datetime-local` input value
+ * ("YYYY-MM-DDTHH:MM" in local time). Used to seed the picker with a
+ * sensible default (e.g. one week out).
+ */
+export function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** Calculate payout schedule for the vesting calculator display */
 export function calculatePayoutSchedule(
   depositAmount: number,

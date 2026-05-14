@@ -29,10 +29,14 @@ import { isUserRejection, extractErrorReason } from "@/lib/errors";
 import {
   DURATION_OPTIONS,
   ALL_INTERVALS,
+  MIN_LOCK_SECONDS,
   getIntervalOptions,
   parsePositiveDurationParam,
   parseAmountParam,
+  parseLockUntilInput,
   formatDuration,
+  formatTargetDate,
+  toDatetimeLocalValue,
   computeFee,
   computeMaxDeposit,
 } from "@/lib/schedule";
@@ -67,6 +71,17 @@ function parseStreamIdFromReceipt(
 }
 
 type Step = "schedule" | "confirm" | "approve" | "lock" | "success";
+type CustomMode = "reloads" | "lockUntil";
+
+// Sensible default for the lock-until picker: 7 days from "now" at the
+// minute the page rendered. Captured once per mount so the input doesn't
+// re-render and drift each second.
+function defaultLockUntilValue(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  d.setSeconds(0, 0);
+  return toDatetimeLocalValue(d);
+}
 
 function Spinner() {
   return (
@@ -147,15 +162,27 @@ function CreateLockInner() {
   const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
   const [customTotal, setCustomTotal] = useState(customTotalParam ?? 3600); // 1 hour default
   const [customInterval, setCustomInterval] = useState(3600); // 1hr default claim interval (display only)
-
-  // Auto-clamp total to be >= cliff, and enforce minimum 1 hour
+  const [customMode, setCustomMode] = useState<CustomMode>("reloads");
+  const [lockUntilInput, setLockUntilInput] = useState<string>(defaultLockUntilValue);
+  // Tick "now" once every 30s so the lock-until duration preview
+  // ("18d 3h from now") doesn't go stale while the form is open. We don't
+  // need per-second precision — the user is picking a target in days/hours.
+  const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Auto-clamp total to be >= cliff, and enforce minimum 1 hour.
+  // Only relevant in reloads mode; lock-until derives total from the picker.
+  useEffect(() => {
+    if (customMode !== "reloads") return;
     if (customTotal < 3600) {
       setCustomTotal(3600);
     } else if (customCliff > customTotal) {
       setCustomTotal(customCliff);
     }
-  }, [customCliff, customTotal]);
+  }, [customCliff, customTotal, customMode]);
   const [amountInput, setAmountInput] = useState(amountParam);
   const [step, setStep] = useState<Step>("schedule");
   const [confirmed, setConfirmed] = useState(false);
@@ -187,8 +214,25 @@ function CreateLockInner() {
   // Unmount-only cleanup for any pending priming timeout.
   useEffect(() => clearPrimingTimeout, [clearPrimingTimeout]);
 
+  // Parsed lock-until target (null when the picker is empty / past /
+  // too soon). Memoized to one read of `nowMs` per tick so the rest of
+  // the form sees a stable view of the schedule.
+  const lockUntilParsed = useMemo(
+    () =>
+      selectedPreset === "custom" && customMode === "lockUntil"
+        ? parseLockUntilInput(lockUntilInput, nowMs)
+        : null,
+    [selectedPreset, customMode, lockUntilInput, nowMs],
+  );
+
   // Derived schedule values
-  const schedule = useMemo(() => {
+  const schedule = useMemo<{
+    cliffSeconds: number;
+    totalSeconds: number;
+    isLumpSum: boolean;
+    label: string;
+    targetMs: number | null;
+  }>(() => {
     if (selectedPreset !== "custom") {
       const p = PRESETS[selectedPreset];
       return {
@@ -196,6 +240,30 @@ function CreateLockInner() {
         totalSeconds: p.totalSeconds,
         isLumpSum: p.isLumpSum,
         label: p.label,
+        targetMs: null,
+      };
+    }
+    if (customMode === "lockUntil") {
+      // Picker not yet valid → totalSeconds = 0 keeps `canProceed` false
+      // so the action button stays disabled until they pick a real date.
+      if (!lockUntilParsed) {
+        return {
+          cliffSeconds: 0,
+          totalSeconds: 0,
+          isLumpSum: true,
+          label: "Lock until …",
+          targetMs: null,
+        };
+      }
+      const total = lockUntilParsed.durationSeconds;
+      // Sablier requires cliff < total strictly. The one-second gap is
+      // negligible vs the unlock date; the user sees a clean lump-sum.
+      return {
+        cliffSeconds: total - 1,
+        totalSeconds: total,
+        isLumpSum: true,
+        label: `Lock until ${formatTargetDate(lockUntilParsed.targetMs)}`,
+        targetMs: lockUntilParsed.targetMs,
       };
     }
     const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
@@ -205,8 +273,9 @@ function CreateLockInner() {
       totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
       isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
       label: "Custom Reloads",
+      targetMs: null,
     };
-  }, [selectedPreset, customCliff, customTotal]);
+  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed]);
 
   // Amount parsing
   const depositAmount = useMemo(() => {
@@ -283,6 +352,8 @@ function CreateLockInner() {
     setSelectedPreset("hourly1d");
     setCustomCliff(0);
     setCustomTotal(3600);
+    setCustomMode("reloads");
+    setLockUntilInput(defaultLockUntilValue());
     setAmountInput("");
     setStep("schedule");
     setConfirmed(false);
@@ -757,6 +828,84 @@ function CreateLockInner() {
                   {/* Custom schedule builder */}
                   {selectedPreset === "custom" && (
                     <div className="space-y-5 border border-line rounded-lg p-5 bg-surface">
+                      {/* Mode toggle: Reloads vs Lock-until. Inside the
+                          custom builder so it doesn't crowd the outer
+                          Presets/Build-your-own tabs. */}
+                      <div
+                        role="tablist"
+                        aria-label="Custom lock mode"
+                        className="grid grid-cols-2 gap-px bg-line border border-line rounded-lg overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={customMode === "reloads"}
+                          disabled={isFormLocked}
+                          onClick={() => setCustomMode("reloads")}
+                          className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                            customMode === "reloads"
+                              ? "bg-cyan/[0.10] text-cyan"
+                              : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          Steady reloads
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={customMode === "lockUntil"}
+                          disabled={isFormLocked}
+                          onClick={() => setCustomMode("lockUntil")}
+                          className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                            customMode === "lockUntil"
+                              ? "bg-cyan/[0.10] text-cyan"
+                              : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          Lock until
+                        </button>
+                      </div>
+
+                      {customMode === "lockUntil" ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label htmlFor="lock-until" className="eyebrow block mb-2">
+                              Unlock on
+                            </label>
+                            <input
+                              id="lock-until"
+                              type="datetime-local"
+                              value={lockUntilInput}
+                              disabled={isFormLocked}
+                              min={toDatetimeLocalValue(new Date(nowMs + MIN_LOCK_SECONDS * 1000))}
+                              onChange={(e) => setLockUntilInput(e.target.value)}
+                              className={`w-full bg-background border border-line rounded-lg px-4 py-3 text-sm tabular focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            />
+                          </div>
+                          {lockUntilParsed ? (
+                            <p className="text-xs text-muted leading-relaxed">
+                              Single unlock on{" "}
+                              <span className="text-foreground">
+                                {formatTargetDate(lockUntilParsed.targetMs)}
+                              </span>
+                              . Locked for{" "}
+                              <span className="text-foreground tabular">
+                                {formatDuration(lockUntilParsed.durationSeconds)}
+                              </span>{" "}
+                              from now. No reloads, no early exit.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-danger leading-relaxed">
+                              Pick a date at least 1 hour from now.
+                            </p>
+                          )}
+                          <p className="text-[11px] text-faint leading-relaxed">
+                            Good for rent, bills, or any single-date deadline.
+                            Cadence and waiting period don&apos;t apply.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
                       {/* Total duration */}
                       <div>
                         <label htmlFor="total-duration" className="eyebrow block mb-2">
@@ -847,6 +996,8 @@ function CreateLockInner() {
                           The wait can&apos;t be longer than the reload window.
                         </p>
                       )}
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -896,6 +1047,7 @@ function CreateLockInner() {
                       cliffSeconds={schedule.cliffSeconds}
                       totalSeconds={schedule.totalSeconds}
                       isLumpSum={schedule.isLumpSum}
+                      targetMs={schedule.targetMs}
                       depositAmount={depositAmount}
                       usdcDecimals={usdcDecimals}
                     />
@@ -957,7 +1109,11 @@ function CreateLockInner() {
                               ? "Minimum 1 USDC"
                               : !hasEnoughBalance
                                 ? "Not enough in the wallet"
-                                : "Review the lock"}
+                                : selectedPreset === "custom" &&
+                                    customMode === "lockUntil" &&
+                                    !lockUntilParsed
+                                  ? "Pick a date at least 1 hour out"
+                                  : "Review the lock"}
                         </button>
                       )}
                     </>
@@ -1147,16 +1303,21 @@ function TimelinePreview({
   cliffSeconds,
   totalSeconds,
   isLumpSum,
+  targetMs,
   depositAmount,
   usdcDecimals,
 }: {
   cliffSeconds: number;
   totalSeconds: number;
   isLumpSum: boolean;
+  targetMs: number | null;
   depositAmount: bigint;
   usdcDecimals: number;
 }) {
   const cliffPct = totalSeconds > 0 ? (cliffSeconds / totalSeconds) * 100 : 0;
+  // Lock-until is a pure wait — show the bar fully filled with the "wait"
+  // color so the visual matches the framing ("nothing until [date]").
+  const isLockUntil = isLumpSum && targetMs !== null;
 
   return (
     <div className="border border-line rounded-lg p-5 space-y-3">
@@ -1180,17 +1341,26 @@ function TimelinePreview({
       {/* Labels */}
       <div className="flex justify-between text-xs text-faint tabular">
         <span>Now</span>
-        {cliffSeconds > 0 && cliffSeconds < totalSeconds && (
+        {!isLockUntil && cliffSeconds > 0 && cliffSeconds < totalSeconds && (
           <span>Wait: {formatDuration(cliffSeconds)}</span>
         )}
         <span>
-          {isLumpSum ? "Unlock" : "Fully reloaded"}: {formatDuration(totalSeconds)}
+          {isLockUntil
+            ? `Unlocks ${formatTargetDate(targetMs)}`
+            : isLumpSum
+              ? `Unlock: ${formatDuration(totalSeconds)}`
+              : `Fully reloaded: ${formatDuration(totalSeconds)}`}
         </span>
       </div>
 
       {/* Description */}
       <p className="text-xs text-muted leading-relaxed">
-        {isLumpSum ? (
+        {isLockUntil ? (
+          <>
+            {formatUnits(depositAmount, usdcDecimals)} USDC unlocks in one drop
+            on {formatTargetDate(targetMs)}.
+          </>
+        ) : isLumpSum ? (
           <>
             {formatUnits(depositAmount, usdcDecimals)} USDC unlocks in one drop
             after {formatDuration(totalSeconds)}.
@@ -1227,7 +1397,13 @@ function ConfirmDialog({
   onLock,
   onCancel,
 }: {
-  schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
+  schedule: {
+    label: string;
+    cliffSeconds: number;
+    totalSeconds: number;
+    isLumpSum: boolean;
+    targetMs: number | null;
+  };
   depositAmount: bigint;
   fee: bigint;
   totalAmount: bigint;
@@ -1326,18 +1502,27 @@ function ConfirmDialog({
               <span>Total from wallet</span>
               <span>{formatUnits(totalAmount, usdcDecimals)} USDC</span>
             </div>
-            {schedule.cliffSeconds > 0 && (
+            {schedule.targetMs !== null ? (
               <div className="flex justify-between pt-2">
-                <span className="text-muted">Wait</span>
-                <span className="text-foreground">{formatDuration(schedule.cliffSeconds)}</span>
+                <span className="text-muted">Unlocks on</span>
+                <span className="text-foreground">{formatTargetDate(schedule.targetMs)}</span>
               </div>
+            ) : (
+              <>
+                {schedule.cliffSeconds > 0 && (
+                  <div className="flex justify-between pt-2">
+                    <span className="text-muted">Wait</span>
+                    <span className="text-foreground">{formatDuration(schedule.cliffSeconds)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    {schedule.isLumpSum ? "Unlock after" : "Reload window"}
+                  </span>
+                  <span className="text-foreground">{formatDuration(schedule.totalSeconds)}</span>
+                </div>
+              </>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted">
-                {schedule.isLumpSum ? "Unlock after" : "Reload window"}
-              </span>
-              <span className="text-foreground">{formatDuration(schedule.totalSeconds)}</span>
-            </div>
           </div>
 
           {/* Non-cancelable warning */}
@@ -1404,7 +1589,13 @@ function SuccessView({
   txHash: `0x${string}`;
   streamId: bigint;
   depositAmount: bigint;
-  schedule: { label: string; cliffSeconds: number; totalSeconds: number; isLumpSum: boolean };
+  schedule: {
+    label: string;
+    cliffSeconds: number;
+    totalSeconds: number;
+    isLumpSum: boolean;
+    targetMs: number | null;
+  };
   usdcDecimals: number;
   sablierAddress: Address;
   explorerUrl: string;
@@ -1412,9 +1603,15 @@ function SuccessView({
   onCreateAnother: () => void;
 }) {
   const now = Math.floor(Date.now() / 1000);
-  const endDate = new Date((now + schedule.totalSeconds) * 1000);
+  const endDate =
+    schedule.targetMs !== null
+      ? new Date(schedule.targetMs)
+      : new Date((now + schedule.totalSeconds) * 1000);
 
   const nextUnlock = (() => {
+    if (schedule.targetMs !== null) {
+      return formatTargetDate(schedule.targetMs);
+    }
     if (schedule.isLumpSum) {
       const d = Math.floor(schedule.totalSeconds / 86400);
       return `${d}d`;

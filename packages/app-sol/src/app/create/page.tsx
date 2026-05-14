@@ -39,9 +39,13 @@ import {
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
 import {
   DURATION_OPTIONS,
+  MIN_LOCK_SECONDS,
   getIntervalOptions,
   parsePositiveDurationParam,
+  parseLockUntilInput,
   formatDuration,
+  formatTargetDate,
+  toDatetimeLocalValue,
   calculatePayoutSchedule,
 } from "@/lib/schedule";
 
@@ -88,6 +92,17 @@ type Status =
   | { kind: "error"; message: string };
 
 type ScheduleSelection = PresetKey | "custom";
+type CustomMode = "reloads" | "lockUntil";
+
+// Sensible default for the lock-until picker: 7 days from "now" at the
+// minute the page rendered. Captured once per mount so the input doesn't
+// drift each second.
+function defaultLockUntilValue(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  d.setSeconds(0, 0);
+  return toDatetimeLocalValue(d);
+}
 
 function CreateForm() {
   const params = useSearchParams();
@@ -111,15 +126,26 @@ function CreateForm() {
   const [customCliff, setCustomCliff] = useState(customCliffParam ?? 0);
   const [customTotal, setCustomTotal] = useState(customTotalParam ?? 3600);
   const [customInterval, setCustomInterval] = useState(3600);
+  const [customMode, setCustomMode] = useState<CustomMode>("reloads");
+  const [lockUntilInput, setLockUntilInput] = useState<string>(defaultLockUntilValue);
+  // Tick "now" once every 30s so the lock-until duration preview
+  // doesn't go stale while the form is open.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Auto-correct invalid custom combinations (mirrors EVM /create logic).
+  // Only applies in reloads mode — lock-until derives total from the picker.
   useEffect(() => {
+    if (customMode !== "reloads") return;
     if (customTotal < 3600) {
       setCustomTotal(3600);
     } else if (customCliff > customTotal) {
       setCustomTotal(customCliff);
     }
-  }, [customCliff, customTotal]);
+  }, [customCliff, customTotal, customMode]);
 
   const [amountStr, setAmountStr] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -136,10 +162,27 @@ function CreateForm() {
   const fee = amount !== null ? computeBrokerFee(amount) : 0n;
   const net = amount !== null ? amount - fee : 0n;
 
+  // Parsed lock-until target (null when the picker is empty / past /
+  // too soon). Memoized to one read of `nowMs` per tick so the rest of
+  // the form sees a stable view of the schedule.
+  const lockUntilParsed = useMemo(
+    () =>
+      selectedPreset === "custom" && customMode === "lockUntil"
+        ? parseLockUntilInput(lockUntilInput, nowMs)
+        : null,
+    [selectedPreset, customMode, lockUntilInput, nowMs],
+  );
+
   // Resolve the active schedule (preset or custom). Sablier requires
   // cliff < total strictly, so for the lump-sum case (cliff === total)
   // we add 1 second to total — same workaround the EVM side uses.
-  const schedule = useMemo(() => {
+  const schedule = useMemo<{
+    cliffSeconds: number;
+    totalSeconds: number;
+    label: string;
+    isLumpSum: boolean;
+    targetMs: number | null;
+  }>(() => {
     if (selectedPreset !== "custom") {
       const args = presetToSolanaArgs(selectedPreset);
       const preset = PRESETS[selectedPreset];
@@ -148,6 +191,28 @@ function CreateForm() {
         totalSeconds: args.totalSeconds,
         label: preset.label,
         isLumpSum: preset.isLumpSum,
+        targetMs: null,
+      };
+    }
+    if (customMode === "lockUntil") {
+      if (!lockUntilParsed) {
+        // Picker not yet valid → totalSeconds = 0 keeps the lock button
+        // disabled until they pick a real date.
+        return {
+          cliffSeconds: 0,
+          totalSeconds: 0,
+          label: "Lock until …",
+          isLumpSum: true,
+          targetMs: null,
+        };
+      }
+      const total = lockUntilParsed.durationSeconds;
+      return {
+        cliffSeconds: total - 1,
+        totalSeconds: total,
+        label: `Lock until ${formatTargetDate(lockUntilParsed.targetMs)}`,
+        isLumpSum: true,
+        targetMs: lockUntilParsed.targetMs,
       };
     }
     const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
@@ -156,8 +221,9 @@ function CreateForm() {
       totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
       label: "Custom Reloads",
       isLumpSum: cliffEqualsTotal,
+      targetMs: null,
     };
-  }, [selectedPreset, customCliff, customTotal]);
+  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed]);
 
   const isPending =
     status.kind === "building" ||
@@ -755,6 +821,83 @@ function CreateForm() {
 
           {selectedPreset === "custom" ? (
             <div className="space-y-5 border border-line rounded-md p-5 bg-surface">
+              {/* Mode toggle: Reloads vs Lock-until. Sits inside the
+                  custom panel so it doesn't crowd the outer Presets /
+                  Build-your-own tabs. */}
+              <div
+                role="tablist"
+                aria-label="Custom lock mode"
+                className="grid grid-cols-2 gap-px bg-line border border-line rounded-md overflow-hidden"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={customMode === "reloads"}
+                  onClick={() => setCustomMode("reloads")}
+                  className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                    customMode === "reloads"
+                      ? "bg-cyan/[0.10] text-cyan"
+                      : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                  }`}
+                >
+                  Steady reloads
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={customMode === "lockUntil"}
+                  onClick={() => setCustomMode("lockUntil")}
+                  className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                    customMode === "lockUntil"
+                      ? "bg-cyan/[0.10] text-cyan"
+                      : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                  }`}
+                >
+                  Lock until
+                </button>
+              </div>
+
+              {customMode === "lockUntil" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label htmlFor="lock-until" className="eyebrow block mb-2">
+                      Unlock on
+                    </label>
+                    <input
+                      id="lock-until"
+                      type="datetime-local"
+                      value={lockUntilInput}
+                      min={toDatetimeLocalValue(
+                        new Date(nowMs + MIN_LOCK_SECONDS * 1000),
+                      )}
+                      onChange={(e) => setLockUntilInput(e.target.value)}
+                      className="w-full bg-background border border-line rounded-md px-4 py-3 text-sm tabular focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors"
+                    />
+                  </div>
+                  {lockUntilParsed ? (
+                    <p className="text-xs text-muted leading-relaxed">
+                      Single unlock on{" "}
+                      <span className="text-foreground">
+                        {formatTargetDate(lockUntilParsed.targetMs)}
+                      </span>
+                      . Locked for{" "}
+                      <span className="text-foreground tabular">
+                        {formatDuration(lockUntilParsed.durationSeconds)}
+                      </span>{" "}
+                      from now. No reloads, no early exit.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-warning leading-relaxed">
+                      Pick a date at least 1 hour from now.
+                    </p>
+                  )}
+                  <p className="text-[11px] text-faint leading-relaxed">
+                    Good for rent, bills, or any single-date deadline.
+                    Cadence and waiting period don&apos;t apply.
+                  </p>
+                </div>
+              ) : (
+                <>
               {/* Total reload window */}
               <div>
                 <label
@@ -872,6 +1015,8 @@ function CreateForm() {
                   The wait can&apos;t be longer than the reload window.
                 </p>
               )}
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -916,6 +1061,30 @@ function CreateForm() {
           />
         )}
 
+        {/* Single-unlock preview for lock-until. */}
+        {amount !== null &&
+          amount > 0n &&
+          schedule.isLumpSum &&
+          schedule.targetMs !== null && (
+            <div className="mt-8 border border-line rounded-md p-5 space-y-3 text-sm">
+              <div className="eyebrow">Single unlock</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 tabular">
+                <div className="text-muted">Unlocks on</div>
+                <div className="text-foreground text-right">
+                  {formatTargetDate(schedule.targetMs)}
+                </div>
+                <div className="text-muted">Locked for</div>
+                <div className="text-foreground text-right">
+                  {formatDuration(schedule.totalSeconds)}
+                </div>
+                <div className="text-muted">Amount</div>
+                <div className="text-foreground text-right">
+                  {formatSol(net)} {DEPOSIT_TOKEN_LABEL}
+                </div>
+              </div>
+            </div>
+          )}
+
         <button
           type="button"
           onClick={onSubmit}
@@ -923,7 +1092,8 @@ function CreateForm() {
             !wallet.connected ||
             isPending ||
             amount === null ||
-            balanceShortfall !== null
+            balanceShortfall !== null ||
+            schedule.totalSeconds === 0
           }
           className="btn-primary mt-8 sm:mt-10 w-full sm:w-auto"
         >
@@ -935,7 +1105,11 @@ function CreateForm() {
                 ? "Sign in your wallet…"
                 : status.kind === "confirming"
                   ? "Confirming on-chain…"
-                  : "Lock it in"}
+                  : selectedPreset === "custom" &&
+                      customMode === "lockUntil" &&
+                      !lockUntilParsed
+                    ? "Pick a date at least 1 hour out"
+                    : "Lock it in"}
         </button>
 
         {status.kind === "error" && (

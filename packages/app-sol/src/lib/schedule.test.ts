@@ -3,6 +3,10 @@ import {
   formatDuration,
   parsePositiveDurationParam,
   parseAmountParam,
+  parseLockUntilInput,
+  formatTargetDate,
+  toDatetimeLocalValue,
+  MIN_LOCK_SECONDS,
   getIntervalOptions,
   computeFee,
   computeMaxDeposit,
@@ -262,5 +266,74 @@ describe("ALL_INTERVALS", () => {
 
   it("starts at 1 hour", () => {
     expect(ALL_INTERVALS[0].seconds).toBe(3600);
+  });
+});
+
+// --- parseLockUntilInput ---
+
+describe("parseLockUntilInput", () => {
+  const NOW_MS = new Date("2026-01-01T00:00:00Z").getTime();
+
+  it("returns null for empty input", () => {
+    expect(parseLockUntilInput("", NOW_MS)).toBeNull();
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(parseLockUntilInput("not-a-date", NOW_MS)).toBeNull();
+  });
+
+  it("returns null for a target in the past", () => {
+    const pastValue = toDatetimeLocalValue(new Date(NOW_MS - 86400_000));
+    expect(parseLockUntilInput(pastValue, NOW_MS)).toBeNull();
+  });
+
+  it("returns null for a target less than the 1-hour minimum", () => {
+    const value = toDatetimeLocalValue(new Date(NOW_MS + 30 * 60_000));
+    expect(parseLockUntilInput(value, NOW_MS)).toBeNull();
+  });
+
+  it("accepts a target at the minimum (1 hour out)", () => {
+    const value = toDatetimeLocalValue(new Date(NOW_MS + MIN_LOCK_SECONDS * 1000));
+    const result = parseLockUntilInput(value, NOW_MS);
+    expect(result).not.toBeNull();
+    expect(result!.durationSeconds).toBeGreaterThanOrEqual(MIN_LOCK_SECONDS - 60);
+    expect(result!.durationSeconds).toBeLessThanOrEqual(MIN_LOCK_SECONDS + 60);
+  });
+
+  it("accepts a target a week out and returns the right duration", () => {
+    const sevenDaysMs = 7 * 86400_000;
+    const value = toDatetimeLocalValue(new Date(NOW_MS + sevenDaysMs));
+    const result = parseLockUntilInput(value, NOW_MS);
+    expect(result).not.toBeNull();
+    expect(result!.durationSeconds).toBeGreaterThanOrEqual(7 * 86400 - 60);
+    expect(result!.durationSeconds).toBeLessThanOrEqual(7 * 86400 + 60);
+  });
+});
+
+// --- formatTargetDate ---
+
+describe("formatTargetDate", () => {
+  it("returns a non-empty string for any valid ms timestamp", () => {
+    const out = formatTargetDate(new Date("2026-06-01T15:00:00").getTime());
+    expect(typeof out).toBe("string");
+    expect(out.length).toBeGreaterThan(0);
+  });
+});
+
+// --- toDatetimeLocalValue ---
+
+describe("toDatetimeLocalValue", () => {
+  it("returns a datetime-local-shaped string", () => {
+    const d = new Date("2026-06-01T15:30:00");
+    const out = toDatetimeLocalValue(d);
+    expect(out).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  });
+
+  it("round-trips through new Date() in local time", () => {
+    const d = new Date();
+    d.setSeconds(0, 0);
+    const out = toDatetimeLocalValue(d);
+    const parsed = new Date(out).getTime();
+    expect(parsed).toBe(d.getTime());
   });
 });
