@@ -106,15 +106,17 @@ function VaultCard({
   usdcDecimals,
   sablierAddress,
   explorerUrl,
+  chainName,
 }: {
   vault: VaultData;
-  onClaim: (streamId: bigint) => void;
+  onClaim: (id: bigint) => void;
   claimingId: bigint | null;
   index: number;
   chainId: number;
   usdcDecimals: number;
   sablierAddress: Address;
   explorerUrl: string;
+  chainName: string;
 }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -280,6 +282,7 @@ function VaultCard({
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
           sablierAddress={sablierAddress}
+          chainName={chainName}
         />
       )}
     </div>
@@ -893,6 +896,7 @@ function VaultDashboard() {
               usdcDecimals={usdcDecimals}
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}
+              chainName={chainConfig.shortName}
             />
           </CardErrorBoundary>
         ))}

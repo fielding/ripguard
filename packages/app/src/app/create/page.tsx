@@ -138,6 +138,7 @@ function CreateLockInner() {
     treasury,
     explorerUrl,
     explorerName,
+    shortName: chainShortName,
     usdcNote,
   } = useMemo(
     () =>
@@ -691,6 +692,7 @@ function CreateLockInner() {
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}
               explorerName={explorerName}
+              chainName={chainShortName}
               onCreateAnother={resetForm}
             />
           ) : (
@@ -1584,6 +1586,7 @@ function SuccessView({
   sablierAddress,
   explorerUrl,
   explorerName,
+  chainName,
   onCreateAnother,
 }: {
   txHash: `0x${string}`;
@@ -1600,6 +1603,7 @@ function SuccessView({
   sablierAddress: Address;
   explorerUrl: string;
   explorerName: string;
+  chainName: string;
   onCreateAnother: () => void;
 }) {
   const now = Math.floor(Date.now() / 1000);
@@ -1680,6 +1684,7 @@ function SuccessView({
         endDate={endDate}
         nextUnlock={nextUnlock}
         sablierAddress={sablierAddress}
+        chainName={chainName}
       />
 
       <div className="space-y-4">

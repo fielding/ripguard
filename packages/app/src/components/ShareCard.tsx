@@ -9,6 +9,7 @@ type ShareCardProps = {
   endDate: Date;
   nextUnlock: string; // countdown string
   sablierAddress: string;
+  chainName: string;
 };
 
 const CARD_W = 600;
@@ -19,7 +20,7 @@ function drawCard(
   props: ShareCardProps,
   masked: boolean
 ) {
-  const { streamId, amountLocked, scheduleType, endDate, nextUnlock, sablierAddress } = props;
+  const { streamId, amountLocked, scheduleType, endDate, nextUnlock, sablierAddress, chainName } = props;
 
   // Background
   ctx.fillStyle = "#0a0a0a";
@@ -47,12 +48,16 @@ function drawCard(
   ctx.fillText("Proof of Lock", 32, 64);
 
   // Chain badge
+  const badgePaddingX = 14;
+  const badgeTextWidth = ctx.measureText(chainName).width;
+  const badgeWidth = Math.max(68, badgeTextWidth + badgePaddingX * 2);
+  const badgeX = CARD_W - 32 - badgeWidth;
   ctx.fillStyle = "rgba(255,255,255,0.08)";
-  roundRect(ctx, CARD_W - 100, 24, 68, 26, 13);
+  roundRect(ctx, badgeX, 24, badgeWidth, 26, 13);
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.font = "12px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Base", CARD_W - 78, 42);
+  ctx.fillText(chainName, badgeX + badgePaddingX, 42);
 
   // Amount
   ctx.fillStyle = "#ffffff";
