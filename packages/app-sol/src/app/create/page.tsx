@@ -26,6 +26,7 @@ import {
   type PresetKey,
 } from "@/config/solsab";
 import { buildLockTx } from "@/sol/lock";
+import { buildUnwrapWsolIxs } from "@/sol/unwrap";
 import { randomSalt } from "@/sol/pdas";
 import {
   presetToSolanaArgs,
@@ -157,6 +158,7 @@ function CreateForm() {
   // balance.
   const [wsolBalance, setWsolBalance] = useState<bigint | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [unwrapping, setUnwrapping] = useState(false);
 
   const amount = useMemo(() => parseSolAmount(amountStr), [amountStr]);
   const fee = amount !== null ? computeBrokerFee(amount) : 0n;
@@ -319,6 +321,44 @@ function CreateForm() {
     solBalance === 0n &&
     wsolBalance !== null &&
     wsolBalance > 0n;
+
+  // Unwrap the user's wSOL back to native SOL in-app by closing their
+  // wSOL ATA. The close tx itself costs a tiny fee (~5000 lamports), so
+  // a wallet at literally 0 native SOL can't pay for it — we surface
+  // that case to the user rather than letting it fail opaquely.
+  const onUnwrap = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) {
+      toast.toast("Connect a Solana wallet first.", "error");
+      return;
+    }
+    setUnwrapping(true);
+    try {
+      const tx = new Transaction();
+      for (const ix of buildUnwrapWsolIxs(wallet.publicKey)) tx.add(ix);
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("processed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = wallet.publicKey;
+
+      const signed = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        { maxRetries: 5, skipPreflight: false, preflightCommitment: "confirmed" },
+      );
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+      toast.toast("Unwrapped to native SOL.", "success");
+      await refreshBalance();
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (isUserRejection(e)) return;
+      toast.toast(extractErrorReason(e), "error");
+    } finally {
+      setUnwrapping(false);
+    }
+  }, [wallet, connection, toast, refreshBalance]);
 
   const onSubmit = useCallback(async () => {
     if (!wallet.publicKey || !wallet.signTransaction) {
@@ -582,35 +622,30 @@ function CreateForm() {
               transaction, so it can&apos;t use your existing wSOL
               directly. You&apos;ll need to unwrap it first.
             </p>
-            <div className="mt-4 rounded-md border border-warning/40 bg-background/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-warning/90 mb-1.5">
-                Heads up
-              </p>
-              <p className="text-sm text-foreground/85 leading-relaxed">
-                Unwrapping is itself a Solana transaction, so it needs a
-                tiny bit of native SOL (~0.001) to pay the fee. If your
-                wallet is literally{" "}
-                <span className="tabular">0 SOL native</span>, send a
-                small amount in first or use Phantom&apos;s in-app Swap
-                (which can route around the fee).
-              </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onUnwrap()}
+                disabled={unwrapping || balanceLoading}
+                className="btn-primary !min-h-[2.75rem] !py-2.5 !px-5 !text-sm disabled:opacity-50"
+              >
+                {unwrapping ? "Unwrapping…" : `Unwrap ${formatSol(wsolBalance)} wSOL → SOL`}
+              </button>
+              <button
+                type="button"
+                onClick={() => refreshBalance()}
+                disabled={balanceLoading || unwrapping}
+                className="inline-flex items-center min-h-[2.5rem] px-2 text-sm text-cyan hover:text-foreground underline transition-colors disabled:opacity-50"
+              >
+                {balanceLoading ? "Refreshing…" : "Refresh balance ↻"}
+              </button>
             </div>
-            <p className="mt-4 text-sm text-foreground/85 leading-relaxed">
-              <span className="font-semibold">In Phantom:</span> tap
-              your wSOL token, then choose{" "}
-              <span className="font-semibold">Unwrap</span>. Or use{" "}
-              <span className="font-semibold">Swap</span> (wSOL → SOL).
+            <p className="mt-4 text-xs text-foreground/70 leading-relaxed">
+              Unwrapping is itself a Solana transaction, so it needs a
+              tiny bit of native SOL (~0.001) for the fee. If your wallet
+              is literally <span className="tabular">0 SOL native</span>,
+              send a small amount in first, then unwrap.
             </p>
-            <button
-              type="button"
-              onClick={() => refreshBalance()}
-              disabled={balanceLoading}
-              className="mt-4 inline-flex items-center min-h-[2.5rem] px-3 -my-1 -ml-1 text-sm text-cyan hover:text-foreground underline transition-colors disabled:opacity-50"
-            >
-              {balanceLoading
-                ? "Refreshing…"
-                : "I unwrapped it. Refresh balance ↻"}
-            </button>
           </div>
         )}
 

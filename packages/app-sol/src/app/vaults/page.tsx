@@ -21,6 +21,7 @@ import {
   type DiscoveredStream,
 } from "@/sol/vault-discovery";
 import { buildWithdrawMaxTx } from "@/sol/withdraw";
+import { buildUnwrapWsolIxs, wsolAta } from "@/sol/unwrap";
 import {
   streamStatus,
   withdrawableAmount,
@@ -165,6 +166,10 @@ function VaultsBody() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [now, setNow] = useState<bigint>(BigInt(Math.floor(Date.now() / 1000)));
   const [claimingMint, setClaimingMint] = useState<string | null>(null);
+  // Leftover wrapped SOL from claims made before auto-unwrap shipped (or
+  // any wSOL the user is otherwise holding). Surfaced as a one-tap unwrap.
+  const [wsolBalance, setWsolBalance] = useState<bigint | null>(null);
+  const [unwrapping, setUnwrapping] = useState(false);
 
   // Tick the clock every second so countdowns feel live.
   useEffect(() => {
@@ -214,11 +219,31 @@ function VaultsBody() {
     }
   }, [provider, wallet.publicKey]);
 
+  // Read the user's wSOL ATA balance. A missing ATA throws — that just
+  // means zero wSOL, so we treat any failure as 0.
+  const loadWsol = useCallback(async () => {
+    if (!wallet.publicKey) return;
+    try {
+      const res = await connection.getTokenAccountBalance(
+        wsolAta(wallet.publicKey),
+        "confirmed",
+      );
+      setWsolBalance(BigInt(res.value.amount));
+    } catch {
+      setWsolBalance(0n);
+    }
+  }, [connection, wallet.publicKey]);
+
   // Auto-load on connect.
   useEffect(() => {
-    if (wallet.connected) loadStreams();
-    else setStreams(null);
-  }, [wallet.connected, loadStreams]);
+    if (wallet.connected) {
+      loadStreams();
+      loadWsol();
+    } else {
+      setStreams(null);
+      setWsolBalance(null);
+    }
+  }, [wallet.connected, loadStreams, loadWsol]);
 
   const onClaim = useCallback(
     async (stream: DiscoveredStream) => {
@@ -270,8 +295,10 @@ function VaultsBody() {
           label: "View tx",
           href: explorerTx(signature),
         });
-        // Refresh after claim.
+        // Refresh after claim. SOL claims auto-unwrap, so wSOL should
+        // read back at 0 — refresh it too so any stale banner clears.
         await loadStreams();
+        void loadWsol();
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         if (isUserRejection(e)) return;
@@ -286,8 +313,43 @@ function VaultsBody() {
         setClaimingMint(null);
       }
     },
-    [connection, loadStreams, provider, toast, wallet],
+    [connection, loadStreams, loadWsol, provider, toast, wallet],
   );
+
+  // Unwrap leftover wSOL back to native SOL by closing the wSOL ATA.
+  const onUnwrap = useCallback(async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) return;
+    setUnwrapping(true);
+    try {
+      const tx = new Transaction();
+      for (const ix of buildUnwrapWsolIxs(wallet.publicKey)) tx.add(ix);
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("processed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = wallet.publicKey;
+
+      const signed = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(
+        signed.serialize(),
+        { maxRetries: 5, skipPreflight: false, preflightCommitment: "confirmed" },
+      );
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+      toast.toast("Unwrapped to native SOL.", "success", {
+        label: "View tx",
+        href: explorerTx(signature),
+      });
+      void loadWsol();
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (isUserRejection(e)) return;
+      toast.toast(extractErrorReason(e), "error");
+    } finally {
+      setUnwrapping(false);
+    }
+  }, [connection, loadWsol, toast, wallet]);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -319,6 +381,35 @@ function VaultsBody() {
             </div>
             <MobileWalletFallback />
           </>
+        )}
+
+        {/* Leftover wrapped SOL — typically from a claim made before
+            auto-unwrap shipped. One tap closes the wSOL account and
+            returns it as native SOL. */}
+        {wallet.connected && wsolBalance !== null && wsolBalance > 0n && (
+          <div className="mt-8 rounded-md border-2 border-cyan/50 bg-cyan/[0.05] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="font-display text-lg tracking-tight">
+                  You have wrapped SOL to unwrap
+                </h3>
+                <p className="mt-1 text-sm text-foreground/85">
+                  <span className="tabular font-semibold">
+                    {formatSol(wsolBalance)} wSOL
+                  </span>{" "}
+                  is sitting in your wallet. Unwrap it back to native SOL.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUnwrap()}
+                disabled={unwrapping}
+                className="btn-primary !min-h-[2.75rem] !py-2.5 !px-5 !text-sm shrink-0 disabled:opacity-50"
+              >
+                {unwrapping ? "Unwrapping…" : "Unwrap → SOL"}
+              </button>
+            </div>
+          </div>
         )}
 
         {wallet.connected && loading && streams === null && (

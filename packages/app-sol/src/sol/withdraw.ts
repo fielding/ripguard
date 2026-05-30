@@ -13,7 +13,13 @@ import {
   type TransactionInstruction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  getAssociatedTokenAddressSync,
+  createCloseAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from "@solana/spl-token";
 import idlJson from "@/idl/sablier_lockup.json";
 import type { Idl } from "@coral-xyz/anchor";
 import { PRIORITY_FEE_MICRO_LAMPORTS } from "@/config/solsab";
@@ -67,6 +73,29 @@ export async function buildWithdrawMaxTx(
     }),
   ];
 
+  // SOL streams pay out in wrapped SOL: withdrawMax deposits the claimed
+  // tokens into the recipient's wSOL ATA, leaving the user holding wSOL
+  // they then have to unwrap themselves — a step many wallets hide or get
+  // wrong. We make the claim self-unwrapping: ensure the wSOL ATA exists
+  // before the withdraw (a prior auto-unwrap may have closed it, and the
+  // program won't create it for us), then close it right after so every
+  // claimed lamport — plus the ATA rent — lands as native SOL in one tx.
+  const isWrappedSol = depositedTokenMint.equals(NATIVE_MINT);
+  const recipientWsolAta = isWrappedSol
+    ? getAssociatedTokenAddressSync(NATIVE_MINT, signer)
+    : null;
+
+  if (recipientWsolAta) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        signer,
+        recipientWsolAta,
+        signer,
+        NATIVE_MINT,
+      ),
+    );
+  }
+
   const ix = await program.methods
     .withdrawMax()
     .accountsPartial({
@@ -82,6 +111,13 @@ export async function buildWithdrawMaxTx(
     })
     .instruction();
   instructions.push(ix);
+
+  // Closing the wSOL ATA unwraps everything in it back to native SOL.
+  if (recipientWsolAta) {
+    instructions.push(
+      createCloseAccountInstruction(recipientWsolAta, signer, signer),
+    );
+  }
 
   return { instructions };
 }
