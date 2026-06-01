@@ -260,9 +260,11 @@ function CreateForm() {
           .then((r) => BigInt(r.value.amount))
           .catch(() => 0n),
       ]);
-      // eslint-disable-next-line no-console
       console.info("[ripguard] balance check", {
-        rpc: connection.rpcEndpoint,
+        // Strip the query string — the RPC URL carries the Helius
+        // api-key as ?api-key=… and we must never log it. Host + path
+        // is enough to diagnose a wrong-endpoint situation.
+        rpc: connection.rpcEndpoint.split("?")[0],
         cluster: IS_DEVNET ? "devnet" : "mainnet-beta",
         pubkey: wallet.publicKey.toBase58(),
         lamports,
@@ -270,9 +272,10 @@ function CreateForm() {
       });
       setSolBalance(BigInt(lamports));
       setWsolBalance(wsolAmount);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("[ripguard] balance check failed", err);
+    } catch {
+      // Swallow — a thrown RPC error can embed the endpoint URL (which
+      // carries the Helius api-key), so we don't log it. A null balance
+      // already drives the "wallet looks empty / wrong network" hint.
       setSolBalance(null);
       setWsolBalance(null);
     } finally {
