@@ -27,6 +27,7 @@ import {
 } from "@/config/solsab";
 import { buildLockTx } from "@/sol/lock";
 import { buildUnwrapWsolIxs } from "@/sol/unwrap";
+import { sendViaWallet } from "@/lib/sendTx";
 import { randomSalt } from "@/sol/pdas";
 import {
   presetToSolanaArgs,
@@ -330,27 +331,17 @@ function CreateForm() {
   // a wallet at literally 0 native SOL can't pay for it — we surface
   // that case to the user rather than letting it fail opaquely.
   const onUnwrap = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction) {
+    if (!wallet.publicKey) {
       toast.toast("Connect a Solana wallet first.", "error");
       return;
     }
     setUnwrapping(true);
     try {
-      const tx = new Transaction();
-      for (const ix of buildUnwrapWsolIxs(wallet.publicKey)) tx.add(ix);
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("processed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = wallet.publicKey;
-
-      const signed = await wallet.signTransaction(tx);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        { maxRetries: 5, skipPreflight: false, preflightCommitment: "confirmed" },
-      );
-      await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        "confirmed",
+      // Unsigned → wallet signs and sends so Lighthouse can guard it.
+      await sendViaWallet(
+        wallet,
+        connection,
+        buildUnwrapWsolIxs(wallet.publicKey),
       );
       toast.toast("Unwrapped to native SOL.", "success");
       await refreshBalance();

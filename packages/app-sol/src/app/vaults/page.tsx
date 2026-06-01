@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { Transaction, type PublicKey } from "@solana/web3.js";
+import { type PublicKey } from "@solana/web3.js";
 
 import { Header } from "@/components/Header";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
@@ -22,6 +22,7 @@ import {
 } from "@/sol/vault-discovery";
 import { buildWithdrawMaxTx } from "@/sol/withdraw";
 import { buildUnwrapWsolIxs, wsolAta } from "@/sol/unwrap";
+import { sendViaWallet } from "@/lib/sendTx";
 import {
   streamStatus,
   withdrawableAmount,
@@ -258,37 +259,10 @@ function VaultsBody() {
           depositedTokenMint: stream.depositedTokenMint,
         });
 
-        if (!wallet.signTransaction) {
-          throw new Error("Wallet does not support signTransaction.");
-        }
-        const tx = new Transaction();
-        for (const ix of instructions) tx.add(ix);
-        // Use `processed` for the blockhash so we get the freshest possible
-        // tip — buys ~30 extra slots of validity vs `confirmed`, which the
-        // Phantom warning popup eats up while the user reads it.
-        const { blockhash, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("processed");
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = wallet.publicKey;
-
-        // Have Phantom sign only — DON'T let Phantom broadcast. Phantom's
-        // RPC isn't stake-weighted; under any contention, leaders silently
-        // drop our tx and we hit "block height exceeded" without it ever
-        // reaching the chain. Broadcasting through our own Helius endpoint
-        // (which has stake-weighted forwarding) gets us reliable landing.
-        const signed = await wallet.signTransaction(tx);
-        const signature = await connection.sendRawTransaction(
-          signed.serialize(),
-          {
-            maxRetries: 5,
-            skipPreflight: false,
-            preflightCommitment: "confirmed",
-          },
-        );
-        await connection.confirmTransaction(
-          { signature, blockhash, lastValidBlockHeight },
-          "confirmed",
-        );
+        // Send unsigned via the wallet so Lighthouse can inject guard
+        // instructions (see sendViaWallet). Claims trade stake-weighted
+        // Helius landing for guard compatibility — fine for this small tx.
+        const signature = await sendViaWallet(wallet, connection, instructions);
 
         trackClaim(mintStr);
         toast.toast("Claimed.", "success", {
@@ -318,24 +292,13 @@ function VaultsBody() {
 
   // Unwrap leftover wSOL back to native SOL by closing the wSOL ATA.
   const onUnwrap = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction) return;
+    if (!wallet.publicKey) return;
     setUnwrapping(true);
     try {
-      const tx = new Transaction();
-      for (const ix of buildUnwrapWsolIxs(wallet.publicKey)) tx.add(ix);
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("processed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = wallet.publicKey;
-
-      const signed = await wallet.signTransaction(tx);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        { maxRetries: 5, skipPreflight: false, preflightCommitment: "confirmed" },
-      );
-      await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        "confirmed",
+      const signature = await sendViaWallet(
+        wallet,
+        connection,
+        buildUnwrapWsolIxs(wallet.publicKey),
       );
       toast.toast("Unwrapped to native SOL.", "success", {
         label: "View tx",
