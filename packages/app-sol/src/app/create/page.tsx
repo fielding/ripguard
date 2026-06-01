@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { Transaction } from "@solana/web3.js";
 import {
   NATIVE_MINT,
   getAssociatedTokenAddressSync,
@@ -27,7 +26,7 @@ import {
 } from "@/config/solsab";
 import { buildLockTx } from "@/sol/lock";
 import { buildUnwrapWsolIxs } from "@/sol/unwrap";
-import { sendViaWallet } from "@/lib/sendTx";
+import { sendViaWallet, sendLockTx } from "@/lib/sendTx";
 import { randomSalt } from "@/sol/pdas";
 import {
   presetToSolanaArgs,
@@ -415,43 +414,13 @@ function CreateForm() {
           salt,
         });
 
-      // Assemble a legacy Transaction. Solana v0 transactions add lookup
-      // tables we don't need yet — keep it simple until we hit the account
-      // limit.
-      if (!wallet.signTransaction) {
-        throw new Error("Wallet does not support signTransaction.");
-      }
-      const tx = new Transaction();
-      for (const ix of instructions) tx.add(ix);
-      // Use `processed` for the blockhash so we get the freshest possible
-      // tip — buys ~30 extra slots of validity vs `confirmed`, which the
-      // Phantom warning popup eats up while the user reads it.
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("processed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = wallet.publicKey;
-
-      // Have Phantom sign only — DON'T let Phantom broadcast. Phantom's
-      // RPC isn't stake-weighted; under any contention, leaders silently
-      // drop our tx and we hit "block height exceeded" without it ever
-      // reaching the chain. Broadcasting through our own Helius endpoint
-      // (which has stake-weighted forwarding) gets us reliable landing.
-      setStatus({ kind: "signing" });
-      const signed = await wallet.signTransaction(tx);
-      const signature = await connection.sendRawTransaction(
-        signed.serialize(),
-        {
-          maxRetries: 5,
-          skipPreflight: false,
-          preflightCommitment: "confirmed",
-        },
-      );
-      setStatus({ kind: "confirming", signature });
-
-      await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        "confirmed",
-      );
+      // Send via the lock helper: v0 + Address Lookup Table when configured
+      // (Lighthouse-compatible), otherwise the legacy Helius path. See
+      // sendLockTx — the ALT path leaves room for Blowfish guard injection.
+      const signature = await sendLockTx(wallet, connection, instructions, {
+        onSign: () => setStatus({ kind: "signing" }),
+        onSent: (sig) => setStatus({ kind: "confirming", signature: sig }),
+      });
 
       trackLockCreated({
         schedule: schedule.label,

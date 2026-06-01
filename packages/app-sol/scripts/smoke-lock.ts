@@ -27,6 +27,8 @@ import {
   Keypair,
   PublicKey,
   Transaction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -38,6 +40,10 @@ import { presetToSolanaArgs } from "../src/sol/preset";
 
 const RPC = process.env.SOLANA_RPC ?? "https://api.devnet.solana.com";
 const KEYPAIR_PATH = process.env.KEYPAIR ?? join(homedir(), ".config/solana/id.json");
+// Set LOOKUP_TABLE=<alt address> to simulate the production v0 + ALT path
+// (what the app sends once NEXT_PUBLIC_LOOKUP_TABLE is configured). Unset →
+// simulate the legacy path. The ALT must already exist on this cluster.
+const LOOKUP_TABLE = process.env.LOOKUP_TABLE;
 // Default to a tiny lock so the smoke run never blocks on faucet limits.
 const AMOUNT_SOL = process.env.AMOUNT_SOL ?? "0.01";
 
@@ -147,14 +153,46 @@ async function main() {
   console.log(`  fee amount: ${feeAmount} lamports`);
   console.log(`  net deposit: ${netDepositAmount} lamports`);
 
-  const tx = new Transaction();
-  for (const ix of instructions) tx.add(ix);
   const { blockhash } = await connection.getLatestBlockhash("confirmed");
-  tx.recentBlockhash = blockhash;
-  tx.feePayer = keypair.publicKey;
 
-  console.log(`\nSimulating against ${RPC}…\n`);
-  const sim = await connection.simulateTransaction(tx, [keypair], false);
+  let sim;
+  if (LOOKUP_TABLE) {
+    // v0 + ALT path — exactly what the app sends in production once the
+    // lookup table is configured. Resolves the table, compresses the static
+    // accounts, and simulates the VersionedTransaction.
+    const altAddress = new PublicKey(LOOKUP_TABLE);
+    const altRes = await connection.getAddressLookupTable(altAddress);
+    if (!altRes.value) {
+      throw new Error(
+        `Lookup table ${LOOKUP_TABLE} not found on this cluster — create it first.`,
+      );
+    }
+    console.log(
+      `\nUsing lookup table ${LOOKUP_TABLE} (${altRes.value.state.addresses.length} addresses)`,
+    );
+    const message = new TransactionMessage({
+      payerKey: keypair.publicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message([altRes.value]);
+    const serializedLen = new VersionedTransaction(message).serialize().length;
+    console.log(
+      `v0 tx size: ${serializedLen} bytes (1232 max — headroom ${1232 - serializedLen} for guards)`,
+    );
+    const vtx = new VersionedTransaction(message);
+    console.log(`\nSimulating v0 tx against ${RPC}…\n`);
+    sim = await connection.simulateTransaction(vtx, {
+      sigVerify: false,
+      replaceRecentBlockhash: true,
+    });
+  } else {
+    const tx = new Transaction();
+    for (const ix of instructions) tx.add(ix);
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = keypair.publicKey;
+    console.log(`\nSimulating legacy tx against ${RPC}…\n`);
+    sim = await connection.simulateTransaction(tx, [keypair], false);
+  }
 
   if (sim.value.err) {
     console.log(`Simulation reported an error:`);

@@ -56,6 +56,23 @@ export const MERKLE_INSTANT_PROGRAM_ID = new PublicKey(
 );
 
 // ----------------------------------------------------------------------------
+// Address Lookup Table (create/lock tx → v0)
+// ----------------------------------------------------------------------------
+//
+// The create/lock tx is account-heavy (Sablier + Metaplex). To leave room for
+// Blowfish/Lighthouse guard injection we compress the fixed, non-program
+// accounts (collection PDAs, wSOL mint, treasury + its ATA, rent sysvar) into
+// an on-chain ALT and send the lock as a v0 transaction. Create the table once
+// with `scripts/create-lookup-table.ts`, then set NEXT_PUBLIC_LOOKUP_TABLE.
+//
+// Null when unset → the lock flow falls back to the legacy (Helius-broadcast)
+// path, so an unconfigured or unreachable table never breaks lock creation.
+const lookupTableEnv = process.env.NEXT_PUBLIC_LOOKUP_TABLE;
+export const LOOKUP_TABLE_ADDRESS: PublicKey | null = lookupTableEnv
+  ? new PublicKey(lookupTableEnv)
+  : null;
+
+// ----------------------------------------------------------------------------
 // Deposit token (Wrapped SOL)
 // ----------------------------------------------------------------------------
 //
