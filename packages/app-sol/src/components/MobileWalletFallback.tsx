@@ -39,6 +39,11 @@ export function MobileWalletFallback() {
   const [show, setShow] = useState(false);
   const [urls, setUrls] = useState<{ phantom: string; solflare: string } | null>(null);
 
+  // Derives from client-only signals (navigator UA, injected-wallet globals,
+  // window.location) plus the reactive `connected` flag. Reading those during
+  // render would mismatch SSR, so we compute on mount/after connect — the
+  // setState here is the intended post-hydration sync, not a cascading render.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (connected) {
       setShow(false);
@@ -56,6 +61,7 @@ export function MobileWalletFallback() {
     });
     setShow(true);
   }, [connected]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!show || !urls) return null;
 

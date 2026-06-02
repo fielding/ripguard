@@ -11,6 +11,10 @@ export function WelcomeModal() {
   useEffect(() => {
     try {
       if (!localStorage.getItem(STORAGE_KEY)) {
+        // Intentional post-hydration setState: localStorage is client-only,
+        // so reading it during render would cause an SSR hydration mismatch
+        // (server has no storage). Deferring to mount is the correct pattern.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setShow(true);
       }
     } catch {
@@ -69,7 +73,7 @@ export function WelcomeModal() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prev;
     };
-  }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [show]);
 
   if (!show) return null;
 

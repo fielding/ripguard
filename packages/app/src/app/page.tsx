@@ -7,7 +7,6 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { RipGuardMark3D } from "@/components/Brand";
-import { BRAND } from "@/content/brand";
 
 function PresetIcon({ variant }: { variant: "clock" | "shield" | "lock" }) {
   const common = {

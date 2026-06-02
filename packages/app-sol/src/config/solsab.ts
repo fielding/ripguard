@@ -120,14 +120,24 @@ export const BROKER_FEE_BPS = BigInt(50);
 const BPS_DENOMINATOR = BigInt(10_000);
 
 /**
- * Absolute broker fee amount, in token base units (USDC = 6 decimals).
+ * Absolute broker fee amount, in token base units (SOL/wSOL = 9 decimals,
+ * i.e. lamports).
  *
  * On Solana we do this skim ourselves, as a separate SPL transfer, prior
- * to calling Sablier's `create_with_durations_ll`. Mirrors the EVM app's
- * `computeBrokerFee` from packages/app — same rate, same floor rounding.
+ * to calling Sablier's `create_with_durations_ll`.
+ *
+ * NOTE — this is NOT the same user-facing semantics as the EVM app. The two
+ * apps share the 0.5% rate and floor rounding, but apply it differently:
+ *   - EVM grosses the fee up ON TOP of the deposit (see `computeFee` in
+ *     packages/app/src/lib/schedule.ts) — the recipient receives the full
+ *     deposit, Sablier's native broker arg pulls the fee from the caller.
+ *   - Solana SKIMS the fee from the amount (this fn) — there is no native
+ *     broker arg, so the recipient receives `amount - fee`.
+ * So the same typed deposit yields a different quoted total per chain by
+ * design; do not "reconcile" them without changing one app's product behavior.
  *
  * Caller's responsibility: handle the rounds-to-zero case (any deposit
- * smaller than 200 base units = 0.0002 USDC produces a 0 fee, which we
+ * smaller than 200 lamports = 0.0000002 SOL produces a 0 fee, which we
  * either skip or block at the form level).
  */
 export function computeBrokerFee(amount: bigint, bps: bigint = BROKER_FEE_BPS): bigint {

@@ -36,7 +36,6 @@ import {
 import { SystemProgram } from "@solana/web3.js";
 import {
   PRIORITY_FEE_MICRO_LAMPORTS,
-  SABLIER_LOCKUP_PROGRAM_ID,
   TREASURY_PUBKEY,
   WSOL_MINT,
   ZERO_PUBKEY,

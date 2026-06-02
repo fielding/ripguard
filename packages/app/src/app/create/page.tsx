@@ -1602,7 +1602,10 @@ function SuccessView({
   explorerName: string;
   onCreateAnother: () => void;
 }) {
-  const now = Math.floor(Date.now() / 1000);
+  // Capture "now" once at mount via a lazy initializer — calling Date.now()
+  // directly in render is impure (react-hooks/purity) and would drift the
+  // displayed end date across re-renders.
+  const [now] = useState(() => Math.floor(Date.now() / 1000));
   const endDate =
     schedule.targetMs !== null
       ? new Date(schedule.targetMs)
