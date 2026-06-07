@@ -67,7 +67,9 @@ describe("buildLockTx", () => {
       await buildLockTx({ ...baseArgs, provider, treasury: ZERO_PUBKEY });
 
     // 2 compute-budget + 1 ATA create + (transfer + syncNative wrap) + create
-    expect(instructions).toHaveLength(6);
+    // 2 compute-budget + ATA create + (transfer + syncNative wrap) + create
+    // + closeAccount (reclaims the wSOL ATA rent).
+    expect(instructions).toHaveLength(7);
     expect(feeActive).toBe(false);
     expect(feeAmount).toBe(0n);
     expect(netDepositAmount).toBe(DEPOSIT);
@@ -91,8 +93,13 @@ describe("buildLockTx", () => {
     expect(
       transfer!.keys.some((k) => k.pubkey.equals(pdas.creatorAta)),
     ).toBe(true);
-    // syncNative on the token program follows the wrap.
-    expect(countByProgram(instructions, TOKEN_PROGRAM_ID)).toBe(1); // syncNative only
+    // Token program rides syncNative + the trailing closeAccount.
+    expect(countByProgram(instructions, TOKEN_PROGRAM_ID)).toBe(2);
+    // The LAST ix closes the creator wSOL ATA (rent back to signer).
+    const last = instructions[instructions.length - 1];
+    expect(last.programId.equals(TOKEN_PROGRAM_ID)).toBe(true);
+    expect(last.keys[0].pubkey.equals(pdas.creatorAta)).toBe(true); // account
+    expect(last.keys[1].pubkey.equals(SIGNER)).toBe(true); // lamport destination
   });
 
   it("with a treasury configured: inserts the broker-fee pre-transfer and nets the deposit", async () => {
@@ -108,8 +115,9 @@ describe("buildLockTx", () => {
       { ...baseArgs, provider }, // treasury param defaults to the env value
     );
 
-    // adds: treasury-ATA idempotent create + fee transfer → 8 ixs.
-    expect(instructions).toHaveLength(8);
+    // adds: treasury-ATA idempotent create + fee transfer → 9 ixs
+    // (7 from the no-fee case + those two).
+    expect(instructions).toHaveLength(9);
     expect(feeActive).toBe(true);
     expect(feeAmount).toBe(5_000n); // 0.5% of 1_000_000
     expect(netDepositAmount).toBe(DEPOSIT - 5_000n);
@@ -119,8 +127,8 @@ describe("buildLockTx", () => {
     const tokenIxs = instructions.filter((ix) =>
       ix.programId.equals(TOKEN_PROGRAM_ID),
     );
-    // syncNative + fee transfer both ride the token program.
-    expect(tokenIxs.length).toBe(2);
+    // syncNative + fee transfer + trailing closeAccount ride the token program.
+    expect(tokenIxs.length).toBe(3);
     const feeTransfer = tokenIxs.find((ix) =>
       ix.keys.some((k) => k.pubkey.equals(treasuryAta)),
     );
