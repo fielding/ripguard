@@ -5,7 +5,10 @@
   "scripts": {
     "balances": "pnpm --filter app balances && pnpm --filter app-sol balances",
     "balances:evm": "pnpm --filter app balances",
-    "balances:sol": "pnpm --filter app-sol balances"
+    "balances:sol": "pnpm --filter app-sol balances",
+    "earnings": "pnpm --filter app earnings && pnpm --filter app-sol earnings",
+    "earnings:evm": "pnpm --filter app earnings",
+    "earnings:sol": "pnpm --filter app-sol earnings"
   },
   "pnpm": {
     "overrides": {

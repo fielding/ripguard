@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "fetch:idl": "tsx scripts/fetch-idl.ts",
     "smoke:lock": "tsx scripts/smoke-lock.ts",
-    "balances": "tsx scripts/treasury-balances.ts"
+    "balances": "tsx scripts/treasury-balances.ts",
+    "earnings": "tsx scripts/treasury-earnings.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
