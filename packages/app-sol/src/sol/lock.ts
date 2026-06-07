@@ -32,6 +32,7 @@ import {
   createTransferInstruction,
   createAssociatedTokenAccountIdempotentInstruction,
   createSyncNativeInstruction,
+  createCloseAccountInstruction,
 } from "@solana/spl-token";
 import { SystemProgram } from "@solana/web3.js";
 import {
@@ -245,6 +246,19 @@ export async function buildLockTx(
     })
     .instruction();
   instructions.push(createIx);
+
+  // Reclaim the wSOL ATA rent. After the wrap → fee → Sablier-deposit dance
+  // the creator's wSOL ATA is left empty but still holding ~0.00204 SOL of
+  // rent — closing it returns that to the user as native SOL (and unwraps any
+  // pre-existing wSOL stranded in the same ATA, which closeAccount allows
+  // because the mint is native). Only for SOL locks: a non-native deposit ATA
+  // could hold a balance the user wants to keep, and closeAccount would reject
+  // a non-empty non-native account anyway.
+  if (isWrappedSol) {
+    instructions.push(
+      createCloseAccountInstruction(pdas.creatorAta, signer, signer),
+    );
+  }
 
   return {
     instructions,
