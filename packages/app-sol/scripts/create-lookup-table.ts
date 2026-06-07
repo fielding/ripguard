@@ -94,7 +94,7 @@ function lookupAccounts(): { label: string; address: PublicKey }[] {
 }
 
 async function main() {
-  console.log(`RPC: ${RPC}`);
+  console.log(`RPC: ${RPC.split("?")[0]}`); // strip ?api-key=…
   console.log(`Sablier Lockup program: ${SABLIER_LOCKUP_PROGRAM_ID.toBase58()}`);
   const connection = new Connection(RPC, "confirmed");
   const payer = await loadKeypair();
@@ -163,7 +163,7 @@ async function main() {
   console.log(`  NEXT_PUBLIC_LOOKUP_TABLE=${lookupTableAddress.toBase58()}`);
   console.log(
     `\nThen verify wiring with the v0 smoke test before cutover:` +
-      `\n  KEYPAIR=${KEYPAIR_PATH} SOLANA_RPC="${RPC}" \\` +
+      `\n  KEYPAIR=${KEYPAIR_PATH} SOLANA_RPC="<your mainnet rpc>" \\` +
       `\n  LOOKUP_TABLE=${lookupTableAddress.toBase58()} \\` +
       `\n  pnpm --filter app-sol exec tsx scripts/smoke-lock.ts`,
   );
