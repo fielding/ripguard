@@ -55,11 +55,17 @@ import {
 const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 const AMOUNT_RE = new RegExp(`^\\d+(\\.\\d{1,${SOL_DECIMALS}})?$`);
 
-// Headroom kept aside for tx fee + ATA rent + a buffer so the wallet
-// doesn't go to literal zero. Lock tx pays the wSOL ATA rent (~0.00204
-// SOL) plus a few thousand lamports of tx fee. 0.005 SOL is safe and
-// also reserves enough for the eventual claim's Sablier fee + tx fee.
-const LOCK_HEADROOM_LAMPORTS = BigInt(5_000_000); // 0.005 SOL
+// Headroom kept aside (beyond the deposit) for the rent the lock tx pays.
+// A lock spins up a stack of brand-new accounts the creator funds: the
+// wSOL ATA, the stream NFT mint, stream-data PDA + its ATA, the recipient
+// NFT ATA, Metaplex metadata + master edition, and — on the first lock —
+// the treasury's fee ATA. Mainnet simulation put a first-time lock at
+// ~0.026 SOL of rent on top of the deposit, and the fee payer must also
+// stay above its own rent-exempt floor (~0.0009 SOL). 0.005 SOL (the old
+// value) badly underquoted this, so "Max" and the balance check passed
+// transactions the chain then rejected for insufficient lamports. Reserve
+// enough to cover a worst-case first-time lock.
+const LOCK_HEADROOM_LAMPORTS = BigInt(27_000_000); // ~0.027 SOL
 
 function parseSolAmount(input: string): bigint | null {
   const trimmed = input.trim();
@@ -366,7 +372,7 @@ function CreateForm() {
     // from the "Attempt to debit an account..." mystery message.
     if (balanceShortfall) {
       toast.toast(
-        `Your wallet has ${balanceShortfall.haveSol} SOL. You need ${balanceShortfall.needSol} for the lock plus ~0.005 SOL for fees and rent.`,
+        `Your wallet has ${balanceShortfall.haveSol} SOL. You need ${balanceShortfall.needSol} for the lock plus ~0.027 SOL for the one-time account rent a new stream creates.`,
         "error",
       );
       return;
@@ -744,9 +750,9 @@ function CreateForm() {
                     setAmountStr(formatSol(max));
                   }}
                   className="inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-muted hover:text-cyan underline transition-colors"
-                  title="Lock everything except a small headroom for fees and rent"
+                  title="Locks everything except the ~0.027 SOL a new stream needs for one-time account rent + fees"
                 >
-                  Max (keeps ~0.005 SOL for fees)
+                  Max (keeps ~0.027 SOL for rent)
                 </button>
               )}
             </div>
@@ -754,8 +760,8 @@ function CreateForm() {
           {balanceShortfall && (
             <p className="mt-2 text-sm text-warning">
               Wallet has {balanceShortfall.haveSol} SOL. Need{" "}
-              {balanceShortfall.needSol} SOL for this lock plus ~0.005 SOL for
-              fees and rent.
+              {balanceShortfall.needSol} SOL for this lock plus ~0.027 SOL for
+              the one-time account rent a new stream creates.
             </p>
           )}
           {amount !== null && (
