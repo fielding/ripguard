@@ -11,6 +11,7 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useSwitchChain,
 } from "wagmi";
 import {
   PRESETS,
@@ -18,7 +19,7 @@ import {
   brokerFeeForTreasury,
   brokerFeePctString,
 } from "@/config/contracts";
-import { getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
+import { CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { erc20Abi, sablierLockupAbi, testUsdcAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -116,6 +117,86 @@ function SectionLabel({ index, children }: { index: string; children: React.Reac
       <span className="h-px w-8 bg-cyan/40" />
       {children}
     </div>
+  );
+}
+
+// Step 00 — network picker. The only prior way to change chains was the tiny
+// chain icon in the wallet button; most users never found it. Surfacing the
+// supported chains as switch-on-tap chips makes "you can lock on any of these"
+// obvious, and a dashed Solana chip points at the sister deployment.
+function NetworkSection({ isFormLocked }: { isFormLocked: boolean }) {
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { toast } = useToast();
+  const { switchChain, isPending } = useSwitchChain({
+    mutation: {
+      onError: (err) =>
+        toast(
+          isUserRejection(err)
+            ? "You rejected the network switch."
+            : extractErrorReason(err),
+          "error",
+        ),
+    },
+  });
+
+  // Only chains live on this deployment (mainnet vs testnet).
+  const chains = Object.values(CHAINS).filter((c) => c.isTestnet === IS_TESTNET);
+  // Solana is a sister deployment — link out so EVM users discover it without
+  // expecting an in-wallet chain switch (dashed border + ↗ mark "leaves site").
+  const solHref = IS_TESTNET
+    ? "https://testnet.sol.ripguard.xyz"
+    : "https://sol.ripguard.xyz";
+  const currentName = chains.find((c) => c.chainId === chainId)?.name;
+
+  const helper = !isConnected
+    ? "Pick where you'll lock — connect your wallet to switch networks."
+    : isPending
+      ? "Switching network…"
+      : currentName
+        ? `You're on ${currentName}. Tap another to switch — your amount carries over.`
+        : "Your wallet's on a network we don't support here. Tap one to switch.";
+
+  return (
+    <section className="space-y-4">
+      <SectionLabel index="00">Network</SectionLabel>
+      <div className="flex flex-wrap gap-2">
+        {chains.map((c) => {
+          const active = isConnected && c.chainId === chainId;
+          const interactive = isConnected && !active && !isFormLocked && !isPending;
+          return (
+            <button
+              key={c.chainId}
+              type="button"
+              aria-pressed={active}
+              disabled={!interactive}
+              onClick={() => switchChain({ chainId: c.chainId })}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border transition-colors min-h-[2.5rem] ${
+                active
+                  ? "border-cyan/60 bg-cyan/10 text-cyan"
+                  : interactive
+                    ? "border-line bg-surface text-muted cursor-pointer hover:border-cyan/50 hover:text-cyan hover:bg-surface-strong"
+                    : "border-line bg-surface text-muted cursor-default"
+              } ${isFormLocked ? "opacity-50" : ""}`}
+            >
+              {active && (
+                <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-cyan glow-cyan" />
+              )}
+              {c.shortName}
+            </button>
+          );
+        })}
+        <a
+          href={solHref}
+          title="RipGuard on Solana — opens the Solana app"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
+        >
+          Solana
+          <span aria-hidden className="text-[11px] -mt-0.5">↗</span>
+        </a>
+      </div>
+      <p className="text-xs text-faint leading-relaxed">{helper}</p>
+    </section>
   );
 }
 
@@ -712,6 +793,10 @@ function CreateLockInner() {
               </div>
 
               <div className="space-y-14 sm:space-y-16">
+                {/* Network — step 00, so picking a chain is the first, most
+                    visible decision rather than a hidden wallet-icon toggle. */}
+                <NetworkSection isFormLocked={isFormLocked} />
+
                 {/* Amount Input — first so the calculator reacts to it */}
                 <section className="space-y-4">
                   <SectionLabel index="01">Amount</SectionLabel>
@@ -811,61 +896,76 @@ function CreateLockInner() {
 
                 {/* Schedule Selection */}
                 <section className="space-y-5">
-                  <div className="flex items-end justify-between gap-4">
-                    <SectionLabel index="02">Reload</SectionLabel>
+                  <SectionLabel index="02">Reload</SectionLabel>
+
+                  {/* Three-tab control: Presets · Custom · Lock until.
+                      Flattened to the top level so the two custom modes are
+                      first-class — no tabs nested inside the builder. */}
+                  <div
+                    role="tablist"
+                    aria-label="Schedule type"
+                    className="grid grid-cols-3 gap-px bg-line border border-line rounded-lg overflow-hidden"
+                  >
                     <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selectedPreset !== "custom"}
                       disabled={isFormLocked}
                       onClick={() => {
-                        setSelectedPreset(selectedPreset === "custom" ? "hourly1d" : "custom");
+                        if (selectedPreset === "custom") setSelectedPreset("hourly1d");
                         setStep("schedule");
                       }}
-                      className={`inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-xs text-muted hover:text-cyan transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                      className={`px-3 py-3 text-[13px] sm:text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                        selectedPreset !== "custom"
+                          ? "bg-cyan/[0.10] text-cyan"
+                          : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                      } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
-                      {selectedPreset === "custom" ? "← Back to presets" : "Build your own →"}
+                      Presets
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selectedPreset === "custom" && customMode === "reloads"}
+                      disabled={isFormLocked}
+                      onClick={() => {
+                        setSelectedPreset("custom");
+                        setCustomMode("reloads");
+                        setStep("schedule");
+                      }}
+                      className={`px-3 py-3 text-[13px] sm:text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                        selectedPreset === "custom" && customMode === "reloads"
+                          ? "bg-cyan/[0.10] text-cyan"
+                          : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                      } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      Custom
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selectedPreset === "custom" && customMode === "lockUntil"}
+                      disabled={isFormLocked}
+                      onClick={() => {
+                        setSelectedPreset("custom");
+                        setCustomMode("lockUntil");
+                        setStep("schedule");
+                      }}
+                      className={`px-3 py-3 text-[13px] sm:text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                        selectedPreset === "custom" && customMode === "lockUntil"
+                          ? "bg-cyan/[0.10] text-cyan"
+                          : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                      } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      Lock until
                     </button>
                   </div>
 
-                  {/* Custom schedule builder */}
+                  {/* Custom schedule builder — "Custom" (steady reloads) vs
+                      "Lock until" is chosen by the top-level tabs above, so
+                      there's no nested toggle here. */}
                   {selectedPreset === "custom" && (
                     <div className="space-y-5 border border-line rounded-lg p-5 bg-surface">
-                      {/* Mode toggle: Reloads vs Lock-until. Inside the
-                          custom builder so it doesn't crowd the outer
-                          Presets/Build-your-own tabs. */}
-                      <div
-                        role="tablist"
-                        aria-label="Custom lock mode"
-                        className="grid grid-cols-2 gap-px bg-line border border-line rounded-lg overflow-hidden"
-                      >
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={customMode === "reloads"}
-                          disabled={isFormLocked}
-                          onClick={() => setCustomMode("reloads")}
-                          className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
-                            customMode === "reloads"
-                              ? "bg-cyan/[0.10] text-cyan"
-                              : "bg-background text-muted hover:bg-surface hover:text-foreground"
-                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          Steady reloads
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={customMode === "lockUntil"}
-                          disabled={isFormLocked}
-                          onClick={() => setCustomMode("lockUntil")}
-                          className={`px-4 py-3 text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
-                            customMode === "lockUntil"
-                              ? "bg-cyan/[0.10] text-cyan"
-                              : "bg-background text-muted hover:bg-surface hover:text-foreground"
-                          } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          Lock until
-                        </button>
-                      </div>
-
                       {customMode === "lockUntil" ? (
                         <div className="space-y-3">
                           <div>
