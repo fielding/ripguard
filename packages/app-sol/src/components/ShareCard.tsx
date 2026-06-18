@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import { DEPOSIT_TOKEN_LABEL } from "@/config/solsab";
 
 type ShareCardProps = {
   streamId: bigint;
-  amountLocked: string; // formatted USDC string
+  amountLocked: string; // formatted SOL string
   scheduleType: string;
   endDate: Date;
   nextUnlock: string; // countdown string
@@ -58,7 +59,7 @@ function drawCard(
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 36px system-ui, -apple-system, sans-serif";
   const displayAmount = masked ? "***.**" : amountLocked;
-  ctx.fillText(`${displayAmount} USDC`, 32, 120);
+  ctx.fillText(`${displayAmount} ${DEPOSIT_TOKEN_LABEL}`, 32, 120);
 
   // Schedule type
   ctx.fillStyle = "rgba(255,255,255,0.5)";
