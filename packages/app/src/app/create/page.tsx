@@ -22,6 +22,7 @@ import {
 import { CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { erc20Abi, sablierLockupAbi, testUsdcAbi } from "@/config/abis";
 import { ShareCard } from "@/components/ShareCard";
+import { formatTokenAmount } from "@/lib/format";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WrongChainPanel } from "@/components/WrongChainPanel";
 import { useToast } from "@/components/Toast";
@@ -213,6 +214,7 @@ function CreateLockInner() {
   // back to the deployment's default chain so the page can still render.
   // The wrong-chain panel below blocks any tx attempt on the unsupported chain.
   const {
+    name: chainName,
     sablierLockup,
     usdc: usdcAddress,
     usdcDecimals,
@@ -772,6 +774,7 @@ function CreateLockInner() {
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}
               explorerName={explorerName}
+              chainName={chainName}
               onCreateAnother={resetForm}
             />
           ) : (
@@ -1684,6 +1687,7 @@ function SuccessView({
   sablierAddress,
   explorerUrl,
   explorerName,
+  chainName,
   onCreateAnother,
 }: {
   txHash: `0x${string}`;
@@ -1700,6 +1704,7 @@ function SuccessView({
   sablierAddress: Address;
   explorerUrl: string;
   explorerName: string;
+  chainName: string;
   onCreateAnother: () => void;
 }) {
   // Capture "now" once at mount via a lazy initializer — calling Date.now()
@@ -1778,11 +1783,12 @@ function SuccessView({
 
       <ShareCard
         streamId={streamId}
-        amountLocked={formatUnits(depositAmount, usdcDecimals)}
+        amountLocked={formatTokenAmount(depositAmount, usdcDecimals)}
         scheduleType={schedule.label}
         endDate={endDate}
         nextUnlock={nextUnlock}
         sablierAddress={sablierAddress}
+        chainName={chainName}
       />
 
       <div className="space-y-4">

@@ -4,7 +4,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { useState, useEffect, useCallback } from "react";
-import { formatUnits, parseAbiItem, type Address, type PublicClient } from "viem";
+import { parseAbiItem, type Address, type PublicClient } from "viem";
 import {
   useAccount,
   useChainId,
@@ -22,6 +22,7 @@ import { ShareCard } from "@/components/ShareCard";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { trackClaim, trackContractError } from "@/lib/analytics";
+import { formatTokenAmount } from "@/lib/format";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
 
 // Sablier Envio indexer — single endpoint, no API key, supports all chains.
@@ -103,6 +104,7 @@ function VaultCard({
   claimingId,
   index,
   chainId,
+  chainName,
   usdcDecimals,
   sablierAddress,
   explorerUrl,
@@ -112,6 +114,7 @@ function VaultCard({
   claimingId: bigint | null;
   index: number;
   chainId: number;
+  chainName: string;
   usdcDecimals: number;
   sablierAddress: Address;
   explorerUrl: string;
@@ -177,7 +180,7 @@ function VaultCard({
         </div>
         <div className="sm:text-right">
           <div className="font-display text-2xl tabular tracking-tight">
-            {formatUnits(vault.deposited, usdcDecimals)}
+            {formatTokenAmount(vault.deposited, usdcDecimals)}
             <span className="text-sm text-muted font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           <div className="eyebrow mt-1">Total locked</div>
@@ -211,10 +214,10 @@ function VaultCard({
         </div>
         <div className="flex justify-between text-xs tabular">
           <span className="text-muted">
-            {formatUnits(vested, usdcDecimals)} unlocked
+            {formatTokenAmount(vested, usdcDecimals)} unlocked
           </span>
           <span className="text-faint">
-            {formatUnits(remaining, usdcDecimals)} remaining
+            {formatTokenAmount(remaining, usdcDecimals)} remaining
           </span>
         </div>
       </div>
@@ -234,7 +237,7 @@ function VaultCard({
           <div
             className={`font-display text-3xl text-cyan tabular tracking-tight ${canClaim ? "animate-claim-pulse" : ""}`}
           >
-            {formatUnits(vault.claimable, usdcDecimals)}
+            {formatTokenAmount(vault.claimable, usdcDecimals)}
             <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           {!canClaim && !isClaimingThis && (
@@ -275,11 +278,12 @@ function VaultCard({
       {showShare && (
         <ShareCard
           streamId={vault.streamId}
-          amountLocked={formatUnits(vault.deposited, usdcDecimals)}
+          amountLocked={formatTokenAmount(vault.deposited, usdcDecimals)}
           scheduleType={getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
           sablierAddress={sablierAddress}
+          chainName={chainName}
         />
       )}
     </div>
@@ -840,20 +844,20 @@ function VaultDashboard() {
               <span
                 className={`font-display text-cyan text-4xl tabular tracking-tight leading-none ${totals.claimable > BigInt(0) ? "animate-claim-pulse" : ""}`}
               >
-                {formatUnits(totals.claimable, usdcDecimals)}
+                {formatTokenAmount(totals.claimable, usdcDecimals)}
               </span>
               <span className="eyebrow">Claimable now</span>
             </li>
             {/* Context: what's behind it */}
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
-                {formatUnits(totals.locked, usdcDecimals)}
+                {formatTokenAmount(totals.locked, usdcDecimals)}
               </span>
               <span className="eyebrow text-faint">Total locked</span>
             </li>
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
-                {formatUnits(totals.claimed, usdcDecimals)}
+                {formatTokenAmount(totals.claimed, usdcDecimals)}
               </span>
               <span className="eyebrow text-faint">Claimed</span>
             </li>
@@ -890,6 +894,7 @@ function VaultDashboard() {
               claimingId={claimingId}
               index={i}
               chainId={chainId}
+              chainName={chainConfig.name}
               usdcDecimals={usdcDecimals}
               sablierAddress={sablierLockup}
               explorerUrl={explorerUrl}

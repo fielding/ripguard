@@ -9,6 +9,7 @@ type ShareCardProps = {
   endDate: Date;
   nextUnlock: string; // countdown string
   sablierAddress: string;
+  chainName: string; // chain the lock lives on, e.g. "Base", "Arbitrum One"
 };
 
 const CARD_W = 600;
@@ -19,7 +20,7 @@ function drawCard(
   props: ShareCardProps,
   masked: boolean
 ) {
-  const { streamId, amountLocked, scheduleType, endDate, nextUnlock, sablierAddress } = props;
+  const { streamId, amountLocked, scheduleType, endDate, nextUnlock, sablierAddress, chainName } = props;
 
   // Background
   ctx.fillStyle = "#0a0a0a";
@@ -46,13 +47,17 @@ function drawCard(
   ctx.font = "12px system-ui, -apple-system, sans-serif";
   ctx.fillText("Proof of Lock", 32, 64);
 
-  // Chain badge
+  // Chain badge — width follows the chain name (varies from "Base" to
+  // "Arbitrum One"), right-aligned against the card edge.
+  ctx.font = "12px system-ui, -apple-system, sans-serif";
+  const padX = 14;
+  const badgeW = Math.ceil(ctx.measureText(chainName).width) + padX * 2;
+  const badgeX = CARD_W - 32 - badgeW;
   ctx.fillStyle = "rgba(255,255,255,0.08)";
-  roundRect(ctx, CARD_W - 100, 24, 68, 26, 13);
+  roundRect(ctx, badgeX, 24, badgeW, 26, 13);
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.font = "12px system-ui, -apple-system, sans-serif";
-  ctx.fillText("Base", CARD_W - 78, 42);
+  ctx.fillText(chainName, badgeX + padX, 42);
 
   // Amount
   ctx.fillStyle = "#ffffff";
