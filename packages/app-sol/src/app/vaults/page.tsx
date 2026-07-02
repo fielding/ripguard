@@ -11,11 +11,11 @@ import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileWalletFallback } from "@/components/MobileWalletFallback";
 import { useToast } from "@/components/Toast";
 import {
-  SOL_DECIMALS,
   DEPOSIT_TOKEN_LABEL,
   explorerAccount,
   explorerTx,
 } from "@/config/solsab";
+import { formatSol, formatCountdown } from "@/lib/format";
 import {
   getStreamsForSender,
   type DiscoveredStream,
@@ -31,33 +31,6 @@ import {
 } from "@/sol/vault-math";
 import { trackClaim, trackContractError } from "@/lib/analytics";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
-
-// Same display strategy as /create: 9 decimals on chain, render up to 4
-// fractional digits, trim trailing zeros.
-const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
-
-function formatSol(units: bigint): string {
-  const whole = units / LAMPORTS_PER_SOL;
-  const frac = units % LAMPORTS_PER_SOL;
-  if (frac === 0n) return whole.toString();
-  const padded = frac.toString().padStart(SOL_DECIMALS, "0");
-  const trimmed = padded.slice(0, 4).replace(/0+$/, "");
-  return trimmed ? `${whole.toString()}.${trimmed}` : whole.toString();
-}
-
-function formatCountdown(seconds: bigint | null): string {
-  if (seconds === null) return "—";
-  if (seconds <= 0n) return "now";
-  const s = Number(seconds);
-  const d = Math.floor(s / 86_400);
-  const h = Math.floor((s % 86_400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${sec}s`;
-  return `${sec}s`;
-}
 
 function shortKey(key: PublicKey | string, n = 4): string {
   const s = typeof key === "string" ? key : key.toBase58();

@@ -16,7 +16,6 @@ import { MobileWalletFallback } from "@/components/MobileWalletFallback";
 import { useToast } from "@/components/Toast";
 import {
   PRESETS,
-  SOL_DECIMALS,
   DEPOSIT_TOKEN_LABEL,
   IS_DEVNET,
   computeBrokerFee,
@@ -24,6 +23,7 @@ import {
   explorerAccount,
   type PresetKey,
 } from "@/config/solsab";
+import { formatSol, parseSolAmount } from "@/lib/format";
 import { buildLockTx } from "@/sol/lock";
 import { buildUnwrapWsolIxs } from "@/sol/unwrap";
 import { sendViaWallet, sendLockTx } from "@/lib/sendTx";
@@ -50,11 +50,6 @@ import {
   calculatePayoutSchedule,
 } from "@/lib/schedule";
 
-// SOL has 9 decimals (1 SOL = 1e9 lamports). Display 4 decimals max so
-// the form stays readable; trim trailing zeros for a clean look.
-const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
-const AMOUNT_RE = new RegExp(`^\\d+(\\.\\d{1,${SOL_DECIMALS}})?$`);
-
 // Headroom kept aside (beyond the deposit) for the rent the lock tx pays.
 // A lock spins up a stack of brand-new accounts the creator funds: the
 // wSOL ATA, the stream NFT mint, stream-data PDA + its ATA, the recipient
@@ -66,29 +61,6 @@ const AMOUNT_RE = new RegExp(`^\\d+(\\.\\d{1,${SOL_DECIMALS}})?$`);
 // transactions the chain then rejected for insufficient lamports. Reserve
 // enough to cover a worst-case first-time lock.
 const LOCK_HEADROOM_LAMPORTS = BigInt(27_000_000); // ~0.027 SOL
-
-function parseSolAmount(input: string): bigint | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  if (!AMOUNT_RE.test(trimmed)) return null;
-  const [whole, frac = ""] = trimmed.split(".");
-  const padded = (frac + "000000000").slice(0, SOL_DECIMALS);
-  try {
-    return BigInt(whole) * LAMPORTS_PER_SOL + BigInt(padded);
-  } catch {
-    return null;
-  }
-}
-
-function formatSol(units: bigint): string {
-  const whole = units / LAMPORTS_PER_SOL;
-  const frac = units % LAMPORTS_PER_SOL;
-  if (frac === 0n) return whole.toString();
-  // Keep up to 4 fractional digits visible — past that is dust.
-  const padded = frac.toString().padStart(SOL_DECIMALS, "0");
-  const trimmed = padded.slice(0, 4).replace(/0+$/, "");
-  return trimmed ? `${whole.toString()}.${trimmed}` : whole.toString();
-}
 
 type Status =
   | { kind: "idle" }
