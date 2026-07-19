@@ -31,6 +31,9 @@ export const BRAND = {
   // PWA install description
   manifestDescription:
     "Lock your crypto winnings into a reload you designed for yourself. Non-custodial. Non-cancelable. Powered by Sablier.",
+
+  // Telegram support channel — footer link and error-toast fallback
+  supportUrl: "https://t.me/ripguard_support",
 } as const;
 
 /**
