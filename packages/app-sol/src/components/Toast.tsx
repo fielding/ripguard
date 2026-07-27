@@ -7,6 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { BRAND } from "@/content/brand";
 
 type ToastType = "success" | "error" | "info";
 
@@ -45,7 +46,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       link?: { label: string; href: string }
     ) => {
       const id = nextId++;
-      setToasts((prev) => [...prev, { id, message, type, link }]);
+      // Every error should offer a path to a human. Call sites can still
+      // pass a more specific link, which wins over the support fallback.
+      const resolvedLink =
+        link ??
+        (type === "error"
+          ? { label: "Get help on Telegram", href: BRAND.supportUrl }
+          : undefined);
+      setToasts((prev) => [...prev, { id, message, type, link: resolvedLink }]);
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, type === "error" ? 10000 : 5000);

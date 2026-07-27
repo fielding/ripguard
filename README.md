@@ -61,7 +61,7 @@ The `packages/contracts/` directory holds an unused `RipGuardRouter.sol` from an
 - **Protocol:** Sablier Lockup v2.0 on Base
 - **Token:** USDC on Base
 - **Indexer:** Sablier Envio indexer (primary), on-chain `getLogs` fallback
-- **Monorepo:** pnpm workspaces (`packages/app`, `packages/contracts`)
+- **Monorepo:** pnpm workspaces (`packages/app` EVM, `packages/app-sol` Solana, `packages/contracts` unused reference)
 
 ## Development
 
@@ -82,7 +82,7 @@ Key env vars in `packages/app/.env.local`:
 - `NEXT_PUBLIC_WC_PROJECT_ID` — WalletConnect project ID
 
 ```bash
-pnpm --filter app test        # vitest, 56 tests
+pnpm --filter app test        # vitest
 pnpm --filter app exec tsc --noEmit
 pnpm --filter app build
 ```

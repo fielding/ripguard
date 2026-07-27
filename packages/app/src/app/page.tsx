@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { WelcomeModal } from "@/components/WelcomeModal";
 import { RipGuardMark3D } from "@/components/Brand";
+import { BRAND } from "@/content/brand";
 
 function PresetIcon({ variant }: { variant: "clock" | "shield" | "lock" }) {
   const common = {
@@ -805,6 +806,14 @@ export default function Home() {
                 className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
               >
                 X
+              </a>
+              <a
+                href={BRAND.supportUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center min-h-[2.75rem] px-3 hover:text-cyan transition-colors"
+              >
+                Support
               </a>
               <a
                 href={sablierExplorerUrl}
