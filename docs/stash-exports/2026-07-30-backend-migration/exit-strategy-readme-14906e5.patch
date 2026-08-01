@@ -1,0 +1,37 @@
+diff --git a/README.md b/README.md
+index ab57bd6..baa6b5b 100644
+--- a/README.md
++++ b/README.md
+@@ -34,21 +34,14 @@ Or set a custom schedule.
+ 
+ ## Architecture
+ 
+-The `RipGuardRouter` is a stateless, non-upgradeable wrapper around Sablier Lockup. It:
+-
+-- Pulls USDC from the user
+-- Creates a non-cancelable Sablier Lockup Linear stream
+-- Routes a 0.5% broker fee to the treasury via Sablier's native mechanism
+-- Never holds funds beyond a single transaction
+-- Has no admin functions, no owner, no pause
++RipGuard has no custom on-chain contract. The frontend calls the Sablier Lockup v2.0 contract directly — your USDC goes from your wallet into Sablier's immutable protocol. The 0.5% broker fee is collected via Sablier's native broker mechanism at stream creation time; RipGuard never holds your funds.
+ 
+ **On-chain contracts (Base Mainnet):**
+ 
+-- **RipGuardRouter**: [`packages/contracts/src/RipGuardRouter.sol`](packages/contracts/src/RipGuardRouter.sol)
+ - **Sablier Lockup**: [`0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B`](https://basescan.org/address/0xb5D78DD3276325f5FAF3106Cc4Acc56E28e0Fe3B) (Sablier Lockup v2.0)
+ - **USDC**: [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
+ 
+-All streams are created as **non-cancelable, non-transferable** Lockup Linear streams with both sender and recipient set to the depositor.
++All streams are created as **non-cancelable, non-transferable** Lockup Linear streams with both sender and recipient set to the depositor. No RipGuard contract exists between you and Sablier.
+ 
+ ## Stack
+ 
+@@ -88,7 +81,7 @@ forge test
+ 
+ ## Security
+ 
+-The `RipGuardRouter` is intentionally minimal — it holds no state, has no admin functions, and cannot be upgraded. All funds flow through [Sablier's audited Lockup protocol](https://docs.sablier.com/contracts/v2/security). RipGuard never custodies funds; the router is stateless and all locks are enforced by Sablier's battle-tested on-chain contracts.
++RipGuard has no custom contract between you and your funds. The app calls the Sablier Lockup v2.0 contract directly — all locks are created in and enforced by [Sablier's audited, immutable protocol](https://docs.sablier.com/contracts/v2/security). The only RipGuard-authored code is the frontend UI and a reference `RipGuardRouter.sol` in `packages/contracts/` (undeployed, written as a fee-routing reference implementation).
+ 
+ If you find a vulnerability, please report it responsibly by emailing the team rather than opening a public issue.
+ 

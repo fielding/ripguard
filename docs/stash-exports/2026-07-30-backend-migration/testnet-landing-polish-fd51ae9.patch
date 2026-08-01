@@ -1,0 +1,220 @@
+diff --git a/packages/app/src/app/page.tsx b/packages/app/src/app/page.tsx
+index cd61e21..7773b31 100644
+--- a/packages/app/src/app/page.tsx
++++ b/packages/app/src/app/page.tsx
+@@ -94,6 +94,10 @@ function FAQItem({
+   );
+ }
+ 
++import Image from "next/image";
++
++// ... existing icons ...
++
+ export default function Home() {
+   const sablierExplorerUrl = `${EXPLORER_URL}/address/${SABLIER_LOCKUP}`;
+   const githubUrl = "https://github.com/fielding/ripguard";
+@@ -113,19 +117,17 @@ export default function Home() {
+             <div className="absolute right-[6%] top-[22%] h-40 w-40 rounded-full bg-cyan/[0.08] blur-[90px]" />
+           </div>
+ 
+-          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
++          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1fr]">
+             <div className="max-w-2xl">
+-              <div className="surface-pill mb-6 text-[11px] font-semibold uppercase tracking-[0.28em]">
++              <div className="surface-pill mb-10 text-[11px] font-semibold uppercase tracking-[0.28em]">
+                 Built on Sablier&apos;s audited contracts
+               </div>
+ 
+-              <RipGuardLockup className="mb-7" />
+-
+-              <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-white sm:text-[4.35rem] sm:leading-[0.98]">
++              <h1 className="max-w-2xl text-5xl font-semibold tracking-[-0.04em] text-white sm:text-[4.8rem] sm:leading-[0.98]">
+                 Lock your winnings before you give them back.
+               </h1>
+ 
+-              <p className="mt-6 max-w-xl text-base leading-8 text-white/62 sm:text-lg">
++              <p className="mt-8 max-w-xl text-base leading-8 text-white/62 sm:text-lg">
+                 The &ldquo;I&apos;m up, get me out&rdquo; button for Base traders. Send USDC
+                 straight into the{" "}
+                 <a
+@@ -139,21 +141,21 @@ export default function Home() {
+                 with a schedule you choose, so future-you can&apos;t instantly ape back in.
+               </p>
+ 
+-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+-                <Link href="/create" className="button-primary px-7 text-base sm:px-8 sm:text-lg">
++              <div className="mt-10 flex flex-col gap-3 sm:flex-row">
++                <Link href="/create" className="button-primary px-8 text-base sm:px-10 sm:text-lg">
+                   Create a Lock
+                 </Link>
+                 <a
+                   href={sablierExplorerUrl}
+                   target="_blank"
+                   rel="noopener noreferrer"
+-                  className="button-secondary px-7 text-base sm:px-8 sm:text-lg"
++                  className="button-secondary px-8 text-base sm:px-10 sm:text-lg"
+                 >
+                   View Contract
+                 </a>
+               </div>
+ 
+-              <div className="mt-6 flex flex-wrap gap-2.5">
++              <div className="mt-8 flex flex-wrap gap-2.5">
+                 {HERO_PROOF_POINTS.map((point) => (
+                   <span key={point} className="surface-pill text-xs font-medium">
+                     <span className="h-1.5 w-1.5 rounded-full bg-cyan shadow-[0_0_12px_rgba(0,229,255,0.45)]" />
+@@ -161,62 +163,59 @@ export default function Home() {
+                   </span>
+                 ))}
+               </div>
+-
+-              {!IS_TESTNET && (
+-                <a
+-                  href="https://testnet.ripguard.xyz"
+-                  className="mt-5 inline-flex text-sm text-white/34 hover:text-cyan/75 transition-colors"
+-                >
+-                  Want to test the flow first? Use the testnet version &rarr;
+-                </a>
+-              )}
+             </div>
+ 
+             <div className="relative">
+-              <div className="hero-stage p-5 sm:p-6">
+-                <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-black/20 px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-white/35">
+-                  <span>RipGuard Vault Engine</span>
+-                  <span>Base Mainnet</span>
+-                </div>
+-
+-                <div className="relative mt-5 overflow-hidden rounded-[1.6rem] border border-cyan/12 bg-[linear-gradient(180deg,rgba(6,20,25,0.92)_0%,rgba(4,10,13,0.98)_100%)] px-6 py-8 sm:px-8">
+-                  <div className="absolute left-1/2 top-4 h-44 w-44 -translate-x-1/2 rounded-full bg-cyan/[0.12] blur-[80px]" />
+-                  <div className="relative flex flex-col items-center text-center">
+-                    <div className="animate-float">
+-                      <RipGuardMark className="h-32 w-32 sm:h-36 sm:w-36" />
+-                    </div>
+-                    <p className="mt-5 text-sm uppercase tracking-[0.3em] text-white/28">
+-                      Discipline, enforced on-chain
+-                    </p>
+-                    <p className="mt-3 max-w-sm text-sm leading-7 text-white/52">
+-                      Your USDC routes directly into Sablier Lockup. No RipGuard custody.
+-                      No admin override. No cancel path.
+-                    </p>
++              <div className="hero-stage group aspect-[4/5] overflow-hidden rounded-[2.5rem] border-white/10 sm:aspect-square lg:aspect-[4/5]">
++                <Image
++                  src="/hero-full.png"
++                  alt="RipGuard Background"
++                  fill
++                  className="object-cover opacity-40 mix-blend-luminosity grayscale transition-transform duration-1000 group-hover:scale-110"
++                />
++                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/40 to-[#0a0a0a]/80" />
++                
++                <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
++                  <div className="relative w-full max-w-[448px] sm:max-w-[512px] aspect-square animate-float mt-[-20px]">
++                    <Image
++                      src="/vault-logo.png"
++                      alt="RipGuard Vault"
++                      fill
++                      className="object-contain glow-cyan drop-shadow-[0_0_60px_rgba(0,229,255,0.25)]"
++                      priority
++                    />
+                   </div>
+ 
+-                  <div className="relative mt-7 grid gap-3">
+-                    {Object.entries(PRESETS).map(([key, preset]) => (
+-                      <Link
+-                        key={key}
+-                        href={`/create?preset=${key}`}
+-                        className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3.5 text-left transition-colors hover:border-cyan/24 hover:bg-cyan/[0.05]"
+-                      >
+-                        <div className="flex items-center gap-3">
+-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan/15 bg-cyan/[0.08]">
+-                            {PRESET_ICONS[key]}
++                  <div className="relative mt-8 w-full max-w-sm">
++                    <div className="grid gap-2">
++                      {Object.entries(PRESETS).map(([key, preset]) => (
++                        <Link
++                          key={key}
++                          href={`/create?preset=${key}`}
++                          className="flex items-center justify-between rounded-xl border border-white/10 bg-black/40 backdrop-blur-md px-5 py-4 text-left transition-all hover:border-cyan/40 hover:bg-cyan/[0.08] hover:translate-y-[-1px]"
++                        >
++                          <div className="flex items-center gap-4">
++                            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan/20 bg-cyan/[0.1]">
++                              {PRESET_ICONS[key]}
++                            </div>
++                            <p className="text-sm font-semibold text-white/90">{preset.label}</p>
+                           </div>
+-                          <div>
+-                            <p className="text-sm font-semibold text-white/88">{preset.label}</p>
+-                            <p className="text-xs text-white/38">{preset.description}</p>
+-                          </div>
+-                        </div>
+-                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-cyan/72">
+-                          Launch
+-                        </span>
+-                      </Link>
+-                    ))}
++                          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan">
++                            Launch
++                          </span>
++                        </Link>
++                      ))}
++                    </div>
+                   </div>
+                 </div>
++
++                <div className="absolute top-8 left-8 right-8 flex items-center justify-between rounded-full border border-white/10 bg-black/40 backdrop-blur-md px-6 py-3 text-[10px] uppercase tracking-[0.3em] text-white/60">
++                  <span className="flex items-center gap-2">
++                    <span className="h-1.5 w-1.5 rounded-full bg-cyan shadow-[0_0_10px_rgba(0,229,255,0.6)]" />
++                    RipGuard Engine
++                  </span>
++                  <span>Base Mainnet</span>
++                </div>
+               </div>
+             </div>
+           </div>
+diff --git a/packages/app/src/components/Brand.tsx b/packages/app/src/components/Brand.tsx
+index b1d4f45..00cbb72 100644
+--- a/packages/app/src/components/Brand.tsx
++++ b/packages/app/src/components/Brand.tsx
+@@ -1,8 +1,24 @@
++import Image from "next/image";
++
+ function cn(...parts: Array<string | undefined>) {
+   return parts.filter(Boolean).join(" ");
+ }
+ 
+-export function RipGuardMark({ className }: { className?: string }) {
++export function RipGuardMark({ className, useImage = false }: { className?: string; useImage?: boolean }) {
++  if (useImage) {
++    return (
++      <div className={cn("relative overflow-hidden", className)}>
++        <Image
++          src="/vault-logo.png"
++          alt="RipGuard Vault"
++          fill
++          className="object-contain glow-cyan"
++          priority
++        />
++      </div>
++    );
++  }
++
+   return (
+     <svg
+       viewBox="0 0 160 160"
+@@ -80,13 +96,15 @@ export function RipGuardWordmark({
+ export function RipGuardLockup({
+   className,
+   showTagline = true,
++  useImage = true,
+ }: {
+   className?: string;
+   showTagline?: boolean;
++  useImage?: boolean;
+ }) {
+   return (
+     <div className={cn("flex items-center gap-4", className)}>
+-      <RipGuardMark className="h-16 w-16 sm:h-20 sm:w-20 shrink-0" />
++      <RipGuardMark useImage={useImage} className="h-14 w-14 sm:h-16 sm:w-16 shrink-0" />
+       <RipGuardWordmark showTagline={showTagline} />
+     </div>
+   );

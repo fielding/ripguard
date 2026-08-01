@@ -1,0 +1,22 @@
+diff --git a/packages/app/src/app/layout.tsx b/packages/app/src/app/layout.tsx
+index c7fe435..72191dd 100644
+--- a/packages/app/src/app/layout.tsx
++++ b/packages/app/src/app/layout.tsx
+@@ -1,7 +1,7 @@
+ import type { Metadata } from "next";
+ import { Geist, Geist_Mono } from "next/font/google";
+-import { Providers } from "@/providers";
+ import { TestnetBanner } from "@/components/TestnetBanner";
++import { ClientProviders } from "@/components/ClientProviders";
+ import "./globals.css";
+ 
+ const geistSans = Geist({
+@@ -50,7 +50,7 @@ export default function RootLayout({
+         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
+       >
+         <TestnetBanner />
+-        <Providers>{children}</Providers>
++        <ClientProviders>{children}</ClientProviders>
+       </body>
+     </html>
+   );
