@@ -13,6 +13,7 @@ import {
 import { Header } from "@/components/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileWalletFallback } from "@/components/MobileWalletFallback";
+import { SolUsdSource, UsdEstimate } from "@/components/SolUsdAmount";
 import { useToast } from "@/components/Toast";
 import {
   PRESETS,
@@ -24,6 +25,8 @@ import {
   type PresetKey,
 } from "@/config/solsab";
 import { formatSol, parseSolAmount } from "@/lib/format";
+import { formatUsdEstimate } from "@/lib/sol-usd";
+import { useSolUsdRate } from "@/hooks/useSolUsdRate";
 import { buildLockTx } from "@/sol/lock";
 import { buildUnwrapWsolIxs } from "@/sol/unwrap";
 import { sendViaWallet, sendLockTx } from "@/lib/sendTx";
@@ -61,6 +64,7 @@ import {
 // transactions the chain then rejected for insufficient lamports. Reserve
 // enough to cover a worst-case first-time lock.
 const LOCK_HEADROOM_LAMPORTS = BigInt(27_000_000); // ~0.027 SOL
+const UNWRAP_FEE_ESTIMATE_LAMPORTS = BigInt(1_000_000); // ~0.001 SOL
 
 type Status =
   | { kind: "idle" }
@@ -94,6 +98,7 @@ function CreateForm() {
   const { connection } = useConnection();
   const wallet = useWallet();
   const toast = useToast();
+  const solUsdRate = useSolUsdRate();
 
   const [selectedPreset, setSelectedPreset] = useState<ScheduleSelection>(
     isCustomFromQuery
@@ -266,20 +271,17 @@ function CreateForm() {
     else setSolBalance(null);
   }, [wallet.connected, refreshBalance]);
 
-  // Pre-flight balance check. Returns null on pass, error string on
-  // fail. Avoids the cryptic preflight blob by catching the empty /
-  // underfunded case before we even build the tx.
+  // Pre-flight balance check. Returns null on pass or the exact amounts
+  // needed for paired SOL/USD error copy on fail. Avoids the cryptic
+  // preflight blob by catching underfunded wallets before building the tx.
   const balanceShortfall = useMemo(() => {
     if (amount === null || amount <= 0n) return null;
     if (solBalance === null) return null;
     const required = amount + LOCK_HEADROOM_LAMPORTS;
     if (solBalance < required) {
-      const need = required - solBalance;
       return {
-        required,
-        haveSol: formatSol(solBalance),
-        needSol: formatSol(amount),
-        shortSol: formatSol(need),
+        have: solBalance,
+        lock: amount,
       };
     }
     return null;
@@ -343,8 +345,20 @@ function CreateForm() {
     // Catch underfunded wallets before they hit Phantom — saves them
     // from the "Attempt to debit an account..." mystery message.
     if (balanceShortfall) {
+      const haveUsd =
+        solUsdRate.kind === "available"
+          ? formatUsdEstimate(balanceShortfall.have, solUsdRate.quote)
+          : "$—";
+      const lockUsd =
+        solUsdRate.kind === "available"
+          ? formatUsdEstimate(balanceShortfall.lock, solUsdRate.quote)
+          : "$—";
+      const rentUsd =
+        solUsdRate.kind === "available"
+          ? formatUsdEstimate(LOCK_HEADROOM_LAMPORTS, solUsdRate.quote)
+          : "$—";
       toast.toast(
-        `Your wallet has ${balanceShortfall.haveSol} SOL. You need ${balanceShortfall.needSol} for the lock plus ~0.027 SOL for the one-time account rent a new stream creates.`,
+        `Your wallet has ${formatSol(balanceShortfall.have)} SOL (≈ ${haveUsd}). You need ${formatSol(balanceShortfall.lock)} SOL (≈ ${lockUsd}) for the lock plus ~0.027 SOL (≈ ${rentUsd}) for the one-time account rent a new stream creates.`,
         "error",
       );
       return;
@@ -453,6 +467,7 @@ function CreateForm() {
     refreshBalance,
     schedule,
     selectedPreset,
+    solUsdRate,
     toast,
     wallet,
   ]);
@@ -524,6 +539,7 @@ function CreateForm() {
           Pick a schedule. Sign once. Your future self claims it back on the
           clock.
         </p>
+        <SolUsdSource rate={solUsdRate} />
 
         {!wallet.connected && (
           <>
@@ -553,11 +569,21 @@ function CreateForm() {
             <p className="text-sm text-foreground/90 leading-relaxed">
               Your wallet holds{" "}
               <span className="tabular text-foreground font-semibold">
-                {formatSol(wsolBalance)} wSOL
+                {formatSol(wsolBalance)} wSOL{" "}
+                <UsdEstimate
+                  lamports={wsolBalance}
+                  rate={solUsdRate}
+                  className="text-foreground/60 text-xs"
+                />
               </span>{" "}
               but{" "}
               <span className="tabular text-foreground font-semibold">
-                0 SOL
+                0 SOL{" "}
+                <UsdEstimate
+                  lamports={0n}
+                  rate={solUsdRate}
+                  className="text-foreground/60 text-xs"
+                />
               </span>{" "}
               in native form. RipGuard wraps native SOL during the lock
               transaction, so it can&apos;t use your existing wSOL
@@ -570,7 +596,18 @@ function CreateForm() {
                 disabled={unwrapping || balanceLoading}
                 className="btn-primary !min-h-[2.75rem] !py-2.5 !px-5 !text-sm disabled:opacity-50"
               >
-                {unwrapping ? "Unwrapping…" : `Unwrap ${formatSol(wsolBalance)} wSOL → SOL`}
+                {unwrapping ? (
+                  "Unwrapping…"
+                ) : (
+                  <span className="flex flex-col items-center leading-tight">
+                    <span>Unwrap {formatSol(wsolBalance)} wSOL → SOL</span>
+                    <UsdEstimate
+                      lamports={wsolBalance}
+                      rate={solUsdRate}
+                      className="mt-1 text-[10px] text-cyan/70"
+                    />
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -583,9 +620,20 @@ function CreateForm() {
             </div>
             <p className="mt-4 text-xs text-foreground/70 leading-relaxed">
               Unwrapping is itself a Solana transaction, so it needs a
-              tiny bit of native SOL (~0.001) for the fee. If your wallet
-              is literally <span className="tabular">0 SOL native</span>,
-              send a small amount in first, then unwrap.
+              tiny bit of native SOL (~0.001, {" "}
+              <UsdEstimate
+                lamports={UNWRAP_FEE_ESTIMATE_LAMPORTS}
+                rate={solUsdRate}
+                className="text-foreground/60"
+              />) for the fee. If your wallet is literally{" "}
+              <span className="tabular">
+                0 SOL native{" "}
+                <UsdEstimate
+                  lamports={0n}
+                  rate={solUsdRate}
+                  className="text-foreground/60"
+                />
+              </span>, send a small amount in first, then unwrap.
             </p>
           </div>
         )}
@@ -607,7 +655,14 @@ function CreateForm() {
             <p className="text-foreground/90 leading-relaxed">
               We see{" "}
               <span className="tabular text-foreground">
-                {solBalance !== null ? formatSol(solBalance) : "—"} SOL
+                {solBalance !== null ? formatSol(solBalance) : "—"} SOL{" "}
+                {solBalance !== null && (
+                  <UsdEstimate
+                    lamports={solBalance}
+                    rate={solUsdRate}
+                    className="text-foreground/60 text-xs"
+                  />
+                )}
               </span>{" "}
               on this account on{" "}
               <strong>
@@ -678,25 +733,46 @@ function CreateForm() {
               {DEPOSIT_TOKEN_LABEL}
             </span>
           </div>
+          <div className="mt-2 min-h-5 text-sm">
+            {amount !== null ? (
+              <UsdEstimate lamports={amount} rate={solUsdRate} />
+            ) : (
+              <span className="tabular text-faint">≈ $—</span>
+            )}
+          </div>
           {amountStr.length > 0 && amount === null && (
             <p className="mt-2 text-sm text-warning">
               Enter a positive number with up to 9 decimal places.
             </p>
           )}
           {wallet.connected && (
-            <div className="mt-2 flex items-center justify-between text-xs text-faint tabular">
-              <span className="flex items-center gap-2 flex-wrap">
-                <span>
+            <div className="mt-2 flex flex-col gap-2 text-xs text-faint tabular sm:flex-row sm:items-center sm:justify-between">
+              <span className="flex items-start gap-2">
+                <span className="flex min-w-0 flex-col gap-0.5 sm:block">
                   Balance:{" "}
                   {balanceLoading
                     ? "loading…"
                     : solBalance === null
                       ? "—"
-                      : `${formatSol(solBalance)} SOL`}
+                      : (
+                        <>
+                          {formatSol(solBalance)} SOL{" "}
+                          <UsdEstimate
+                            lamports={solBalance}
+                            rate={solUsdRate}
+                            className="text-faint"
+                          />
+                        </>
+                      )}
                   {wsolBalance !== null && wsolBalance > 0n && (
-                    <span className="text-muted">
-                      {" "}
-                      · {formatSol(wsolBalance)} wSOL
+                    <span className="block text-muted sm:inline">
+                      <span className="hidden sm:inline"> · </span>
+                      {formatSol(wsolBalance)} wSOL{" "}
+                      <UsdEstimate
+                        lamports={wsolBalance}
+                        rate={solUsdRate}
+                        className="text-faint"
+                      />
                     </span>
                   )}
                 </span>
@@ -721,33 +797,63 @@ function CreateForm() {
                     const max = solBalance - LOCK_HEADROOM_LAMPORTS;
                     setAmountStr(formatSol(max));
                   }}
-                  className="inline-flex items-center min-h-[2.75rem] px-2 -my-2 -mr-2 text-muted hover:text-cyan underline transition-colors"
+                  className="inline-flex min-h-[2.75rem] items-center self-start px-2 -my-2 -ml-2 text-left text-muted underline transition-colors hover:text-cyan sm:self-auto sm:-mr-2 sm:ml-0 sm:text-right"
                   title="Locks everything except the ~0.027 SOL a new stream needs for one-time account rent + fees"
                 >
-                  Max (keeps ~0.027 SOL for rent)
+                  <span>
+                    Max (keeps ~0.027 SOL ·{" "}
+                    <UsdEstimate
+                      lamports={LOCK_HEADROOM_LAMPORTS}
+                      rate={solUsdRate}
+                      className="text-muted"
+                    />)
+                  </span>
                 </button>
               )}
             </div>
           )}
           {balanceShortfall && (
-            <p className="mt-2 text-sm text-warning">
-              Wallet has {balanceShortfall.haveSol} SOL. Need{" "}
-              {balanceShortfall.needSol} SOL for this lock plus ~0.027 SOL for
-              the one-time account rent a new stream creates.
+            <p className="mt-2 text-sm text-warning leading-relaxed">
+              Wallet has {formatSol(balanceShortfall.have)} SOL{" "}
+              <UsdEstimate
+                lamports={balanceShortfall.have}
+                rate={solUsdRate}
+                className="text-warning/70"
+              />. Need {formatSol(balanceShortfall.lock)} SOL{" "}
+              <UsdEstimate
+                lamports={balanceShortfall.lock}
+                rate={solUsdRate}
+                className="text-warning/70"
+              /> for this lock plus ~0.027 SOL{" "}
+              <UsdEstimate
+                lamports={LOCK_HEADROOM_LAMPORTS}
+                rate={solUsdRate}
+                className="text-warning/70"
+              /> for the one-time account rent a new stream creates.
             </p>
           )}
           {amount !== null && (
             <dl className="mt-4 space-y-1 text-sm tabular">
               <div className="flex justify-between text-muted">
                 <dt>Fee (0.5%)</dt>
-                <dd>
-                  {formatSol(fee)} {DEPOSIT_TOKEN_LABEL}
+                <dd className="flex flex-col items-end">
+                  <span>{formatSol(fee)} {DEPOSIT_TOKEN_LABEL}</span>
+                  <UsdEstimate
+                    lamports={fee}
+                    rate={solUsdRate}
+                    className="text-faint text-xs"
+                  />
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted">Locked</dt>
-                <dd className="text-foreground">
-                  {formatSol(net)} {DEPOSIT_TOKEN_LABEL}
+                <dd className="flex flex-col items-end text-foreground">
+                  <span>{formatSol(net)} {DEPOSIT_TOKEN_LABEL}</span>
+                  <UsdEstimate
+                    lamports={net}
+                    rate={solUsdRate}
+                    className="text-muted text-xs"
+                  />
                 </dd>
               </div>
             </dl>
@@ -1028,7 +1134,8 @@ function CreateForm() {
             full timeline component (port-as-needed later). */}
         {amount !== null && amount > 0n && !schedule.isLumpSum && (
           <PayoutPreview
-            depositSol={Number(formatSol(net))}
+            depositLamports={net}
+            solUsdRate={solUsdRate}
             totalSeconds={schedule.totalSeconds}
             cliffSeconds={schedule.cliffSeconds}
             intervalSeconds={
@@ -1054,8 +1161,13 @@ function CreateForm() {
                   {formatDuration(schedule.totalSeconds)}
                 </div>
                 <div className="text-muted">Amount</div>
-                <div className="text-foreground text-right">
-                  {formatSol(net)} {DEPOSIT_TOKEN_LABEL}
+                <div className="flex flex-col items-end text-foreground text-right">
+                  <span>{formatSol(net)} {DEPOSIT_TOKEN_LABEL}</span>
+                  <UsdEstimate
+                    lamports={net}
+                    rate={solUsdRate}
+                    className="text-muted text-xs"
+                  />
                 </div>
               </div>
             </div>
@@ -1114,18 +1226,20 @@ function CreateForm() {
 }
 
 function PayoutPreview({
-  depositSol,
+  depositLamports,
+  solUsdRate,
   totalSeconds,
   cliffSeconds,
   intervalSeconds,
 }: {
-  depositSol: number;
+  depositLamports: bigint;
+  solUsdRate: ReturnType<typeof useSolUsdRate>;
   totalSeconds: number;
   cliffSeconds: number;
   intervalSeconds: number;
 }) {
   const { totalIntervals, perInterval, pctPerInterval } = calculatePayoutSchedule(
-    depositSol,
+    Number(formatSol(depositLamports)),
     totalSeconds,
     cliffSeconds,
     intervalSeconds,
@@ -1141,9 +1255,15 @@ function PayoutPreview({
           {totalIntervals} × {formatDuration(intervalSeconds)}
         </div>
         <div className="text-muted">Each reload</div>
-        <div className="text-foreground text-right">
-          ~{perInterval.toFixed(perInterval >= 1 ? 2 : 4)} SOL (
-          {pctPerInterval.toFixed(2)}%)
+        <div className="flex flex-col items-end text-foreground text-right">
+          <span>
+            ~{perInterval.toFixed(perInterval >= 1 ? 2 : 4)} SOL ({pctPerInterval.toFixed(2)}%)
+          </span>
+          <UsdEstimate
+            lamports={depositLamports / BigInt(totalIntervals)}
+            rate={solUsdRate}
+            className="text-muted text-xs"
+          />
         </div>
         {cliffSeconds > 0 && (
           <>
