@@ -9,6 +9,7 @@ import { type PublicKey } from "@solana/web3.js";
 import { Header } from "@/components/Header";
 import { ErrorBoundary, CardErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileWalletFallback } from "@/components/MobileWalletFallback";
+import { SolUsdSource, UsdEstimate } from "@/components/SolUsdAmount";
 import { useToast } from "@/components/Toast";
 import {
   DEPOSIT_TOKEN_LABEL,
@@ -16,6 +17,7 @@ import {
   explorerTx,
 } from "@/config/solsab";
 import { formatSol, formatCountdown } from "@/lib/format";
+import { useSolUsdRate, type SolUsdRate } from "@/hooks/useSolUsdRate";
 import {
   getStreamsForSender,
   type DiscoveredStream,
@@ -42,9 +44,16 @@ interface VaultCardProps {
   now: bigint;
   onClaim: (stream: DiscoveredStream) => void;
   claiming: boolean;
+  solUsdRate: SolUsdRate;
 }
 
-function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
+function VaultCard({
+  stream,
+  now,
+  onClaim,
+  claiming,
+  solUsdRate,
+}: VaultCardProps) {
   const { snapshot } = stream;
   const status = streamStatus(snapshot, now);
   const claimable = withdrawableAmount(snapshot, now);
@@ -75,6 +84,11 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
           <h2 className="mt-2 font-display text-xl sm:text-2xl tracking-tight tabular break-all">
             {formatSol(snapshot.deposited)} {DEPOSIT_TOKEN_LABEL}
           </h2>
+          <UsdEstimate
+            lamports={snapshot.deposited}
+            rate={solUsdRate}
+            className="mt-0.5 block text-xs text-faint"
+          />
           <p className="mt-1 text-xs text-faint font-mono">
             <a
               href={explorerAccount(stream.streamNftMint)}
@@ -90,8 +104,13 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
         <div className="text-right shrink-0">
           <div className="eyebrow text-faint">Claimable</div>
           <div className="font-display text-lg sm:text-xl tabular text-cyan">
-            {formatSol(claimable)}
+            {formatSol(claimable)} SOL
           </div>
+          <UsdEstimate
+            lamports={claimable}
+            rate={solUsdRate}
+            className="mt-0.5 block text-xs text-faint"
+          />
         </div>
       </div>
 
@@ -123,7 +142,12 @@ function VaultCard({ stream, now, onClaim, claiming }: VaultCardProps) {
           {claiming ? "Claiming…" : canClaim ? "Claim" : "Nothing to claim"}
         </button>
         <span className="text-xs text-faint tabular">
-          Withdrawn: {formatSol(snapshot.withdrawn)} {DEPOSIT_TOKEN_LABEL}
+          Withdrawn: {formatSol(snapshot.withdrawn)} {DEPOSIT_TOKEN_LABEL}{" "}
+          <UsdEstimate
+            lamports={snapshot.withdrawn}
+            rate={solUsdRate}
+            className="text-faint"
+          />
         </span>
       </div>
     </article>
@@ -134,6 +158,7 @@ function VaultsBody() {
   const { connection } = useConnection();
   const wallet = useWallet();
   const toast = useToast();
+  const solUsdRate = useSolUsdRate();
 
   const [streams, setStreams] = useState<DiscoveredStream[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -297,6 +322,7 @@ function VaultsBody() {
             <h1 className="mt-2 font-display text-3xl sm:text-4xl tracking-tight">
               Claim what&apos;s unlocked<span className="text-cyan">.</span>
             </h1>
+            <SolUsdSource rate={solUsdRate} />
           </div>
           {wallet.connected && (
             <button
@@ -331,7 +357,12 @@ function VaultsBody() {
                 </h3>
                 <p className="mt-1 text-sm text-foreground/85">
                   <span className="tabular font-semibold">
-                    {formatSol(wsolBalance)} wSOL
+                    {formatSol(wsolBalance)} wSOL{" "}
+                    <UsdEstimate
+                      lamports={wsolBalance}
+                      rate={solUsdRate}
+                      className="text-foreground/60 text-xs"
+                    />
                   </span>{" "}
                   is sitting in your wallet. Unwrap it back to native SOL.
                 </p>
@@ -379,6 +410,7 @@ function VaultsBody() {
                   claiming={
                     claimingMint === stream.streamNftMint.toBase58()
                   }
+                  solUsdRate={solUsdRate}
                 />
               </CardErrorBoundary>
             ))}
