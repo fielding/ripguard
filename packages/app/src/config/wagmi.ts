@@ -1,4 +1,5 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { getDefaultConfig, getDefaultWallets } from "@rainbow-me/rainbowkit";
+import { phantomWallet } from "@rainbow-me/rainbowkit/wallets";
 import * as wagmiChains from "wagmi/chains";
 import { type Chain } from "wagmi/chains";
 import { CHAINS } from "./chains";
@@ -40,9 +41,16 @@ if (!wcProjectId && process.env.NODE_ENV === "development") {
   );
 }
 
+// RainbowKit's default list (Rainbow, Coinbase, MetaMask, WalletConnect)
+// omits Phantom, so Phantom-first users only got flaky EIP-6963 detection
+// and no mobile deep-link. Append it explicitly.
+const { wallets: defaultWallets } = getDefaultWallets();
+defaultWallets[0]?.wallets.push(phantomWallet);
+
 export const config = getDefaultConfig({
   appName: "RipGuard",
   projectId: wcProjectId || "YOUR_WC_PROJECT_ID",
   chains: supportedChains as [Chain, ...Chain[]],
+  wallets: defaultWallets,
   ssr: true,
 });
