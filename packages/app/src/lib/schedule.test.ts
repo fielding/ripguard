@@ -13,6 +13,11 @@ import {
   calculatePayoutSchedule,
   DURATION_OPTIONS,
   ALL_INTERVALS,
+  sablierNetDeposit,
+  secondsUntilTimeOfDay,
+  computeTranches,
+  RELOAD_INTERVAL_SECONDS,
+  MIN_FIRST_RELOAD_SECONDS,
 } from "./schedule";
 
 // --- formatDuration ---
@@ -345,5 +350,117 @@ describe("toDatetimeLocalValue", () => {
     const out = toDatetimeLocalValue(d);
     const parsed = new Date(out).getTime();
     expect(parsed).toBe(d.getTime());
+  });
+});
+
+// --- daily reloads (Lockup Tranched) ---
+
+const BROKER_FEE = BigInt("5000000000000000"); // 0.5% as UD60x18, matches contracts.ts
+const SCALE_1E18 = BigInt("1000000000000000000");
+
+describe("sablierNetDeposit", () => {
+  it("replicates the contract's floor math", () => {
+    // Sablier computes brokerFeeAmount = floor(totalAmount * fee / 1e18)
+    // and streams totalAmount - brokerFeeAmount. Any mismatch here reverts
+    // the LT create, so check against the formula directly.
+    const samples = [
+      BigInt(1_000_000), // 1 USDC
+      BigInt(5_000_001), // dusty
+      BigInt(123_456_789),
+      BigInt("999999999999999999"),
+      BigInt(7),
+    ];
+    for (const total of samples) {
+      const expected = total - (total * BROKER_FEE) / SCALE_1E18;
+      expect(sablierNetDeposit(total, BROKER_FEE)).toBe(expected);
+    }
+  });
+
+  it("passes the whole amount through at zero fee (testnet)", () => {
+    expect(sablierNetDeposit(BigInt(42_000_000), BigInt(0))).toBe(BigInt(42_000_000));
+  });
+
+  it("round-trips with computeFee within a wei of dust", () => {
+    // computeFee grosses the fee up on top of the deposit; Sablier then
+    // takes its cut from the gross. The recipient should get the deposit
+    // back, allowing at most 1 unit of floor dust.
+    const deposits = [BigInt(1_000_000), BigInt(333_333_333), BigInt(999_999)];
+    for (const deposit of deposits) {
+      const total = deposit + computeFee(deposit, BROKER_FEE);
+      const net = sablierNetDeposit(total, BROKER_FEE);
+      const dust = net - deposit;
+      expect(dust >= BigInt(-1) && dust <= BigInt(1)).toBe(true);
+    }
+  });
+});
+
+describe("secondsUntilTimeOfDay", () => {
+  // Fixed reference: local noon.
+  const noon = new Date(2026, 8, 1, 12, 0, 0, 0).getTime();
+
+  it("targets later today when the time is ahead", () => {
+    expect(secondsUntilTimeOfDay("18:00", noon)).toBe(6 * 3600);
+  });
+
+  it("rolls to tomorrow when the time already passed", () => {
+    expect(secondsUntilTimeOfDay("09:00", noon)).toBe(21 * 3600);
+  });
+
+  it("rolls to tomorrow when the time is too soon", () => {
+    const in5min = secondsUntilTimeOfDay("12:05", noon);
+    expect(in5min).toBe(5 * 60 + RELOAD_INTERVAL_SECONDS);
+    // Boundary: exactly at the minimum stays today.
+    const atMin = secondsUntilTimeOfDay("12:15", noon);
+    expect(atMin).toBe(MIN_FIRST_RELOAD_SECONDS);
+  });
+
+  it("rejects malformed input", () => {
+    expect(secondsUntilTimeOfDay("", noon)).toBeNull();
+    expect(secondsUntilTimeOfDay("25:00", noon)).toBeNull();
+    expect(secondsUntilTimeOfDay("12:60", noon)).toBeNull();
+    expect(secondsUntilTimeOfDay("noonish", noon)).toBeNull();
+  });
+});
+
+describe("computeTranches", () => {
+  it("splits evenly and folds dust into the last tranche", () => {
+    const tranches = computeTranches(BigInt(10_000_001), 3600, RELOAD_INTERVAL_SECONDS, 3);
+    expect(tranches).not.toBeNull();
+    expect(tranches!.length).toBe(3);
+    expect(tranches![0].amount).toBe(BigInt(3_333_333));
+    expect(tranches![1].amount).toBe(BigInt(3_333_333));
+    expect(tranches![2].amount).toBe(BigInt(3_333_335));
+    const sum = tranches!.reduce((a, t) => a + t.amount, BigInt(0));
+    expect(sum).toBe(BigInt(10_000_001));
+  });
+
+  it("uses the first delay for tranche 0 and the interval after", () => {
+    const tranches = computeTranches(BigInt(1_000_000), 7200, RELOAD_INTERVAL_SECONDS, 4)!;
+    expect(tranches.map((t) => t.duration)).toEqual([
+      7200,
+      RELOAD_INTERVAL_SECONDS,
+      RELOAD_INTERVAL_SECONDS,
+      RELOAD_INTERVAL_SECONDS,
+    ]);
+  });
+
+  it("sums to the net deposit exactly across awkward amounts", () => {
+    const amounts = [BigInt(1_000_000), BigInt(999_999), BigInt(123_456_789), BigInt(7_000_003)];
+    for (const net of amounts) {
+      for (const count of [2, 7, 30, 365]) {
+        const tranches = computeTranches(net, 3600, RELOAD_INTERVAL_SECONDS, count)!;
+        expect(tranches.length).toBe(count);
+        const sum = tranches.reduce((a, t) => a + t.amount, BigInt(0));
+        expect(sum).toBe(net);
+        // Sablier rejects zero-amount tranches.
+        for (const t of tranches) expect(t.amount > BigInt(0)).toBe(true);
+      }
+    }
+  });
+
+  it("returns null when a tranche would be zero or inputs are invalid", () => {
+    expect(computeTranches(BigInt(2), 3600, RELOAD_INTERVAL_SECONDS, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 0, RELOAD_INTERVAL_SECONDS, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 3600, RELOAD_INTERVAL_SECONDS, 0)).toBeNull();
   });
 });

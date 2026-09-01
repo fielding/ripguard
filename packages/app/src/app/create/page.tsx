@@ -41,6 +41,11 @@ import {
   toDatetimeLocalValue,
   computeFee,
   computeMaxDeposit,
+  RELOAD_INTERVAL_SECONDS,
+  RELOAD_DAY_OPTIONS,
+  secondsUntilTimeOfDay,
+  sablierNetDeposit,
+  computeTranches,
 } from "@/lib/schedule";
 
 type PresetKey = keyof typeof PRESETS;
@@ -73,7 +78,11 @@ function parseStreamIdFromReceipt(
 }
 
 type Step = "schedule" | "confirm" | "approve" | "lock" | "success";
-type CustomMode = "reloads" | "lockUntil";
+type CustomMode = "reloads" | "dailyReload" | "lockUntil";
+// How the lock is written on-chain: linear/lockUntil use createWithDurationsLL,
+// dailyReload uses createWithDurationsLT (discrete tranches — nothing claimable
+// between drops).
+type ScheduleKind = "linear" | "lockUntil" | "dailyReload";
 
 // Sensible default for the lock-until picker: 7 days from "now" at the
 // minute the page rendered. Captured once per mount so the input doesn't
@@ -247,6 +256,10 @@ function CreateLockInner() {
   const [customInterval, setCustomInterval] = useState(3600); // 1hr default claim interval (display only)
   const [customMode, setCustomMode] = useState<CustomMode>("reloads");
   const [lockUntilInput, setLockUntilInput] = useState<string>(defaultLockUntilValue);
+  // Daily reload (tranched) inputs: how many daily drops, and what local
+  // time of day they land.
+  const [reloadDays, setReloadDays] = useState(7);
+  const [reloadTime, setReloadTime] = useState("18:00");
   // Tick "now" once every 30s so the lock-until duration preview
   // ("18d 3h from now") doesn't go stale while the form is open. We don't
   // need per-second precision — the user is picking a target in days/hours.
@@ -310,20 +323,27 @@ function CreateLockInner() {
 
   // Derived schedule values
   const schedule = useMemo<{
+    kind: ScheduleKind;
     cliffSeconds: number;
     totalSeconds: number;
     isLumpSum: boolean;
     label: string;
     targetMs: number | null;
+    /** dailyReload only: seconds until the first drop, and drop count. */
+    firstDelaySeconds: number;
+    reloadCount: number;
   }>(() => {
     if (selectedPreset !== "custom") {
       const p = PRESETS[selectedPreset];
       return {
+        kind: "linear",
         cliffSeconds: p.cliffSeconds,
         totalSeconds: p.totalSeconds,
         isLumpSum: p.isLumpSum,
         label: p.label,
         targetMs: null,
+        firstDelaySeconds: 0,
+        reloadCount: 0,
       };
     }
     if (customMode === "lockUntil") {
@@ -331,34 +351,69 @@ function CreateLockInner() {
       // so the action button stays disabled until they pick a real date.
       if (!lockUntilParsed) {
         return {
+          kind: "lockUntil",
           cliffSeconds: 0,
           totalSeconds: 0,
           isLumpSum: true,
           label: "Lock until …",
           targetMs: null,
+          firstDelaySeconds: 0,
+          reloadCount: 0,
         };
       }
       const total = lockUntilParsed.durationSeconds;
       // Sablier requires cliff < total strictly. The one-second gap is
       // negligible vs the unlock date; the user sees a clean lump-sum.
       return {
+        kind: "lockUntil",
         cliffSeconds: total - 1,
         totalSeconds: total,
         isLumpSum: true,
         label: `Lock until ${formatTargetDate(lockUntilParsed.targetMs)}`,
         targetMs: lockUntilParsed.targetMs,
+        firstDelaySeconds: 0,
+        reloadCount: 0,
+      };
+    }
+    if (customMode === "dailyReload") {
+      const firstDelay = secondsUntilTimeOfDay(reloadTime, nowMs);
+      // Malformed time input → totalSeconds = 0 keeps `canProceed` false.
+      if (firstDelay === null) {
+        return {
+          kind: "dailyReload",
+          cliffSeconds: 0,
+          totalSeconds: 0,
+          isLumpSum: false,
+          label: "Daily Reload",
+          targetMs: null,
+          firstDelaySeconds: 0,
+          reloadCount: 0,
+        };
+      }
+      return {
+        kind: "dailyReload",
+        cliffSeconds: 0,
+        totalSeconds: firstDelay + (reloadDays - 1) * RELOAD_INTERVAL_SECONDS,
+        isLumpSum: false,
+        label: `Daily Reload × ${reloadDays}`,
+        targetMs: nowMs + firstDelay * 1000,
+        firstDelaySeconds: firstDelay,
+        reloadCount: reloadDays,
       };
     }
     const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
     return {
+      kind: "linear",
       cliffSeconds: customCliff,
       // Sablier requires cliff < total strictly; add 1s so linear stream amount is non-zero
       totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
       isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
       label: "Custom Reloads",
       targetMs: null,
+      firstDelaySeconds: 0,
+      reloadCount: 0,
     };
-  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed]);
+  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed, reloadDays, reloadTime, nowMs]);
 
   // Amount parsing
   const depositAmount = useMemo(() => {
@@ -377,6 +432,22 @@ function CreateLockInner() {
   // Unlock amounts for Sablier
   const unlockStart = BigInt(0);
   const unlockCliff = schedule.isLumpSum ? depositAmount : BigInt(0);
+
+  // Tranche list for daily-reload locks. Amounts must sum to exactly the
+  // net deposit Sablier computes after the broker cut, or the create reverts
+  // on-chain — sablierNetDeposit replicates that floor math.
+  const tranches = useMemo(
+    () =>
+      schedule.kind === "dailyReload" && totalAmount > BigInt(0)
+        ? computeTranches(
+            sablierNetDeposit(totalAmount, brokerFee),
+            schedule.firstDelaySeconds,
+            RELOAD_INTERVAL_SECONDS,
+            schedule.reloadCount,
+          )
+        : null,
+    [schedule, totalAmount, brokerFee],
+  );
 
   // Read USDC allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -437,6 +508,8 @@ function CreateLockInner() {
     setCustomTotal(3600);
     setCustomMode("reloads");
     setLockUntilInput(defaultLockUntilValue());
+    setReloadDays(7);
+    setReloadTime("18:00");
     setAmountInput("");
     setStep("schedule");
     setConfirmed(false);
@@ -498,28 +571,39 @@ function CreateLockInner() {
     });
   }, [writeApprove, address, resetApproveWrite, usdcAddress, sablierLockup]);
 
-  const handleLock = useCallback(() => {
-    if (!address || lockInFlightRef.current) return;
-    lockInFlightRef.current = true;
-    // Clear stale success/error state from any previous lock so the
-    // post-confirm effect doesn't fire against leftover data.
-    resetLockWrite();
-    setStep("lock");
+  // The single place lock txs are written. Both entry points (direct Lock
+  // click and the approve→lock auto-progress) call this so the LL/LT
+  // branching can't drift between them.
+  const fireLock = useCallback(() => {
+    if (!address) return;
+    const params = {
+      sender: address as Address,
+      recipient: address as Address,
+      totalAmount,
+      token: usdcAddress,
+      cancelable: false,
+      transferable: false,
+      shape: "RipGuard",
+      broker: { account: treasury, fee: brokerFee },
+    };
+    if (schedule.kind === "dailyReload") {
+      // canProceed already blocks invalid tranche lists; this guard is for
+      // the async priming path where state may have shifted.
+      if (!tranches) return;
+      writeLock({
+        address: sablierLockup,
+        abi: sablierLockupAbi,
+        functionName: "createWithDurationsLT",
+        args: [params, tranches],
+      });
+      return;
+    }
     writeLock({
       address: sablierLockup,
       abi: sablierLockupAbi,
       functionName: "createWithDurationsLL",
       args: [
-        {
-          sender: address as Address,
-          recipient: address as Address,
-          totalAmount,
-          token: usdcAddress,
-          cancelable: false,
-          transferable: false,
-          shape: "RipGuard",
-          broker: { account: treasury, fee: brokerFee },
-        },
+        params,
         { start: unlockStart, cliff: unlockCliff },
         { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
       ],
@@ -528,15 +612,25 @@ function CreateLockInner() {
     writeLock,
     totalAmount,
     schedule,
+    tranches,
     unlockStart,
     unlockCliff,
     address,
-    resetLockWrite,
     sablierLockup,
     usdcAddress,
     treasury,
     brokerFee,
   ]);
+
+  const handleLock = useCallback(() => {
+    if (!address || lockInFlightRef.current) return;
+    lockInFlightRef.current = true;
+    // Clear stale success/error state from any previous lock so the
+    // post-confirm effect doesn't fire against leftover data.
+    resetLockWrite();
+    setStep("lock");
+    fireLock();
+  }, [address, resetLockWrite, fireLock]);
 
   // Auto-advance from approve to lock after approval confirms. We skip
   // re-opening the confirm dialog because (a) the user already consented
@@ -586,42 +680,17 @@ function CreateLockInner() {
       primingTimeoutRef.current = null;
       setIsPrimingLock(false);
       lockInFlightRef.current = true;
-      writeLock({
-        address: sablierLockup,
-        abi: sablierLockupAbi,
-        functionName: "createWithDurationsLL",
-        args: [
-          {
-            sender: address as Address,
-            recipient: address as Address,
-            totalAmount,
-            token: usdcAddress,
-            cancelable: false,
-            transferable: false,
-            shape: "RipGuard",
-            broker: { account: treasury, fee: brokerFee },
-          },
-          { start: unlockStart, cliff: unlockCliff },
-          { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
-        ],
-      });
+      fireLock();
     }, 1500);
   }, [
     isApproveConfirmed,
     step,
     address,
     totalAmount,
-    schedule,
-    unlockStart,
-    unlockCliff,
-    writeLock,
+    fireLock,
     refetchAllowance,
     resetLockWrite,
     toast,
-    sablierLockup,
-    usdcAddress,
-    treasury,
-    brokerFee,
     usdcDecimals,
   ]);
 
@@ -738,7 +807,13 @@ function CreateLockInner() {
 
   const meetsMinimum = depositAmount >= minDeposit;
   const canProceed =
-    depositAmount > 0 && meetsMinimum && schedule.totalSeconds > 0 && isConnected;
+    depositAmount > 0 &&
+    meetsMinimum &&
+    schedule.totalSeconds > 0 &&
+    // Daily reload needs a valid tranche list (well-formed time, every
+    // tranche amount > 0) before the lock can be reviewed.
+    (schedule.kind !== "dailyReload" || tranches !== null) &&
+    isConnected;
 
   const isValidForm = canProceed && hasEnoughBalance;
 
@@ -901,13 +976,14 @@ function CreateLockInner() {
                 <section className="space-y-5">
                   <SectionLabel index="02">Reload</SectionLabel>
 
-                  {/* Three-tab control: Presets · Custom · Lock until.
-                      Flattened to the top level so the two custom modes are
-                      first-class — no tabs nested inside the builder. */}
+                  {/* Four-tab control: Presets · Custom · Daily reload ·
+                      Lock until. Flattened to the top level so the custom
+                      modes are first-class — no tabs nested inside the
+                      builder. */}
                   <div
                     role="tablist"
                     aria-label="Schedule type"
-                    className="grid grid-cols-3 gap-px bg-line border border-line rounded-lg overflow-hidden"
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line border border-line rounded-lg overflow-hidden"
                   >
                     <button
                       type="button"
@@ -943,6 +1019,24 @@ function CreateLockInner() {
                       } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       Custom
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selectedPreset === "custom" && customMode === "dailyReload"}
+                      disabled={isFormLocked}
+                      onClick={() => {
+                        setSelectedPreset("custom");
+                        setCustomMode("dailyReload");
+                        setStep("schedule");
+                      }}
+                      className={`px-3 py-3 text-[13px] sm:text-sm font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                        selectedPreset === "custom" && customMode === "dailyReload"
+                          ? "bg-cyan/[0.10] text-cyan"
+                          : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                      } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      Daily reload
                     </button>
                     <button
                       type="button"
@@ -1005,6 +1099,63 @@ function CreateLockInner() {
                           <p className="text-[11px] text-faint leading-relaxed">
                             Good for rent, bills, or any single-date deadline.
                             Cadence and waiting period don&apos;t apply.
+                          </p>
+                        </div>
+                      ) : customMode === "dailyReload" ? (
+                        <div className="space-y-5">
+                          <div>
+                            <label htmlFor="reload-days" className="eyebrow block mb-2">
+                              Daily drops
+                            </label>
+                            <div className="relative">
+                              <select
+                                id="reload-days"
+                                value={reloadDays}
+                                disabled={isFormLocked}
+                                onChange={(e) => setReloadDays(Number(e.target.value))}
+                                className={`w-full appearance-none bg-background border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors cursor-pointer ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                              >
+                                {RELOAD_DAY_OPTIONS.map((d) => (
+                                  <option key={d} value={d}>
+                                    {d} days
+                                  </option>
+                                ))}
+                              </select>
+                              <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="reload-time" className="eyebrow block mb-2">
+                              Drop time
+                            </label>
+                            <input
+                              id="reload-time"
+                              type="time"
+                              value={reloadTime}
+                              disabled={isFormLocked}
+                              onChange={(e) => setReloadTime(e.target.value)}
+                              className={`w-full bg-background border border-line rounded-lg px-4 py-3 text-sm tabular focus:outline-none focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-2 focus:border-cyan/50 transition-colors ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            />
+                          </div>
+                          {schedule.targetMs !== null ? (
+                            <p className="text-xs text-muted leading-relaxed">
+                              First drop{" "}
+                              <span className="text-foreground">
+                                {formatTargetDate(schedule.targetMs)}
+                              </span>
+                              , then every 24 hours — {reloadDays} drops total.
+                              Between drops, the claimable balance is zero.
+                              Enforced on-chain, not just displayed.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-danger leading-relaxed">
+                              Pick a drop time.
+                            </p>
+                          )}
+                          <p className="text-[11px] text-faint leading-relaxed">
+                            The real daily reload. Unlike steady reloads,
+                            nothing drips between drops — the chunk lands all
+                            at once, on schedule.
                           </p>
                         </div>
                       ) : (
@@ -1147,10 +1298,12 @@ function CreateLockInner() {
                   <section className="space-y-4">
                     <SectionLabel index="03">Payout</SectionLabel>
                     <TimelinePreview
+                      kind={schedule.kind}
                       cliffSeconds={schedule.cliffSeconds}
                       totalSeconds={schedule.totalSeconds}
                       isLumpSum={schedule.isLumpSum}
                       targetMs={schedule.targetMs}
+                      reloadCount={schedule.reloadCount}
                       depositAmount={depositAmount}
                       usdcDecimals={usdcDecimals}
                     />
@@ -1160,6 +1313,14 @@ function CreateLockInner() {
                         totalSeconds={schedule.totalSeconds}
                         cliffSeconds={schedule.cliffSeconds}
                         intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
+                        reload={
+                          schedule.kind === "dailyReload"
+                            ? {
+                                firstDelaySeconds: schedule.firstDelaySeconds,
+                                count: schedule.reloadCount,
+                              }
+                            : null
+                        }
                         usdcDecimals={usdcDecimals}
                       />
                     )}
@@ -1216,7 +1377,11 @@ function CreateLockInner() {
                                     customMode === "lockUntil" &&
                                     !lockUntilParsed
                                   ? "Pick a date at least 1 hour out"
-                                  : "Review the lock"}
+                                  : selectedPreset === "custom" &&
+                                      customMode === "dailyReload" &&
+                                      !tranches
+                                    ? "Pick a drop time"
+                                    : "Review the lock"}
                         </button>
                       )}
                     </>
@@ -1336,26 +1501,35 @@ function VestingCalculator({
   totalSeconds,
   cliffSeconds,
   intervalSeconds,
+  reload = null,
   usdcDecimals,
 }: {
   depositAmount: bigint;
   totalSeconds: number;
   cliffSeconds: number;
   intervalSeconds: number;
+  /** Tranched daily-reload schedule — exact drops, not synthetic checkpoints. */
+  reload?: { firstDelaySeconds: number; count: number } | null;
   usdcDecimals: number;
 }) {
   const vestSeconds = totalSeconds - cliffSeconds;
-  const totalIntervals = vestSeconds > 0 ? Math.floor(vestSeconds / intervalSeconds) : 0;
+  const totalIntervals = reload
+    ? reload.count
+    : vestSeconds > 0 ? Math.floor(vestSeconds / intervalSeconds) : 0;
   const perInterval = totalIntervals > 0
     ? Number(formatUnits(depositAmount, usdcDecimals)) / totalIntervals
     : 0;
-  const intervalLabel = ALL_INTERVALS.find((i) => i.seconds === intervalSeconds)?.label ?? formatDuration(intervalSeconds);
+  const intervalLabel = reload
+    ? "day"
+    : ALL_INTERVALS.find((i) => i.seconds === intervalSeconds)?.label ?? formatDuration(intervalSeconds);
   const pctPerInterval = totalIntervals > 0 ? (100 / totalIntervals) : 0;
 
   // Show first few intervals as a mini schedule
   const previewCount = Math.min(totalIntervals, 5);
   const previewRows = Array.from({ length: previewCount }, (_, i) => {
-    const elapsed = cliffSeconds + (i + 1) * intervalSeconds;
+    const elapsed = reload
+      ? reload.firstDelaySeconds + i * RELOAD_INTERVAL_SECONDS
+      : cliffSeconds + (i + 1) * intervalSeconds;
     const cumulative = perInterval * (i + 1);
     return { elapsed, cumulative, payout: perInterval };
   });
@@ -1368,7 +1542,8 @@ function VestingCalculator({
           ${perInterval.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div className="mt-3 text-xs text-muted tabular">
-          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) · {totalIntervals} reloads over {formatDuration(totalSeconds)}
+          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) · {totalIntervals}{" "}
+          {reload ? "drops" : "reloads"} over {formatDuration(totalSeconds)}
         </div>
       </div>
 
@@ -1393,7 +1568,7 @@ function VestingCalculator({
           ))}
           {totalIntervals > previewCount && (
             <div className="text-[10px] text-faint text-center pt-2 tabular">
-              … {totalIntervals - previewCount} more reloads
+              … {totalIntervals - previewCount} more {reload ? "drops" : "reloads"}
             </div>
           )}
         </div>
@@ -1403,17 +1578,21 @@ function VestingCalculator({
 }
 
 function TimelinePreview({
+  kind,
   cliffSeconds,
   totalSeconds,
   isLumpSum,
   targetMs,
+  reloadCount,
   depositAmount,
   usdcDecimals,
 }: {
+  kind: ScheduleKind;
   cliffSeconds: number;
   totalSeconds: number;
   isLumpSum: boolean;
   targetMs: number | null;
+  reloadCount: number;
   depositAmount: bigint;
   usdcDecimals: number;
 }) {
@@ -1458,7 +1637,13 @@ function TimelinePreview({
 
       {/* Description */}
       <p className="text-xs text-muted leading-relaxed">
-        {isLockUntil ? (
+        {kind === "dailyReload" && targetMs !== null ? (
+          <>
+            {formatUnits(depositAmount, usdcDecimals)} USDC lands in{" "}
+            {reloadCount} equal daily drops, first on{" "}
+            {formatTargetDate(targetMs)}. Zero claimable between drops.
+          </>
+        ) : isLockUntil ? (
           <>
             {formatUnits(depositAmount, usdcDecimals)} USDC unlocks in one drop
             on {formatTargetDate(targetMs)}.
@@ -1501,11 +1686,13 @@ function ConfirmDialog({
   onCancel,
 }: {
   schedule: {
+    kind: ScheduleKind;
     label: string;
     cliffSeconds: number;
     totalSeconds: number;
     isLumpSum: boolean;
     targetMs: number | null;
+    reloadCount: number;
   };
   depositAmount: bigint;
   fee: bigint;
@@ -1605,7 +1792,20 @@ function ConfirmDialog({
               <span>Total from wallet</span>
               <span>{formatUnits(totalAmount, usdcDecimals)} USDC</span>
             </div>
-            {schedule.targetMs !== null ? (
+            {schedule.kind === "dailyReload" && schedule.targetMs !== null ? (
+              <>
+                <div className="flex justify-between pt-2">
+                  <span className="text-muted">First drop</span>
+                  <span className="text-foreground">{formatTargetDate(schedule.targetMs)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Drops</span>
+                  <span className="text-foreground">
+                    {schedule.reloadCount} × every 24h
+                  </span>
+                </div>
+              </>
+            ) : schedule.targetMs !== null ? (
               <div className="flex justify-between pt-2">
                 <span className="text-muted">Unlocks on</span>
                 <span className="text-foreground">{formatTargetDate(schedule.targetMs)}</span>
@@ -1711,8 +1911,10 @@ function SuccessView({
   // directly in render is impure (react-hooks/purity) and would drift the
   // displayed end date across re-renders.
   const [now] = useState(() => Math.floor(Date.now() / 1000));
+  // For daily reloads targetMs is the FIRST drop, not the end — only
+  // lock-until's targetMs marks the end of the lock.
   const endDate =
-    schedule.targetMs !== null
+    schedule.isLumpSum && schedule.targetMs !== null
       ? new Date(schedule.targetMs)
       : new Date((now + schedule.totalSeconds) * 1000);
 
