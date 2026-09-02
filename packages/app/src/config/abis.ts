@@ -146,6 +146,22 @@ export const sablierLockupAbi = [
   },
   {
     type: "function",
+    name: "getTranches",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [
+      {
+        name: "tranches",
+        type: "tuple[]",
+        components: [
+          { name: "amount", type: "uint128" },
+          { name: "timestamp", type: "uint40" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "createWithDurationsLT",
     inputs: [
       {
