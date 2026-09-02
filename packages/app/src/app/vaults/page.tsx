@@ -241,7 +241,7 @@ function VaultCard({
             <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           {!canClaim && !isClaimingThis && (
-            <span className="text-[11px] text-faint mt-1 block tabular">
+            <span className="text-xs text-faint mt-1 block tabular">
               {claimStatus}
             </span>
           )}
@@ -832,7 +832,7 @@ function VaultDashboard() {
   return (
     <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
       {chainConfig.usdcNote && (
-        <p className="text-[11px] text-faint leading-relaxed pt-1">
+        <p className="text-xs text-faint leading-relaxed pt-1">
           {chainConfig.usdcNote}
         </p>
       )}

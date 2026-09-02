@@ -129,7 +129,7 @@ function ChainChipRow() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
           >
             Solana
-            <span aria-hidden="true" className="text-[11px] -mt-0.5">↗</span>
+            <span aria-hidden="true" className="text-xs -mt-0.5">↗</span>
           </a>
         </li>
       </ul>

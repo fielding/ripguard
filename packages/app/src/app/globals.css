@@ -8,9 +8,12 @@
   --surface-elevated: oklch(0.25 0.012 200 / 0.84);
 
   --foreground: oklch(0.96 0.005 200);
-  --text-muted: oklch(0.70 0.008 200);
-  --text-subtle: oklch(0.66 0.012 200);
-  --text-faint: oklch(0.60 0.012 200);
+  /* Secondary-text ramp. Keep the muted > subtle > faint ordering, and keep
+     faint readable at 11-12px on the 0.14L background — it dips below
+     comfortable small-text contrast under ~0.66L. */
+  --text-muted: oklch(0.76 0.008 200);
+  --text-subtle: oklch(0.72 0.012 200);
+  --text-faint: oklch(0.68 0.012 200);
 
   --line: oklch(0.82 0.040 200 / 0.14);
   --line-strong: oklch(0.82 0.040 200 / 0.28);

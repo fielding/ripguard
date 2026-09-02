@@ -141,7 +141,7 @@ export function WelcomeModal() {
           </button>
         </div>
 
-        <p className="mt-6 text-[10px] tabular text-faint text-center tracking-wider uppercase">
+        <p className="mt-6 text-[11px] tabular text-faint text-center tracking-wider uppercase">
           RipGuard is the UI · Sablier is the bank
         </p>
       </div>

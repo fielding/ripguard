@@ -203,7 +203,7 @@ function NetworkSection({ isFormLocked }: { isFormLocked: boolean }) {
           className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
         >
           Solana
-          <span aria-hidden className="text-[11px] -mt-0.5">↗</span>
+          <span aria-hidden className="text-xs -mt-0.5">↗</span>
         </a>
       </div>
       <p className="text-xs text-faint leading-relaxed">{helper}</p>
@@ -949,7 +949,7 @@ function CreateLockInner() {
                     </p>
                   )}
                   {usdcNote && (
-                    <p className="text-[11px] text-faint leading-relaxed">
+                    <p className="text-xs text-faint leading-relaxed">
                       {usdcNote}
                     </p>
                   )}
@@ -1141,7 +1141,7 @@ function CreateLockInner() {
                               Pick a date at least 1 hour from now.
                             </p>
                           )}
-                          <p className="text-[11px] text-faint leading-relaxed">
+                          <p className="text-xs text-faint leading-relaxed">
                             Good for rent, bills, or any single-date deadline.
                             Cadence and waiting period don&apos;t apply.
                           </p>
@@ -1539,7 +1539,7 @@ function VestingCalculator({
             </div>
           ))}
           {totalIntervals > previewCount && (
-            <div className="text-[10px] text-faint text-center pt-2 tabular">
+            <div className="text-[11px] text-faint text-center pt-2 tabular">
               … {totalIntervals - previewCount} more {strict ? "payouts" : "reloads"}
             </div>
           )}

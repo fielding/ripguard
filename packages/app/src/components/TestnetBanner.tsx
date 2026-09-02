@@ -6,7 +6,7 @@ export function TestnetBanner() {
   if (!IS_TESTNET) return null;
 
   return (
-    <div className="bg-warning text-background text-center text-[11px] font-semibold py-1.5 px-4 tracking-[0.18em] uppercase tabular">
+    <div className="bg-warning text-background text-center text-xs font-semibold py-1.5 px-4 tracking-[0.18em] uppercase tabular">
       Base Sepolia Testnet · No real funds · Get test ETH from{" "}
       <a
         href="https://www.alchemy.com/faucets/base-sepolia"
