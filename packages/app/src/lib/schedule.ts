@@ -123,7 +123,7 @@ export function toDatetimeLocalValue(d: Date): string {
 }
 
 // ----------------------------------------------------------------------------
-// Daily reloads (Lockup Tranched)
+// Strict payouts (Lockup Tranched)
 // ----------------------------------------------------------------------------
 
 /** One Sablier tranche: `amount` unlocks `duration` seconds after the previous one. */
@@ -132,19 +132,28 @@ export interface TrancheWithDuration {
   duration: number;
 }
 
-export const RELOAD_INTERVAL_SECONDS = 86400;
+/**
+ * Sablier's on-chain tranche-count cap. Verified empirically against the
+ * deployed v2.0 contract: 500 creates, 501 reverts. Hourly cadence over a
+ * long window can exceed this — the form blocks those combinations.
+ */
+export const MAX_TRANCHE_COUNT = 500;
 
 /**
- * If the picked time-of-day is closer than this, the first reload rolls to
- * tomorrow — a drop that lands moments after signing isn't a lock.
+ * How many strict payouts a (cliff, total, interval) schedule yields —
+ * the same floor math the payout calculator displays, so strict mode
+ * enforces exactly the checkpoints the drip UI was already showing.
  */
-export const MIN_FIRST_RELOAD_SECONDS = 900;
-
-/** Sablier caps tranche count at 500; a year of daily drops stays under it. */
-export const MAX_RELOAD_DAYS = 365;
-export const MIN_RELOAD_DAYS = 2;
-
-export const RELOAD_DAY_OPTIONS = [2, 3, 5, 7, 10, 14, 21, 30, 60, 90] as const;
+export function strictDropCount(
+  totalSeconds: number,
+  cliffSeconds: number,
+  intervalSeconds: number,
+): number {
+  const vestSeconds = totalSeconds - cliffSeconds;
+  return vestSeconds > 0 && intervalSeconds > 0
+    ? Math.floor(vestSeconds / intervalSeconds)
+    : 0;
+}
 
 /**
  * The net amount Sablier will actually stream after taking the broker fee
@@ -156,29 +165,11 @@ export function sablierNetDeposit(totalAmount: bigint, brokerFee: bigint): bigin
 }
 
 /**
- * Seconds from `nowMs` until the next local occurrence of "HH:MM". Rolls to
- * the following day when the next occurrence is sooner than
- * MIN_FIRST_RELOAD_SECONDS. Returns null for a malformed input.
- */
-export function secondsUntilTimeOfDay(time: string, nowMs: number): number | null {
-  const m = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!m) return null;
-  const hours = Number(m[1]);
-  const minutes = Number(m[2]);
-  if (hours > 23 || minutes > 59) return null;
-  const target = new Date(nowMs);
-  target.setHours(hours, minutes, 0, 0);
-  let delta = Math.floor((target.getTime() - nowMs) / 1000);
-  if (delta < MIN_FIRST_RELOAD_SECONDS) delta += RELOAD_INTERVAL_SECONDS;
-  return delta;
-}
-
-/**
  * Split `netDeposit` into `count` tranches: the first lands after
  * `firstDelaySeconds`, the rest every `intervalSeconds`. Integer dust from
  * the division is folded into the final tranche so the sum is exact.
  * Returns null when the inputs can't form a valid Sablier tranche list
- * (every tranche amount must be > 0).
+ * (every tranche amount must be > 0, count within the contract cap).
  */
 export function computeTranches(
   netDeposit: bigint,
@@ -186,7 +177,8 @@ export function computeTranches(
   intervalSeconds: number,
   count: number,
 ): TrancheWithDuration[] | null {
-  if (count < 1 || firstDelaySeconds < 1 || intervalSeconds < 1) return null;
+  if (count < 1 || count > MAX_TRANCHE_COUNT) return null;
+  if (firstDelaySeconds < 1 || intervalSeconds < 1) return null;
   const n = BigInt(count);
   if (netDeposit < n) return null;
   const per = netDeposit / n;

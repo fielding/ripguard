@@ -14,10 +14,9 @@ import {
   DURATION_OPTIONS,
   ALL_INTERVALS,
   sablierNetDeposit,
-  secondsUntilTimeOfDay,
   computeTranches,
-  RELOAD_INTERVAL_SECONDS,
-  MIN_FIRST_RELOAD_SECONDS,
+  strictDropCount,
+  MAX_TRANCHE_COUNT,
 } from "./schedule";
 
 // --- formatDuration ---
@@ -353,7 +352,7 @@ describe("toDatetimeLocalValue", () => {
   });
 });
 
-// --- daily reloads (Lockup Tranched) ---
+// --- strict payouts (Lockup Tranched) ---
 
 const BROKER_FEE = BigInt("5000000000000000"); // 0.5% as UD60x18, matches contracts.ts
 const SCALE_1E18 = BigInt("1000000000000000000");
@@ -394,37 +393,9 @@ describe("sablierNetDeposit", () => {
   });
 });
 
-describe("secondsUntilTimeOfDay", () => {
-  // Fixed reference: local noon.
-  const noon = new Date(2026, 8, 1, 12, 0, 0, 0).getTime();
-
-  it("targets later today when the time is ahead", () => {
-    expect(secondsUntilTimeOfDay("18:00", noon)).toBe(6 * 3600);
-  });
-
-  it("rolls to tomorrow when the time already passed", () => {
-    expect(secondsUntilTimeOfDay("09:00", noon)).toBe(21 * 3600);
-  });
-
-  it("rolls to tomorrow when the time is too soon", () => {
-    const in5min = secondsUntilTimeOfDay("12:05", noon);
-    expect(in5min).toBe(5 * 60 + RELOAD_INTERVAL_SECONDS);
-    // Boundary: exactly at the minimum stays today.
-    const atMin = secondsUntilTimeOfDay("12:15", noon);
-    expect(atMin).toBe(MIN_FIRST_RELOAD_SECONDS);
-  });
-
-  it("rejects malformed input", () => {
-    expect(secondsUntilTimeOfDay("", noon)).toBeNull();
-    expect(secondsUntilTimeOfDay("25:00", noon)).toBeNull();
-    expect(secondsUntilTimeOfDay("12:60", noon)).toBeNull();
-    expect(secondsUntilTimeOfDay("noonish", noon)).toBeNull();
-  });
-});
-
 describe("computeTranches", () => {
   it("splits evenly and folds dust into the last tranche", () => {
-    const tranches = computeTranches(BigInt(10_000_001), 3600, RELOAD_INTERVAL_SECONDS, 3);
+    const tranches = computeTranches(BigInt(10_000_001), 3600, 86400, 3);
     expect(tranches).not.toBeNull();
     expect(tranches!.length).toBe(3);
     expect(tranches![0].amount).toBe(BigInt(3_333_333));
@@ -435,12 +406,12 @@ describe("computeTranches", () => {
   });
 
   it("uses the first delay for tranche 0 and the interval after", () => {
-    const tranches = computeTranches(BigInt(1_000_000), 7200, RELOAD_INTERVAL_SECONDS, 4)!;
+    const tranches = computeTranches(BigInt(1_000_000), 7200, 86400, 4)!;
     expect(tranches.map((t) => t.duration)).toEqual([
       7200,
-      RELOAD_INTERVAL_SECONDS,
-      RELOAD_INTERVAL_SECONDS,
-      RELOAD_INTERVAL_SECONDS,
+      86400,
+      86400,
+      86400,
     ]);
   });
 
@@ -448,7 +419,7 @@ describe("computeTranches", () => {
     const amounts = [BigInt(1_000_000), BigInt(999_999), BigInt(123_456_789), BigInt(7_000_003)];
     for (const net of amounts) {
       for (const count of [2, 7, 30, 365]) {
-        const tranches = computeTranches(net, 3600, RELOAD_INTERVAL_SECONDS, count)!;
+        const tranches = computeTranches(net, 3600, 86400, count)!;
         expect(tranches.length).toBe(count);
         const sum = tranches.reduce((a, t) => a + t.amount, BigInt(0));
         expect(sum).toBe(net);
@@ -459,8 +430,33 @@ describe("computeTranches", () => {
   });
 
   it("returns null when a tranche would be zero or inputs are invalid", () => {
-    expect(computeTranches(BigInt(2), 3600, RELOAD_INTERVAL_SECONDS, 3)).toBeNull();
-    expect(computeTranches(BigInt(1_000_000), 0, RELOAD_INTERVAL_SECONDS, 3)).toBeNull();
-    expect(computeTranches(BigInt(1_000_000), 3600, RELOAD_INTERVAL_SECONDS, 0)).toBeNull();
+    expect(computeTranches(BigInt(2), 3600, 86400, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 0, 86400, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 3600, 86400, 0)).toBeNull();
+  });
+
+  it("enforces the on-chain tranche cap (500 creates, 501 reverts)", () => {
+    const big = BigInt(1_000_000_000);
+    expect(computeTranches(big, 3600, 3600, MAX_TRANCHE_COUNT)).not.toBeNull();
+    expect(computeTranches(big, 3600, 3600, MAX_TRANCHE_COUNT + 1)).toBeNull();
+  });
+});
+
+describe("strictDropCount", () => {
+  it("matches the payout calculator's checkpoint math", () => {
+    // hourly over 24h
+    expect(strictDropCount(86400, 0, 3600)).toBe(24);
+    // daily over a week
+    expect(strictDropCount(7 * 86400, 0, 86400)).toBe(7);
+    // 1d cliff then daily for 7d
+    expect(strictDropCount(8 * 86400, 86400, 86400)).toBe(7);
+    // partial tail floors away
+    expect(strictDropCount(90000, 0, 86400)).toBe(1);
+  });
+
+  it("yields zero when there is no vest window or cadence", () => {
+    // Panic Lock: cliff ~= total, nothing to tranche
+    expect(strictDropCount(86401, 86400, 3600)).toBe(0);
+    expect(strictDropCount(86400, 0, 0)).toBe(0);
   });
 });
