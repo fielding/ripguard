@@ -13,6 +13,10 @@ import {
   calculatePayoutSchedule,
   DURATION_OPTIONS,
   ALL_INTERVALS,
+  sablierNetDeposit,
+  computeTranches,
+  strictDropCount,
+  MAX_TRANCHE_COUNT,
 } from "./schedule";
 
 // --- formatDuration ---
@@ -345,5 +349,114 @@ describe("toDatetimeLocalValue", () => {
     const out = toDatetimeLocalValue(d);
     const parsed = new Date(out).getTime();
     expect(parsed).toBe(d.getTime());
+  });
+});
+
+// --- strict payouts (Lockup Tranched) ---
+
+const BROKER_FEE = BigInt("5000000000000000"); // 0.5% as UD60x18, matches contracts.ts
+const SCALE_1E18 = BigInt("1000000000000000000");
+
+describe("sablierNetDeposit", () => {
+  it("replicates the contract's floor math", () => {
+    // Sablier computes brokerFeeAmount = floor(totalAmount * fee / 1e18)
+    // and streams totalAmount - brokerFeeAmount. Any mismatch here reverts
+    // the LT create, so check against the formula directly.
+    const samples = [
+      BigInt(1_000_000), // 1 USDC
+      BigInt(5_000_001), // dusty
+      BigInt(123_456_789),
+      BigInt("999999999999999999"),
+      BigInt(7),
+    ];
+    for (const total of samples) {
+      const expected = total - (total * BROKER_FEE) / SCALE_1E18;
+      expect(sablierNetDeposit(total, BROKER_FEE)).toBe(expected);
+    }
+  });
+
+  it("passes the whole amount through at zero fee (testnet)", () => {
+    expect(sablierNetDeposit(BigInt(42_000_000), BigInt(0))).toBe(BigInt(42_000_000));
+  });
+
+  it("round-trips with computeFee within a wei of dust", () => {
+    // computeFee grosses the fee up on top of the deposit; Sablier then
+    // takes its cut from the gross. The recipient should get the deposit
+    // back, allowing at most 1 unit of floor dust.
+    const deposits = [BigInt(1_000_000), BigInt(333_333_333), BigInt(999_999)];
+    for (const deposit of deposits) {
+      const total = deposit + computeFee(deposit, BROKER_FEE);
+      const net = sablierNetDeposit(total, BROKER_FEE);
+      const dust = net - deposit;
+      expect(dust >= BigInt(-1) && dust <= BigInt(1)).toBe(true);
+    }
+  });
+});
+
+describe("computeTranches", () => {
+  it("splits evenly and folds dust into the last tranche", () => {
+    const tranches = computeTranches(BigInt(10_000_001), 3600, 86400, 3);
+    expect(tranches).not.toBeNull();
+    expect(tranches!.length).toBe(3);
+    expect(tranches![0].amount).toBe(BigInt(3_333_333));
+    expect(tranches![1].amount).toBe(BigInt(3_333_333));
+    expect(tranches![2].amount).toBe(BigInt(3_333_335));
+    const sum = tranches!.reduce((a, t) => a + t.amount, BigInt(0));
+    expect(sum).toBe(BigInt(10_000_001));
+  });
+
+  it("uses the first delay for tranche 0 and the interval after", () => {
+    const tranches = computeTranches(BigInt(1_000_000), 7200, 86400, 4)!;
+    expect(tranches.map((t) => t.duration)).toEqual([
+      7200,
+      86400,
+      86400,
+      86400,
+    ]);
+  });
+
+  it("sums to the net deposit exactly across awkward amounts", () => {
+    const amounts = [BigInt(1_000_000), BigInt(999_999), BigInt(123_456_789), BigInt(7_000_003)];
+    for (const net of amounts) {
+      for (const count of [2, 7, 30, 365]) {
+        const tranches = computeTranches(net, 3600, 86400, count)!;
+        expect(tranches.length).toBe(count);
+        const sum = tranches.reduce((a, t) => a + t.amount, BigInt(0));
+        expect(sum).toBe(net);
+        // Sablier rejects zero-amount tranches.
+        for (const t of tranches) expect(t.amount > BigInt(0)).toBe(true);
+      }
+    }
+  });
+
+  it("returns null when a tranche would be zero or inputs are invalid", () => {
+    expect(computeTranches(BigInt(2), 3600, 86400, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 0, 86400, 3)).toBeNull();
+    expect(computeTranches(BigInt(1_000_000), 3600, 86400, 0)).toBeNull();
+  });
+
+  it("enforces the on-chain tranche cap (500 creates, 501 reverts)", () => {
+    const big = BigInt(1_000_000_000);
+    expect(computeTranches(big, 3600, 3600, MAX_TRANCHE_COUNT)).not.toBeNull();
+    expect(computeTranches(big, 3600, 3600, MAX_TRANCHE_COUNT + 1)).toBeNull();
+  });
+});
+
+describe("strictDropCount", () => {
+  it("matches the payout calculator's checkpoint math", () => {
+    // hourly over 24h
+    expect(strictDropCount(86400, 0, 3600)).toBe(24);
+    // daily over a week
+    expect(strictDropCount(7 * 86400, 0, 86400)).toBe(7);
+    // 1d cliff then daily for 7d
+    expect(strictDropCount(8 * 86400, 86400, 86400)).toBe(7);
+    // partial tail floors away
+    expect(strictDropCount(90000, 0, 86400)).toBe(1);
+  });
+
+  it("yields zero when there is no vest window or cadence", () => {
+    // Panic Lock: cliff ~= total, nothing to tranche
+    expect(strictDropCount(86401, 86400, 3600)).toBe(0);
+    expect(strictDropCount(86400, 0, 0)).toBe(0);
   });
 });

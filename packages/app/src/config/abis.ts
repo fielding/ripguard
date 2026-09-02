@@ -144,4 +144,57 @@ export const sablierLockupAbi = [
     outputs: [{ name: "streamId", type: "uint256" }],
     stateMutability: "payable",
   },
+  {
+    type: "function",
+    name: "getTranches",
+    inputs: [{ name: "streamId", type: "uint256" }],
+    outputs: [
+      {
+        name: "tranches",
+        type: "tuple[]",
+        components: [
+          { name: "amount", type: "uint128" },
+          { name: "timestamp", type: "uint40" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "createWithDurationsLT",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "sender", type: "address" },
+          { name: "recipient", type: "address" },
+          { name: "totalAmount", type: "uint128" },
+          { name: "token", type: "address" },
+          { name: "cancelable", type: "bool" },
+          { name: "transferable", type: "bool" },
+          { name: "shape", type: "string" },
+          {
+            name: "broker",
+            type: "tuple",
+            components: [
+              { name: "account", type: "address" },
+              { name: "fee", type: "uint256" },
+            ],
+          },
+        ],
+      },
+      {
+        name: "tranchesWithDuration",
+        type: "tuple[]",
+        components: [
+          { name: "amount", type: "uint128" },
+          { name: "duration", type: "uint40" },
+        ],
+      },
+    ],
+    outputs: [{ name: "streamId", type: "uint256" }],
+    stateMutability: "payable",
+  },
 ] as const;

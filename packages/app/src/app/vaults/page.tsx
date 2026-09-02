@@ -38,6 +38,8 @@ type SubgraphStream = {
   cliffTime: string | null;
 };
 
+type Tranche = { amount: bigint; timestamp: number };
+
 type VaultData = {
   streamId: bigint;
   totalAmount: bigint;
@@ -49,6 +51,8 @@ type VaultData = {
   endTime: number;
   cliffTime: number;
   claimable: bigint;
+  /** Strict (tranched) streams only — null for linear. */
+  tranches: Tranche[] | null;
 };
 
 function formatCountdown(seconds: number): string {
@@ -56,12 +60,19 @@ function formatCountdown(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
+  const sec = Math.floor(seconds % 60);
   if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
 }
 
-function getScheduleType(cliffSeconds: number, totalSeconds: number): string {
+function getScheduleType(
+  cliffSeconds: number,
+  totalSeconds: number,
+  isTranched = false,
+): string {
+  if (isTranched) return "Strict Payouts";
   if (cliffSeconds === totalSeconds && cliffSeconds > 0) return "One Drop";
   if (cliffSeconds > 0) return "Wait, then reloads";
   return "Steady reloads";
@@ -76,6 +87,7 @@ function getLockLabel(
   chainId: number,
   cliffSeconds: number,
   totalSeconds: number,
+  isTranched = false,
 ): string {
   if (typeof window !== "undefined") {
     try {
@@ -87,7 +99,7 @@ function getLockLabel(
       // localStorage unavailable, fall through
     }
   }
-  return getScheduleType(cliffSeconds, totalSeconds);
+  return getScheduleType(cliffSeconds, totalSeconds, isTranched);
 }
 
 function formatDate(timestamp: number): string {
@@ -121,14 +133,19 @@ function VaultCard({
 }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
-  // Tick countdown — faster when close to unlock
+  const nextTranche =
+    vault.tranches?.find((t) => t.timestamp > now) ?? null;
+
+  // Tick countdown — faster when close to the next unlock (next tranche
+  // for strict streams, stream end for linear).
   useEffect(() => {
-    if (now >= vault.endTime) return;
-    const secsLeft = vault.endTime - now;
+    const target = nextTranche ? nextTranche.timestamp : vault.endTime;
+    if (now >= target) return;
+    const secsLeft = target - now;
     const interval = secsLeft <= 300 ? 1_000 : secsLeft <= 3600 ? 10_000 : 60_000;
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), interval);
     return () => clearInterval(id);
-  }, [now, vault.endTime]);
+  }, [now, vault.endTime, nextTranche]);
   const remaining = vault.deposited - vault.withdrawn;
   const vested = vault.withdrawn + vault.claimable;
   const vestedPct =
@@ -141,6 +158,12 @@ function VaultCard({
       : 0;
 
   const nextUnlock = (() => {
+    if (vault.tranches) {
+      if (nextTranche) {
+        return { label: "Next payout in", time: nextTranche.timestamp - now };
+      }
+      return { label: "All payouts unlocked", time: 0 };
+    }
     if (vault.cliffTime > 0 && now < vault.cliffTime) {
       return { label: "Reloads start in", time: vault.cliffTime - now };
     }
@@ -157,8 +180,11 @@ function VaultCard({
 
   const canClaim = vault.claimable > BigInt(0);
   const isClaimingThis = claimingId === vault.streamId;
-  const claimStatus =
-    now < vault.cliffTime
+  const claimStatus = vault.tranches
+    ? nextTranche
+      ? "Locked until next payout"
+      : "All claimed"
+    : now < vault.cliffTime
       ? "Waiting"
       : now < vault.endTime
         ? "Reloading"
@@ -175,7 +201,7 @@ function VaultCard({
             Lock #{vault.streamId.toString()}
           </div>
           <div className="font-display text-xl tracking-tight">
-            {getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
+            {getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds, vault.tranches !== null)}
           </div>
         </div>
         <div className="sm:text-right">
@@ -241,7 +267,7 @@ function VaultCard({
             <span className="text-sm text-cyan/60 font-sans ml-1.5 tracking-wider">USDC</span>
           </div>
           {!canClaim && !isClaimingThis && (
-            <span className="text-[11px] text-faint mt-1 block tabular">
+            <span className="text-xs text-faint mt-1 block tabular">
               {claimStatus}
             </span>
           )}
@@ -279,7 +305,7 @@ function VaultCard({
         <ShareCard
           streamId={vault.streamId}
           amountLocked={formatTokenAmount(vault.deposited, usdcDecimals)}
-          scheduleType={getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds)}
+          scheduleType={getLockLabel(vault.streamId, chainId, vault.cliffSeconds, vault.totalSeconds, vault.tranches !== null)}
           endDate={new Date(vault.endTime * 1000)}
           nextUnlock={nextUnlockLabel}
           sablierAddress={sablierAddress}
@@ -576,6 +602,25 @@ function VaultDashboard() {
     },
   });
 
+  // Tranche schedules for strict (LT) streams. Immutable once created, so
+  // fetch once and cache forever. Linear streams revert on getTranches —
+  // allowFailure (the default) turns that into a per-call failure we map
+  // to null rather than an error.
+  const trancheContracts = streamIds.map((id) => ({
+    address: sablierLockup,
+    abi: sablierLockupAbi,
+    functionName: "getTranches" as const,
+    args: [id] as const,
+  }));
+
+  const { data: trancheResults } = useReadContracts({
+    contracts: trancheContracts,
+    query: {
+      enabled: streamIds.length > 0,
+      staleTime: Infinity,
+    },
+  });
+
   // Build vault data from subgraph + on-chain claimable
   let failedStreamCount = 0;
   const vaults: VaultData[] = subgraphStreams
@@ -590,6 +635,14 @@ function VaultDashboard() {
       const claimable = claimableResult?.status === "success"
         ? (claimableResult.result as bigint)
         : BigInt(0);
+
+      const trancheResult = trancheResults?.[i];
+      const tranches: Tranche[] | null =
+        trancheResult?.status === "success"
+          ? (
+              trancheResult.result as Array<{ amount: bigint; timestamp: number | bigint }>
+            ).map((t) => ({ amount: t.amount, timestamp: Number(t.timestamp) }))
+          : null;
 
       if (claimableResults && claimableResult?.status !== "success") {
         failedStreamCount++;
@@ -609,6 +662,7 @@ function VaultDashboard() {
         endTime,
         cliffTime,
         claimable,
+        tranches,
       };
     })
     .filter((v): v is VaultData => v !== null);
@@ -832,7 +886,7 @@ function VaultDashboard() {
   return (
     <div className="flex-1 w-full max-w-4xl mx-auto px-5 sm:px-8 pb-24 space-y-10">
       {chainConfig.usdcNote && (
-        <p className="text-[11px] text-faint leading-relaxed pt-1">
+        <p className="text-xs text-faint leading-relaxed pt-1">
           {chainConfig.usdcNote}
         </p>
       )}

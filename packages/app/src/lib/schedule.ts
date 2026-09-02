@@ -122,6 +122,73 @@ export function toDatetimeLocalValue(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ----------------------------------------------------------------------------
+// Strict payouts (Lockup Tranched)
+// ----------------------------------------------------------------------------
+
+/** One Sablier tranche: `amount` unlocks `duration` seconds after the previous one. */
+export interface TrancheWithDuration {
+  amount: bigint;
+  duration: number;
+}
+
+/**
+ * Sablier's on-chain tranche-count cap. Verified empirically against the
+ * deployed v2.0 contract: 500 creates, 501 reverts. Hourly cadence over a
+ * long window can exceed this — the form blocks those combinations.
+ */
+export const MAX_TRANCHE_COUNT = 500;
+
+/**
+ * How many strict payouts a (cliff, total, interval) schedule yields —
+ * the same floor math the payout calculator displays, so strict mode
+ * enforces exactly the checkpoints the drip UI was already showing.
+ */
+export function strictDropCount(
+  totalSeconds: number,
+  cliffSeconds: number,
+  intervalSeconds: number,
+): number {
+  const vestSeconds = totalSeconds - cliffSeconds;
+  return vestSeconds > 0 && intervalSeconds > 0
+    ? Math.floor(vestSeconds / intervalSeconds)
+    : 0;
+}
+
+/**
+ * The net amount Sablier will actually stream after taking the broker fee
+ * out of `totalAmount`. Replicates the contract's UD60x18 floor math —
+ * tranche amounts must sum to exactly this or createWithDurationsLT reverts.
+ */
+export function sablierNetDeposit(totalAmount: bigint, brokerFee: bigint): bigint {
+  return totalAmount - (totalAmount * brokerFee) / SCALE;
+}
+
+/**
+ * Split `netDeposit` into `count` tranches: the first lands after
+ * `firstDelaySeconds`, the rest every `intervalSeconds`. Integer dust from
+ * the division is folded into the final tranche so the sum is exact.
+ * Returns null when the inputs can't form a valid Sablier tranche list
+ * (every tranche amount must be > 0, count within the contract cap).
+ */
+export function computeTranches(
+  netDeposit: bigint,
+  firstDelaySeconds: number,
+  intervalSeconds: number,
+  count: number,
+): TrancheWithDuration[] | null {
+  if (count < 1 || count > MAX_TRANCHE_COUNT) return null;
+  if (firstDelaySeconds < 1 || intervalSeconds < 1) return null;
+  const n = BigInt(count);
+  if (netDeposit < n) return null;
+  const per = netDeposit / n;
+  const last = netDeposit - per * (n - BigInt(1));
+  return Array.from({ length: count }, (_, i) => ({
+    amount: i === count - 1 ? last : per,
+    duration: i === 0 ? firstDelaySeconds : intervalSeconds,
+  }));
+}
+
 /** Calculate payout schedule for the vesting calculator display */
 export function calculatePayoutSchedule(
   depositAmount: number,

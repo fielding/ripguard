@@ -41,6 +41,10 @@ import {
   toDatetimeLocalValue,
   computeFee,
   computeMaxDeposit,
+  strictDropCount,
+  MAX_TRANCHE_COUNT,
+  sablierNetDeposit,
+  computeTranches,
 } from "@/lib/schedule";
 
 type PresetKey = keyof typeof PRESETS;
@@ -74,6 +78,12 @@ function parseStreamIdFromReceipt(
 
 type Step = "schedule" | "confirm" | "approve" | "lock" | "success";
 type CustomMode = "reloads" | "lockUntil";
+// How the payouts unlock on-chain. "linear" and "lockUntil" write
+// createWithDurationsLL; "strict" writes createWithDurationsLT — discrete
+// tranches, nothing claimable between payouts.
+type ScheduleKind = "linear" | "lockUntil" | "strict";
+// The user-facing toggle: steady per-second drip vs strict on-chain chunks.
+type PayoutStyle = "drip" | "strict";
 
 // Sensible default for the lock-until picker: 7 days from "now" at the
 // minute the page rendered. Captured once per mount so the input doesn't
@@ -193,7 +203,7 @@ function NetworkSection({ isFormLocked }: { isFormLocked: boolean }) {
           className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-wide rounded-full border border-dashed border-line text-muted hover:border-cyan/60 hover:text-cyan transition-colors min-h-[2.5rem]"
         >
           Solana
-          <span aria-hidden className="text-[11px] -mt-0.5">↗</span>
+          <span aria-hidden className="text-xs -mt-0.5">↗</span>
         </a>
       </div>
       <p className="text-xs text-faint leading-relaxed">{helper}</p>
@@ -247,6 +257,9 @@ function CreateLockInner() {
   const [customInterval, setCustomInterval] = useState(3600); // 1hr default claim interval (display only)
   const [customMode, setCustomMode] = useState<CustomMode>("reloads");
   const [lockUntilInput, setLockUntilInput] = useState<string>(defaultLockUntilValue);
+  // Drip vs strict applies to presets and custom reloads alike; lock-until
+  // is already a single strict drop, so the toggle doesn't show there.
+  const [payoutStyle, setPayoutStyle] = useState<PayoutStyle>("drip");
   // Tick "now" once every 30s so the lock-until duration preview
   // ("18d 3h from now") doesn't go stale while the form is open. We don't
   // need per-second precision — the user is picking a target in days/hours.
@@ -308,57 +321,100 @@ function CreateLockInner() {
     [selectedPreset, customMode, lockUntilInput, nowMs],
   );
 
+  // The payout cadence of the picked schedule — presets carry their own,
+  // custom uses the cadence chips. Drives both the calculator display and
+  // strict-mode tranche derivation, so what's shown is what's enforced.
+  const intervalSeconds =
+    selectedPreset === "custom" ? customInterval : PRESETS[selectedPreset].intervalSeconds;
+
   // Derived schedule values
   const schedule = useMemo<{
+    kind: ScheduleKind;
     cliffSeconds: number;
     totalSeconds: number;
     isLumpSum: boolean;
     label: string;
     targetMs: number | null;
+    /** strict only: payout cadence and drop count. */
+    intervalSeconds: number;
+    dropCount: number;
   }>(() => {
-    if (selectedPreset !== "custom") {
-      const p = PRESETS[selectedPreset];
-      return {
-        cliffSeconds: p.cliffSeconds,
-        totalSeconds: p.totalSeconds,
-        isLumpSum: p.isLumpSum,
-        label: p.label,
-        targetMs: null,
-      };
-    }
-    if (customMode === "lockUntil") {
-      // Picker not yet valid → totalSeconds = 0 keeps `canProceed` false
-      // so the action button stays disabled until they pick a real date.
-      if (!lockUntilParsed) {
+    const base = (() => {
+      if (selectedPreset !== "custom") {
+        const p = PRESETS[selectedPreset];
         return {
-          cliffSeconds: 0,
-          totalSeconds: 0,
-          isLumpSum: true,
-          label: "Lock until …",
+          kind: "linear" as ScheduleKind,
+          cliffSeconds: p.cliffSeconds,
+          totalSeconds: p.totalSeconds,
+          isLumpSum: p.isLumpSum,
+          label: p.label,
           targetMs: null,
+          intervalSeconds: 0,
+          dropCount: 0,
         };
       }
-      const total = lockUntilParsed.durationSeconds;
-      // Sablier requires cliff < total strictly. The one-second gap is
-      // negligible vs the unlock date; the user sees a clean lump-sum.
+      if (customMode === "lockUntil") {
+        // Picker not yet valid → totalSeconds = 0 keeps `canProceed` false
+        // so the action button stays disabled until they pick a real date.
+        if (!lockUntilParsed) {
+          return {
+            kind: "lockUntil" as ScheduleKind,
+            cliffSeconds: 0,
+            totalSeconds: 0,
+            isLumpSum: true,
+            label: "Lock until …",
+            targetMs: null,
+            intervalSeconds: 0,
+            dropCount: 0,
+          };
+        }
+        const total = lockUntilParsed.durationSeconds;
+        // Sablier requires cliff < total strictly. The one-second gap is
+        // negligible vs the unlock date; the user sees a clean lump-sum.
+        return {
+          kind: "lockUntil" as ScheduleKind,
+          cliffSeconds: total - 1,
+          totalSeconds: total,
+          isLumpSum: true,
+          label: `Lock until ${formatTargetDate(lockUntilParsed.targetMs)}`,
+          targetMs: lockUntilParsed.targetMs,
+          intervalSeconds: 0,
+          dropCount: 0,
+        };
+      }
+      const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
       return {
-        cliffSeconds: total - 1,
-        totalSeconds: total,
-        isLumpSum: true,
-        label: `Lock until ${formatTargetDate(lockUntilParsed.targetMs)}`,
-        targetMs: lockUntilParsed.targetMs,
+        kind: "linear" as ScheduleKind,
+        cliffSeconds: customCliff,
+        // Sablier requires cliff < total strictly; add 1s so linear stream amount is non-zero
+        totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
+        isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
+        label: "Custom Reloads",
+        targetMs: null,
+        intervalSeconds: 0,
+        dropCount: 0,
       };
+    })();
+
+    // Strict payouts: same schedule, enforced as discrete tranches. The
+    // drop count is the exact checkpoint list the drip calculator shows.
+    if (payoutStyle === "strict" && base.kind === "linear" && !base.isLumpSum) {
+      const count = strictDropCount(base.totalSeconds, base.cliffSeconds, intervalSeconds);
+      if (count >= 1) {
+        return {
+          ...base,
+          kind: "strict",
+          // The stream ends at the last drop — floor the window to the
+          // cadence rather than leaving a partial tail.
+          totalSeconds: base.cliffSeconds + count * intervalSeconds,
+          label: `${base.label} · Strict`,
+          intervalSeconds,
+          dropCount: count,
+        };
+      }
     }
-    const cliffEqualsTotal = customCliff === customTotal && customCliff > 0;
-    return {
-      cliffSeconds: customCliff,
-      // Sablier requires cliff < total strictly; add 1s so linear stream amount is non-zero
-      totalSeconds: cliffEqualsTotal ? customTotal + 1 : customTotal,
-      isLumpSum: false, // Never set unlockCliff=totalAmount — Sablier rejects zero linear stream amount
-      label: "Custom Reloads",
-      targetMs: null,
-    };
-  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed]);
+    return base;
+  }, [selectedPreset, customMode, customCliff, customTotal, lockUntilParsed, payoutStyle, intervalSeconds]);
 
   // Amount parsing
   const depositAmount = useMemo(() => {
@@ -377,6 +433,24 @@ function CreateLockInner() {
   // Unlock amounts for Sablier
   const unlockStart = BigInt(0);
   const unlockCliff = schedule.isLumpSum ? depositAmount : BigInt(0);
+
+  // Tranche list for strict-payout locks. Amounts must sum to exactly the
+  // net deposit Sablier computes after the broker cut, or the create reverts
+  // on-chain — sablierNetDeposit replicates that floor math. The first drop
+  // lands at cliff + one interval, matching the drip calculator's first
+  // checkpoint.
+  const tranches = useMemo(
+    () =>
+      schedule.kind === "strict" && totalAmount > BigInt(0)
+        ? computeTranches(
+            sablierNetDeposit(totalAmount, brokerFee),
+            schedule.cliffSeconds + schedule.intervalSeconds,
+            schedule.intervalSeconds,
+            schedule.dropCount,
+          )
+        : null,
+    [schedule, totalAmount, brokerFee],
+  );
 
   // Read USDC allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -437,6 +511,7 @@ function CreateLockInner() {
     setCustomTotal(3600);
     setCustomMode("reloads");
     setLockUntilInput(defaultLockUntilValue());
+    setPayoutStyle("drip");
     setAmountInput("");
     setStep("schedule");
     setConfirmed(false);
@@ -498,28 +573,39 @@ function CreateLockInner() {
     });
   }, [writeApprove, address, resetApproveWrite, usdcAddress, sablierLockup]);
 
-  const handleLock = useCallback(() => {
-    if (!address || lockInFlightRef.current) return;
-    lockInFlightRef.current = true;
-    // Clear stale success/error state from any previous lock so the
-    // post-confirm effect doesn't fire against leftover data.
-    resetLockWrite();
-    setStep("lock");
+  // The single place lock txs are written. Both entry points (direct Lock
+  // click and the approve→lock auto-progress) call this so the LL/LT
+  // branching can't drift between them.
+  const fireLock = useCallback(() => {
+    if (!address) return;
+    const params = {
+      sender: address as Address,
+      recipient: address as Address,
+      totalAmount,
+      token: usdcAddress,
+      cancelable: false,
+      transferable: false,
+      shape: "RipGuard",
+      broker: { account: treasury, fee: brokerFee },
+    };
+    if (schedule.kind === "strict") {
+      // canProceed already blocks invalid tranche lists; this guard is for
+      // the async priming path where state may have shifted.
+      if (!tranches) return;
+      writeLock({
+        address: sablierLockup,
+        abi: sablierLockupAbi,
+        functionName: "createWithDurationsLT",
+        args: [params, tranches],
+      });
+      return;
+    }
     writeLock({
       address: sablierLockup,
       abi: sablierLockupAbi,
       functionName: "createWithDurationsLL",
       args: [
-        {
-          sender: address as Address,
-          recipient: address as Address,
-          totalAmount,
-          token: usdcAddress,
-          cancelable: false,
-          transferable: false,
-          shape: "RipGuard",
-          broker: { account: treasury, fee: brokerFee },
-        },
+        params,
         { start: unlockStart, cliff: unlockCliff },
         { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
       ],
@@ -528,15 +614,25 @@ function CreateLockInner() {
     writeLock,
     totalAmount,
     schedule,
+    tranches,
     unlockStart,
     unlockCliff,
     address,
-    resetLockWrite,
     sablierLockup,
     usdcAddress,
     treasury,
     brokerFee,
   ]);
+
+  const handleLock = useCallback(() => {
+    if (!address || lockInFlightRef.current) return;
+    lockInFlightRef.current = true;
+    // Clear stale success/error state from any previous lock so the
+    // post-confirm effect doesn't fire against leftover data.
+    resetLockWrite();
+    setStep("lock");
+    fireLock();
+  }, [address, resetLockWrite, fireLock]);
 
   // Auto-advance from approve to lock after approval confirms. We skip
   // re-opening the confirm dialog because (a) the user already consented
@@ -586,42 +682,17 @@ function CreateLockInner() {
       primingTimeoutRef.current = null;
       setIsPrimingLock(false);
       lockInFlightRef.current = true;
-      writeLock({
-        address: sablierLockup,
-        abi: sablierLockupAbi,
-        functionName: "createWithDurationsLL",
-        args: [
-          {
-            sender: address as Address,
-            recipient: address as Address,
-            totalAmount,
-            token: usdcAddress,
-            cancelable: false,
-            transferable: false,
-            shape: "RipGuard",
-            broker: { account: treasury, fee: brokerFee },
-          },
-          { start: unlockStart, cliff: unlockCliff },
-          { cliff: schedule.cliffSeconds, total: schedule.totalSeconds },
-        ],
-      });
+      fireLock();
     }, 1500);
   }, [
     isApproveConfirmed,
     step,
     address,
     totalAmount,
-    schedule,
-    unlockStart,
-    unlockCliff,
-    writeLock,
+    fireLock,
     refetchAllowance,
     resetLockWrite,
     toast,
-    sablierLockup,
-    usdcAddress,
-    treasury,
-    brokerFee,
     usdcDecimals,
   ]);
 
@@ -738,7 +809,13 @@ function CreateLockInner() {
 
   const meetsMinimum = depositAmount >= minDeposit;
   const canProceed =
-    depositAmount > 0 && meetsMinimum && schedule.totalSeconds > 0 && isConnected;
+    depositAmount > 0 &&
+    meetsMinimum &&
+    schedule.totalSeconds > 0 &&
+    // Strict payouts need a valid tranche list (count within Sablier's
+    // cap, every tranche amount > 0) before the lock can be reviewed.
+    (schedule.kind !== "strict" || tranches !== null) &&
+    isConnected;
 
   const isValidForm = canProceed && hasEnoughBalance;
 
@@ -872,7 +949,7 @@ function CreateLockInner() {
                     </p>
                   )}
                   {usdcNote && (
-                    <p className="text-[11px] text-faint leading-relaxed">
+                    <p className="text-xs text-faint leading-relaxed">
                       {usdcNote}
                     </p>
                   )}
@@ -964,6 +1041,68 @@ function CreateLockInner() {
                     </button>
                   </div>
 
+                  {/* Payout style — steady drip vs strict on-chain chunks.
+                      Applies to presets and custom reloads alike; hidden for
+                      lock-until, which is already a single strict drop. */}
+                  {!(selectedPreset === "custom" && customMode === "lockUntil") && (
+                    <div className="space-y-2.5">
+                      <div
+                        role="radiogroup"
+                        aria-label="Payout style"
+                        className="grid grid-cols-2 gap-px bg-line border border-line rounded-lg overflow-hidden"
+                      >
+                        {(
+                          [
+                            { key: "drip", label: "Steady drip" },
+                            { key: "strict", label: "Strict payouts" },
+                          ] as const
+                        ).map((opt) => {
+                          const active = payoutStyle === opt.key;
+                          return (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              disabled={isFormLocked}
+                              onClick={() => {
+                                setPayoutStyle(opt.key);
+                                setStep("schedule");
+                              }}
+                              className={`px-3 py-2.5 text-[13px] font-semibold tabular tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-cyan focus-visible:outline-offset-[-2px] ${
+                                active
+                                  ? "bg-cyan/[0.10] text-cyan"
+                                  : "bg-background text-muted hover:bg-surface hover:text-foreground"
+                              } ${isFormLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-faint leading-relaxed">
+                        {payoutStyle === "drip"
+                          ? "Unlocks by the second. Claim whatever's built up, whenever you want."
+                          : "Nothing between payouts. Each chunk lands on schedule — enforced on-chain, not just displayed."}
+                      </p>
+                      {payoutStyle === "strict" &&
+                        schedule.kind === "strict" &&
+                        schedule.dropCount > MAX_TRANCHE_COUNT && (
+                          <p className="text-xs text-danger leading-relaxed">
+                            Strict locks cap at {MAX_TRANCHE_COUNT} payouts —
+                            this schedule needs {schedule.dropCount}. Pick a
+                            bigger cadence or a shorter window.
+                          </p>
+                        )}
+                      {payoutStyle === "strict" && schedule.kind === "linear" && (
+                        <p className="text-xs text-faint leading-relaxed">
+                          This schedule has a single unlock, so strict
+                          doesn&apos;t change it.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Custom schedule builder — "Custom" (steady reloads) vs
                       "Lock until" is chosen by the top-level tabs above, so
                       there's no nested toggle here. */}
@@ -1002,7 +1141,7 @@ function CreateLockInner() {
                               Pick a date at least 1 hour from now.
                             </p>
                           )}
-                          <p className="text-[11px] text-faint leading-relaxed">
+                          <p className="text-xs text-faint leading-relaxed">
                             Good for rent, bills, or any single-date deadline.
                             Cadence and waiting period don&apos;t apply.
                           </p>
@@ -1147,10 +1286,12 @@ function CreateLockInner() {
                   <section className="space-y-4">
                     <SectionLabel index="03">Payout</SectionLabel>
                     <TimelinePreview
+                      kind={schedule.kind}
                       cliffSeconds={schedule.cliffSeconds}
                       totalSeconds={schedule.totalSeconds}
                       isLumpSum={schedule.isLumpSum}
                       targetMs={schedule.targetMs}
+                      dropCount={schedule.dropCount}
                       depositAmount={depositAmount}
                       usdcDecimals={usdcDecimals}
                     />
@@ -1159,7 +1300,8 @@ function CreateLockInner() {
                         depositAmount={depositAmount}
                         totalSeconds={schedule.totalSeconds}
                         cliffSeconds={schedule.cliffSeconds}
-                        intervalSeconds={selectedPreset === "custom" ? customInterval : 3600}
+                        intervalSeconds={intervalSeconds}
+                        strict={schedule.kind === "strict"}
                         usdcDecimals={usdcDecimals}
                       />
                     )}
@@ -1216,7 +1358,9 @@ function CreateLockInner() {
                                     customMode === "lockUntil" &&
                                     !lockUntilParsed
                                   ? "Pick a date at least 1 hour out"
-                                  : "Review the lock"}
+                                  : schedule.kind === "strict" && !tranches
+                                    ? "Too many payouts for one lock"
+                                    : "Review the lock"}
                         </button>
                       )}
                     </>
@@ -1336,12 +1480,15 @@ function VestingCalculator({
   totalSeconds,
   cliffSeconds,
   intervalSeconds,
+  strict = false,
   usdcDecimals,
 }: {
   depositAmount: bigint;
   totalSeconds: number;
   cliffSeconds: number;
   intervalSeconds: number;
+  /** Strict payouts: the rows below are enforced tranches, not synthetic checkpoints. */
+  strict?: boolean;
   usdcDecimals: number;
 }) {
   const vestSeconds = totalSeconds - cliffSeconds;
@@ -1368,7 +1515,7 @@ function VestingCalculator({
           ${perInterval.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div className="mt-3 text-xs text-muted tabular">
-          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) · {totalIntervals} reloads over {formatDuration(totalSeconds)}
+          every {intervalLabel} ({pctPerInterval.toFixed(1)}%) · {totalIntervals} {strict ? "strict payouts" : "reloads"} over {formatDuration(totalSeconds)}
         </div>
       </div>
 
@@ -1392,8 +1539,8 @@ function VestingCalculator({
             </div>
           ))}
           {totalIntervals > previewCount && (
-            <div className="text-[10px] text-faint text-center pt-2 tabular">
-              … {totalIntervals - previewCount} more reloads
+            <div className="text-[11px] text-faint text-center pt-2 tabular">
+              … {totalIntervals - previewCount} more {strict ? "payouts" : "reloads"}
             </div>
           )}
         </div>
@@ -1403,17 +1550,21 @@ function VestingCalculator({
 }
 
 function TimelinePreview({
+  kind,
   cliffSeconds,
   totalSeconds,
   isLumpSum,
   targetMs,
+  dropCount,
   depositAmount,
   usdcDecimals,
 }: {
+  kind: ScheduleKind;
   cliffSeconds: number;
   totalSeconds: number;
   isLumpSum: boolean;
   targetMs: number | null;
+  dropCount: number;
   depositAmount: bigint;
   usdcDecimals: number;
 }) {
@@ -1458,7 +1609,14 @@ function TimelinePreview({
 
       {/* Description */}
       <p className="text-xs text-muted leading-relaxed">
-        {isLockUntil ? (
+        {kind === "strict" ? (
+          <>
+            {formatUnits(depositAmount, usdcDecimals)} USDC lands in{" "}
+            {dropCount} equal payouts{cliffSeconds > 0 ? (
+              <> after a {formatDuration(cliffSeconds)} wait</>
+            ) : null}. Zero claimable between payouts.
+          </>
+        ) : isLockUntil ? (
           <>
             {formatUnits(depositAmount, usdcDecimals)} USDC unlocks in one drop
             on {formatTargetDate(targetMs)}.
@@ -1501,11 +1659,14 @@ function ConfirmDialog({
   onCancel,
 }: {
   schedule: {
+    kind: ScheduleKind;
     label: string;
     cliffSeconds: number;
     totalSeconds: number;
     isLumpSum: boolean;
     targetMs: number | null;
+    intervalSeconds: number;
+    dropCount: number;
   };
   depositAmount: bigint;
   fee: bigint;
@@ -1605,7 +1766,22 @@ function ConfirmDialog({
               <span>Total from wallet</span>
               <span>{formatUnits(totalAmount, usdcDecimals)} USDC</span>
             </div>
-            {schedule.targetMs !== null ? (
+            {schedule.kind === "strict" ? (
+              <>
+                <div className="flex justify-between pt-2">
+                  <span className="text-muted">Payouts</span>
+                  <span className="text-foreground">
+                    {schedule.dropCount} × every {formatDuration(schedule.intervalSeconds)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">First payout in</span>
+                  <span className="text-foreground">
+                    {formatDuration(schedule.cliffSeconds + schedule.intervalSeconds)}
+                  </span>
+                </div>
+              </>
+            ) : schedule.targetMs !== null ? (
               <div className="flex justify-between pt-2">
                 <span className="text-muted">Unlocks on</span>
                 <span className="text-foreground">{formatTargetDate(schedule.targetMs)}</span>
@@ -1694,11 +1870,14 @@ function SuccessView({
   streamId: bigint;
   depositAmount: bigint;
   schedule: {
+    kind: ScheduleKind;
     label: string;
     cliffSeconds: number;
     totalSeconds: number;
     isLumpSum: boolean;
     targetMs: number | null;
+    intervalSeconds: number;
+    dropCount: number;
   };
   usdcDecimals: number;
   sablierAddress: Address;
@@ -1711,14 +1890,19 @@ function SuccessView({
   // directly in render is impure (react-hooks/purity) and would drift the
   // displayed end date across re-renders.
   const [now] = useState(() => Math.floor(Date.now() / 1000));
+  // For daily reloads targetMs is the FIRST drop, not the end — only
+  // lock-until's targetMs marks the end of the lock.
   const endDate =
-    schedule.targetMs !== null
+    schedule.isLumpSum && schedule.targetMs !== null
       ? new Date(schedule.targetMs)
       : new Date((now + schedule.totalSeconds) * 1000);
 
   const nextUnlock = (() => {
     if (schedule.targetMs !== null) {
       return formatTargetDate(schedule.targetMs);
+    }
+    if (schedule.kind === "strict") {
+      return `First payout in ${formatDuration(schedule.cliffSeconds + schedule.intervalSeconds)}`;
     }
     if (schedule.isLumpSum) {
       const d = Math.floor(schedule.totalSeconds / 86400);
