@@ -1,11 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   CHAINS,
   DEFAULT_CHAIN_ID,
+  DEPLOYMENT_CHAINS,
   SUPPORTED_CHAIN_IDS,
   getChainConfig,
   isSupportedChain,
   isSupportedDeploymentChain,
+  parseRpcOverrides,
 } from "./chains";
 
 describe("chain registry", () => {
@@ -40,8 +42,10 @@ describe("chain registry", () => {
       expect(chain.usdc, `${chain.name} usdc`).toMatch(/^0x[a-fA-F0-9]{40}$/);
       expect(chain.treasury, `${chain.name} treasury`).toMatch(/^0x[a-fA-F0-9]{40}$/);
       expect(chain.usdcDecimals, `${chain.name} usdcDecimals`).toBeGreaterThan(0);
-      expect(chain.streamStartBlock > BigInt(0), `${chain.name} streamStartBlock`).toBe(true);
-      expect(chain.logChunkSize > BigInt(0), `${chain.name} logChunkSize`).toBe(true);
+      expect(chain.rpcUrls.length, `${chain.name} rpcUrls`).toBeGreaterThan(0);
+      for (const url of chain.rpcUrls) {
+        expect(url, `${chain.name} rpcUrl`).toMatch(/^https:\/\//);
+      }
       expect(chain.explorerUrl, `${chain.name} explorerUrl`).toMatch(/^https:\/\//);
     }
   });
@@ -100,6 +104,46 @@ describe("chain registry", () => {
     const expected = [1, 10, 56, 137, 8453, 42161, 43114];
     for (const id of expected) {
       expect(isSupportedChain(id), `chainId ${id} must be in the registry`).toBe(true);
+    }
+  });
+});
+
+describe("DEPLOYMENT_CHAINS", () => {
+  it("only contains chains matching the default chain's testnet flag", () => {
+    const flag = getChainConfig(DEFAULT_CHAIN_ID).isTestnet;
+    expect(DEPLOYMENT_CHAINS.length).toBeGreaterThan(0);
+    for (const chain of DEPLOYMENT_CHAINS) {
+      expect(chain.isTestnet, chain.name).toBe(flag);
+    }
+    expect(DEPLOYMENT_CHAINS.some((c) => c.chainId === DEFAULT_CHAIN_ID)).toBe(true);
+  });
+});
+
+describe("parseRpcOverrides", () => {
+  it("returns no overrides for an unset variable", () => {
+    expect(parseRpcOverrides(undefined)).toEqual({});
+    expect(parseRpcOverrides("")).toEqual({});
+  });
+
+  it("parses a chainId-keyed object of https URLs", () => {
+    expect(
+      parseRpcOverrides('{"8453":"https://base.example/v2/key","1":"https://eth.example"}'),
+    ).toEqual({ 8453: "https://base.example/v2/key", 1: "https://eth.example" });
+  });
+
+  it("degrades to public defaults on malformed input instead of throwing", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(parseRpcOverrides("{not json")).toEqual({});
+      expect(parseRpcOverrides('["https://a"]')).toEqual({});
+      expect(parseRpcOverrides('"https://a"')).toEqual({});
+      // Bad entries are dropped individually; good ones survive.
+      expect(
+        parseRpcOverrides('{"base":"https://a","8453":"http://insecure","1":"https://ok"}'),
+      ).toEqual({ 1: "https://ok" });
+      expect(error).toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
     }
   });
 });

@@ -80,6 +80,7 @@ Key env vars in `packages/app/.env.local`:
 - `NEXT_PUBLIC_USDC_ADDRESS` — override for testnet address
 - `NEXT_PUBLIC_TREASURY_ADDRESS` — broker fee recipient. Set to zero address to disable the fee (useful on testnet).
 - `NEXT_PUBLIC_WC_PROJECT_ID` — WalletConnect project ID
+- `NEXT_PUBLIC_RPC_URLS` — optional JSON object of keyed RPC URLs by chainId (e.g. `{"8453":"https://..."}`). Prepended to the vetted public RPC list in `packages/app/src/config/chains.ts`.
 
 ```bash
 pnpm --filter app test        # vitest

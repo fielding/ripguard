@@ -82,6 +82,16 @@ export const sablierLockupAbi = [
     outputs: [{ name: "withdrawableAmount", type: "uint128" }],
     stateMutability: "view",
   },
+  // ERC-721 owner lookup. The stream NFT's owner is the recipient who can
+  // withdraw; /vaults uses it to confirm a device-remembered stream ID still
+  // belongs to the connected wallet before rendering it.
+  {
+    type: "function",
+    name: "ownerOf",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "owner", type: "address" }],
+    stateMutability: "view",
+  },
   {
     type: "function",
     name: "withdrawMax",
