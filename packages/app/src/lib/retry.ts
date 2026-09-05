@@ -1,4 +1,4 @@
-/** Retry a transaction-sending function with exponential backoff.
+/** Retry an async operation with exponential backoff.
  *
  *  Useful for RPC rate-limits and transient network errors.
  *  User rejections are never retried. */
@@ -14,9 +14,14 @@ export interface RetryOptions {
   backoffFactor?: number;
   /** Maximum delay cap in ms. Default: 10000 */
   maxDelay?: number;
+  /** Decide whether a failure is worth another attempt. Defaults to a
+   *  message sniff for network / rate-limit wording, which is all a
+   *  wallet-surfaced RPC error gives us. Callers with typed errors should
+   *  pass something precise. User rejections are never retried regardless. */
+  shouldRetry?: (error: Error) => boolean;
 }
 
-const DEFAULTS: Required<RetryOptions> = {
+const DEFAULTS: Required<Omit<RetryOptions, "shouldRetry">> = {
   maxAttempts: 3,
   baseDelay: 1000,
   backoffFactor: 2,
@@ -25,8 +30,6 @@ const DEFAULTS: Required<RetryOptions> = {
 
 /** Returns true for errors that are safe to retry (network/RPC issues). */
 function isRetryable(error: Error): boolean {
-  if (isUserRejection(error)) return false;
-
   const msg = error.message?.toLowerCase() ?? "";
   return (
     msg.includes("network") ||
@@ -45,6 +48,7 @@ export async function retryWithBackoff<T>(
   options?: RetryOptions,
 ): Promise<T> {
   const opts = { ...DEFAULTS, ...options };
+  const shouldRetry = options?.shouldRetry ?? isRetryable;
   let lastError: Error | null = null;
   let delay = opts.baseDelay;
 
@@ -54,7 +58,11 @@ export async function retryWithBackoff<T>(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
-      if (!isRetryable(lastError) || attempt === opts.maxAttempts) {
+      if (
+        isUserRejection(lastError) ||
+        !shouldRetry(lastError) ||
+        attempt === opts.maxAttempts
+      ) {
         throw lastError;
       }
 

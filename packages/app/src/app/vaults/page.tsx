@@ -4,7 +4,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { useState, useEffect, useCallback } from "react";
-import { parseAbiItem, type Address, type PublicClient } from "viem";
+import { type Address } from "viem";
 import {
   useAccount,
   useChainId,
@@ -14,7 +14,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID, type ChainConfig } from "@/config/chains";
+import { DEPLOYMENT_CHAINS, getChainConfig, isSupportedDeploymentChain, DEFAULT_CHAIN_ID } from "@/config/chains";
 import { IS_TESTNET } from "@/config/contracts";
 import { sablierLockupAbi } from "@/config/abis";
 import { WrongChainPanel } from "@/components/WrongChainPanel";
@@ -24,19 +24,15 @@ import { useToast } from "@/components/Toast";
 import { trackClaim, trackContractError } from "@/lib/analytics";
 import { formatTokenAmount } from "@/lib/format";
 import { isUserRejection, extractErrorReason } from "@/lib/errors";
-
-// Sablier Envio indexer — single endpoint, no API key, supports all chains.
-// Per-chain selection happens via the `chainId` filter in the GraphQL query.
-const SABLIER_SUBGRAPH = "https://indexer.hyperindex.xyz/53b7e25/v1/graphql";
-
-type SubgraphStream = {
-  tokenId: string;
-  depositAmount: string;
-  withdrawnAmount: string;
-  startTime: string;
-  endTime: string;
-  cliffTime: string | null;
-};
+import {
+  fetchIndexedStreamsWithRetry,
+  getScheduleType,
+  knownStreamIds,
+  readStreamsOnChain,
+  rememberStreamIds,
+  splitByChain,
+  type StreamRecord,
+} from "@/lib/vaults";
 
 type Tranche = { amount: bigint; timestamp: number };
 
@@ -65,17 +61,6 @@ function formatCountdown(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
-}
-
-function getScheduleType(
-  cliffSeconds: number,
-  totalSeconds: number,
-  isTranched = false,
-): string {
-  if (isTranched) return "Strict Payouts";
-  if (cliffSeconds === totalSeconds && cliffSeconds > 0) return "One Drop";
-  if (cliffSeconds > 0) return "Wait, then reloads";
-  return "Steady reloads";
 }
 
 // Prefer the preset label the user picked on /create (stored at lock time).
@@ -351,105 +336,6 @@ function VaultSkeleton() {
   );
 }
 
-// ERC-721 Transfer event for stream discovery fallback
-const transferEvent = parseAbiItem(
-  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
-);
-
-async function fetchFromSubgraph(
-  address: Address,
-  chainId: number,
-  sablierAddress: Address
-): Promise<SubgraphStream[]> {
-  const query = `{
-    LockupStream(
-      where: {
-        recipient: { _eq: "${address.toLowerCase()}" }
-        chainId: { _eq: "${chainId.toString()}" }
-        contract: { _eq: "${sablierAddress.toLowerCase()}" }
-      }
-      order_by: { startTime: desc }
-    ) {
-      tokenId
-      depositAmount
-      withdrawnAmount
-      startTime
-      endTime
-      cliffTime
-    }
-  }`;
-
-  const res = await fetch(SABLIER_SUBGRAPH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-  });
-
-  if (!res.ok) throw new Error(`Subgraph returned ${res.status}`);
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0]?.message || "Subgraph query failed");
-  return json.data?.LockupStream ?? [];
-}
-
-async function fetchFromChain(
-  publicClient: PublicClient,
-  address: Address,
-  chainConfig: ChainConfig,
-): Promise<SubgraphStream[]> {
-  const { sablierLockup, streamStartBlock, logChunkSize } = chainConfig;
-  const toBlock = await publicClient.getBlockNumber();
-  const allTokenIds: bigint[] = [];
-  let from = streamStartBlock;
-
-  while (from <= toBlock) {
-    const to = from + logChunkSize > toBlock ? toBlock : from + logChunkSize;
-    const chunk = await publicClient.getLogs({
-      address: sablierLockup,
-      event: transferEvent,
-      args: { from: "0x0000000000000000000000000000000000000000", to: address },
-      fromBlock: from,
-      toBlock: to,
-    });
-    for (const log of chunk) {
-      if (log.args.tokenId != null) allTokenIds.push(log.args.tokenId);
-    }
-    from = to + BigInt(1);
-  }
-
-  if (allTokenIds.length === 0) return [];
-
-  const ids = allTokenIds;
-
-  // Multicall: 5 reads per stream (startTime, endTime, cliffTime, deposited, withdrawn)
-  const calls = ids.flatMap((id) => [
-    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getStartTime" as const, args: [id] as const },
-    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getEndTime" as const, args: [id] as const },
-    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getCliffTime" as const, args: [id] as const },
-    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getDepositedAmount" as const, args: [id] as const },
-    { address: sablierLockup, abi: sablierLockupAbi, functionName: "getWithdrawnAmount" as const, args: [id] as const },
-  ]);
-
-  const results = await publicClient.multicall({ contracts: calls });
-
-  return ids.map((id, i) => {
-    const base = i * 5;
-    const startTime = results[base].result as number;
-    const endTime = results[base + 1].result as number;
-    const cliffTime = results[base + 2].result as number;
-    const deposited = results[base + 3].result as bigint;
-    const withdrawn = results[base + 4].result as bigint;
-
-    return {
-      tokenId: id.toString(),
-      depositAmount: deposited.toString(),
-      withdrawnAmount: withdrawn.toString(),
-      startTime: startTime.toString(),
-      endTime: endTime.toString(),
-      cliffTime: cliffTime > 0 ? cliffTime.toString() : null,
-    };
-  });
-}
-
 function VaultDashboard() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -464,21 +350,25 @@ function VaultDashboard() {
   const publicClient = usePublicClient();
   const { toast } = useToast();
 
-  const [subgraphStreams, setSubgraphStreams] = useState<SubgraphStream[]>([]);
+  const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<bigint | null>(null);
   const [fetchKey, setFetchKey] = useState(0);
-  const [fetchSource, setFetchSource] = useState<"subgraph" | "onchain" | null>(null);
-  // Other-chain probe — when the current chain returns 0 streams, fan
-  // out to the rest of the deployment's chains so we can tell users
-  // exactly where their vaults actually live. The "vault vanished"
-  // support hits we've seen are almost all wallet-on-wrong-chain.
+  const [fetchSource, setFetchSource] = useState<"indexer" | "onchain" | null>(null);
+  // Vault counts on the deployment's other chains, from the same indexer
+  // response. The "vault vanished" support hits we've seen are almost all
+  // wallet-on-wrong-chain, so when the current chain is empty we can say
+  // exactly where the locks live.
   const [otherChainStreams, setOtherChainStreams] = useState<
     Array<{ chainId: number; chainName: string; count: number }>
   >([]);
 
-  // Fetch streams: subgraph first, on-chain fallback
+  // Discovery: one indexer query covering every deployment chain (the
+  // indexer rate-limits per IP, so a per-chain fan-out is the wrong shape).
+  // If it is down or throttled past our retries, fall back to the stream IDs
+  // this device already knows and read their state straight from the chain.
+  // See lib/vaults.ts for why scanning Transfer logs is not the fallback.
   useEffect(() => {
     if (!isConnected || !address) return;
 
@@ -486,33 +376,41 @@ function VaultDashboard() {
     setIsLoadingEvents(true);
     setFetchError(null);
     setFetchSource(null);
+    const storage = typeof window !== "undefined" ? window.localStorage : null;
 
     (async () => {
       try {
-        const streams = await fetchFromSubgraph(address, chainId, sablierLockup);
-        if (!cancelled) {
-          setSubgraphStreams(streams);
-          setFetchSource("subgraph");
-        }
-      } catch (subgraphErr) {
-        // Subgraph unavailable — fall back to on-chain
-        trackContractError({ action: "fetchVaults", error: String(subgraphErr), contract: "SablierLockup" });
+        const all = await fetchIndexedStreamsWithRetry(address, DEPLOYMENT_CHAINS);
+        const { current, elsewhere } = splitByChain(all, chainId);
+        rememberStreamIds(storage, chainId, address, current.map((s) => s.tokenId));
+        if (cancelled) return;
+        setStreams(current);
+        setOtherChainStreams(
+          elsewhere.map((c) => ({ ...c, chainName: getChainConfig(c.chainId).name })),
+        );
+        setFetchSource("indexer");
+      } catch (indexerErr) {
+        trackContractError({ action: "fetchVaults", error: String(indexerErr), contract: "SablierLockup" });
 
-        if (!publicClient) {
-          if (!cancelled) setFetchError("Wallet not connected. Please reconnect and try again.");
+        const ids = knownStreamIds(storage, chainId, address);
+        if (!publicClient || ids.length === 0) {
+          if (!cancelled) {
+            setFetchError("The vault indexer is busy right now. Try again in a moment.");
+          }
           return;
         }
 
         try {
-          const streams = await fetchFromChain(publicClient, address, chainConfig);
+          const known = await readStreamsOnChain(publicClient, chainConfig, address, ids);
           if (!cancelled) {
-            setSubgraphStreams(streams);
+            setStreams(known);
+            setOtherChainStreams([]);
             setFetchSource("onchain");
           }
         } catch (chainErr) {
           trackContractError({ action: "fetchVaults:onchain", error: String(chainErr), contract: "SablierLockup" });
           if (!cancelled) {
-            setFetchError("Failed to load vaults. Try again in a moment.");
+            setFetchError("Couldn't read your vaults from the chain. Try again in a moment.");
           }
         }
       } finally {
@@ -521,64 +419,14 @@ function VaultDashboard() {
     })();
 
     return () => { cancelled = true; };
-  }, [address, isConnected, publicClient, fetchKey, chainId, sablierLockup, chainConfig]);
+  }, [address, isConnected, publicClient, fetchKey, chainId, chainConfig]);
 
   const retryFetch = useCallback(() => setFetchKey((k) => k + 1), []);
-
-  // Cross-chain probe: when the current chain comes back empty, hit
-  // every other deployment chain's subgraph in parallel and surface
-  // the counts. Cheap (one subgraph query per chain), and tells users
-  // exactly where their vaults live when the wallet is on the wrong
-  // chain. Subgraph-only by design — chain-scan fallback would be
-  // catastrophic to fan out across 6 chains on mobile.
-  useEffect(() => {
-    if (
-      !isConnected ||
-      !address ||
-      isLoadingEvents ||
-      fetchError ||
-      subgraphStreams.length > 0
-    ) {
-      setOtherChainStreams([]);
-      return;
-    }
-    let cancelled = false;
-    const otherChains = Object.values(CHAINS).filter(
-      (c) => c.isTestnet === IS_TESTNET && c.chainId !== chainId,
-    );
-    Promise.all(
-      otherChains.map(async (c) => {
-        try {
-          const streams = await fetchFromSubgraph(
-            address,
-            c.chainId,
-            c.sablierLockup,
-          );
-          return { chainId: c.chainId, chainName: c.name, count: streams.length };
-        } catch {
-          return { chainId: c.chainId, chainName: c.name, count: 0 };
-        }
-      }),
-    ).then((results) => {
-      if (cancelled) return;
-      setOtherChainStreams(results.filter((r) => r.count > 0));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    address,
-    chainId,
-    fetchError,
-    isConnected,
-    isLoadingEvents,
-    subgraphStreams.length,
-  ]);
 
   // Clear vault state when wallet disconnects
   useEffect(() => {
     if (!isConnected) {
-      setSubgraphStreams([]);
+      setStreams([]);
       setFetchError(null);
       setClaimingId(null);
       setOtherChainStreams([]);
@@ -586,7 +434,7 @@ function VaultDashboard() {
   }, [isConnected]);
 
   // Only need on-chain call for live claimable amount (1 call per stream)
-  const streamIds = subgraphStreams.map((s) => BigInt(s.tokenId));
+  const streamIds = streams.map((s) => s.tokenId);
   const claimableContracts = streamIds.map((id) => ({
     address: sablierLockup,
     abi: sablierLockupAbi,
@@ -623,13 +471,9 @@ function VaultDashboard() {
 
   // Build vault data from subgraph + on-chain claimable
   let failedStreamCount = 0;
-  const vaults: VaultData[] = subgraphStreams
+  const vaults: VaultData[] = streams
     .map((stream, i) => {
-      const startTime = Number(stream.startTime);
-      const endTime = Number(stream.endTime);
-      const cliffTime = stream.cliffTime ? Number(stream.cliffTime) : 0;
-      const deposited = BigInt(stream.depositAmount);
-      const withdrawn = BigInt(stream.withdrawnAmount);
+      const { startTime, endTime, cliffTime, deposited, withdrawn } = stream;
 
       const claimableResult = claimableResults?.[i];
       const claimable = claimableResult?.status === "success"
@@ -652,7 +496,7 @@ function VaultDashboard() {
       const cliffSeconds = cliffTime > 0 ? cliffTime - startTime : 0;
 
       return {
-        streamId: BigInt(stream.tokenId),
+        streamId: stream.tokenId,
         totalAmount: deposited,
         cliffSeconds,
         totalSeconds,
@@ -771,7 +615,7 @@ function VaultDashboard() {
       <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 px-6 text-center">
         <div className="eyebrow text-warning/80">Connection error</div>
         <h3 className="font-display text-3xl tracking-tight max-w-md">
-          Couldn&apos;t reach the chain.
+          Couldn&apos;t load your vaults.
         </h3>
         <p className="text-muted text-sm max-w-sm leading-relaxed">
           {fetchError} Your vaults are unaffected. They live in Sablier.
@@ -871,15 +715,19 @@ function VaultDashboard() {
     );
   }
 
-  // Aggregate stats (only compute when we have multiple vaults)
+  // Aggregate stats (only when there are multiple vaults). "Still locked" is
+  // what has not unlocked yet — deposits minus claimed minus claimable — so it
+  // never repeats a single card's "Total locked" figure or counts a fully
+  // claimed test lock as money still in a vault. Both misreads came up in
+  // support as "it merged my vaults" / "the balance is off".
   const totals = vaults.length >= 2
     ? vaults.reduce(
         (acc, v) => ({
-          locked: acc.locked + v.deposited,
+          stillLocked: acc.stillLocked + (v.deposited - v.withdrawn - v.claimable),
           claimable: acc.claimable + v.claimable,
           claimed: acc.claimed + v.withdrawn,
         }),
-        { locked: BigInt(0), claimable: BigInt(0), claimed: BigInt(0) }
+        { stillLocked: BigInt(0), claimable: BigInt(0), claimed: BigInt(0) }
       )
     : null;
 
@@ -891,7 +739,10 @@ function VaultDashboard() {
         </p>
       )}
       {totals && (
-        <div className="border-y border-line py-7">
+        <div className="border-y border-line py-7 space-y-4">
+          <div className="eyebrow text-faint">
+            Across {vaults.length} vaults on {chainConfig.name}
+          </div>
           <ul className="flex flex-wrap items-baseline gap-x-10 gap-y-5">
             {/* Primary: the actionable number */}
             <li className="flex items-baseline gap-3">
@@ -905,9 +756,9 @@ function VaultDashboard() {
             {/* Context: what's behind it */}
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
-                {formatTokenAmount(totals.locked, usdcDecimals)}
+                {formatTokenAmount(totals.stillLocked, usdcDecimals)}
               </span>
-              <span className="eyebrow text-faint">Total locked</span>
+              <span className="eyebrow text-faint">Still locked</span>
             </li>
             <li className="flex items-baseline gap-2">
               <span className="font-display text-foreground text-xl tabular tracking-tight">
@@ -921,7 +772,12 @@ function VaultDashboard() {
       {fetchSource === "onchain" && (
         <div className="flex items-center gap-2 text-xs text-faint tabular">
           <span className="w-1.5 h-1.5 rounded-full bg-warning/70" />
-          Loaded from on-chain (indexer unavailable)
+          <span>
+            Indexer unavailable. Showing the locks this device knows about.{" "}
+            <button onClick={retryFetch} className="underline hover:text-foreground transition-colors">
+              Retry
+            </button>
+          </span>
         </div>
       )}
       {failedStreamCount > 0 && (

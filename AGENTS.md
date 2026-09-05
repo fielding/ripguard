@@ -48,3 +48,17 @@ When updating this file, preserve this bar for all agents and keep entries conci
   500; tranche amounts must sum exactly to the post-broker-fee net deposit or the
   create reverts — always go through `computeTranches`/`sablierNetDeposit` in
   `packages/app/src/lib/schedule.ts`.
+
+## RPC transports + vault discovery (EVM app)
+
+- Never let a chain fall back to viem's built-in default RPC. Ethereum's
+  (`eth.merkle.io`) rejects CORS preflight, and RainbowKit runs mainnet ENS
+  lookups on every page whenever chain 1 is configured — that was the console
+  CORS storm on ripguard.xyz. Each chain's RPC list lives in
+  `packages/app/src/config/chains.ts` (`rpcUrls`, each checked for a permissive
+  preflight); `NEXT_PUBLIC_RPC_URLS` prepends a keyed provider per chain.
+- Never rediscover streams by scanning Transfer logs. Public RPCs cap
+  `eth_getLogs` at 1k–10k blocks (BSC: 1,000), so the scan is tens of thousands
+  of calls. Discovery is the Sablier Envio indexer — one query for all
+  deployment chains, since it allows 250 req/min per IP — with a fallback to
+  stream IDs the device already knows (`packages/app/src/lib/vaults.ts`).
