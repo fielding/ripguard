@@ -31,3 +31,20 @@ Keep this file for knowledge useful to almost every future agent session in this
 Do not repeat what the codebase already shows; point to the authoritative file or command instead.
 Prefer rewriting or pruning existing entries over appending new ones.
 When updating this file, preserve this bar for all agents and keep entries concise.
+
+## Deploy + verification conventions
+
+- After every prod merge, fast-forward the testnet deployment branch:
+  `git push origin origin/main:testnet`. Both Vercel prods build from their branch.
+- `NEXT_PUBLIC_*` env vars bake at build time — changing one on Vercel does nothing
+  until a redeploy (bit us in the 2026-08-19 Helius key outage).
+- Contract-touching changes can be verified without a funded wallet or foundry:
+  viem `simulateBlocks` (eth_simulateV1) against `https://sepolia.base.org`, using a
+  balance stateOverride + TestUSDC `faucet()` → `approve` → create. Put heavy calls
+  in separate simulated blocks — several multi-million-gas calls in one block hit the
+  shared block-gas ceiling and revert positionally, which looks like a contract limit
+  but isn't.
+- Sablier Lockup Tranched facts (probed on-chain, not docs): tranche cap is exactly
+  500; tranche amounts must sum exactly to the post-broker-fee net deposit or the
+  create reverts — always go through `computeTranches`/`sablierNetDeposit` in
+  `packages/app/src/lib/schedule.ts`.
