@@ -25,6 +25,15 @@ Verify a deploy the way Vercel does, not the way CI does:
 `cd packages/<app> && CI=1 pnpm install && ./node_modules/.bin/next build`.
 A green `pnpm install --frozen-lockfile` at the repo root does not exercise this path.
 
+Because `rootDirectory` is set, Vercel reads `vercel.json` from `packages/<app>/`, not
+the repo root. Each package's `vercel.json` wires `scripts/vercel-ignore.sh` as the
+Ignored Build Step: it skips Preview builds of `main`/`testnet` (each is production for
+one project and a wasted Preview on the others) and skips any build where nothing under
+the package or the workspace manifests changed since the last successful deployment.
+Every retained deployment holds a ~23 MB function bundle, and Vercel keeps the last 20
+production + 20 preview deployments per project regardless of retention policy, so
+deployment count is what drives Functions Storage.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
